@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// execCommand is a variable to allow mocking exec.Command in tests
+var execCommand = exec.Command
+
 // AgentTask represents a GitHub Copilot agent task session
 type AgentTask struct {
 	ID         string    `json:"id"`
@@ -28,7 +31,7 @@ func FetchAgentTasks(repo string) ([]AgentTask, error) {
 		args = append(args, "-R", repo)
 	}
 
-	cmd := exec.Command("gh", args...)
+	cmd := execCommand("gh", args...)
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch agent tasks: %w", err)
@@ -49,7 +52,7 @@ func FetchAgentTaskDetail(id string, repo string) (*AgentTask, error) {
 		args = append(args, "-R", repo)
 	}
 
-	cmd := exec.Command("gh", args...)
+	cmd := execCommand("gh", args...)
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch agent task detail: %w", err)
@@ -70,7 +73,7 @@ func FetchAgentTaskLog(id string, repo string) (string, error) {
 		args = append(args, "-R", repo)
 	}
 
-	cmd := exec.Command("gh", args...)
+	cmd := execCommand("gh", args...)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch agent task log: %w", err)

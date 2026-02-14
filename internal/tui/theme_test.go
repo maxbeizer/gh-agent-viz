@@ -66,6 +66,7 @@ func TestNewTheme(t *testing.T) {
 		t.Fatal("expected non-nil theme")
 	}
 
-	// Basic verification that theme was created successfully
-	// The styles should be configured with different properties
+	// Verify the theme was successfully created
+	// lipgloss.Style fields contain functions and cannot be compared directly,
+	// so we just verify the function completed successfully and returned a theme
 }

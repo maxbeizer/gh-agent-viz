@@ -66,11 +66,6 @@ func TestNewTheme(t *testing.T) {
 		t.Fatal("expected non-nil theme")
 	}
 
-	// Verify that all style fields are initialized (basic check)
-	// We can't easily test the exact colors without rendering, but we can
-	// verify the theme was created and has non-zero styles
-	if theme.Title.String() == theme.Footer.String() {
-		// If all styles are identical, something is wrong
-		// This is a simple check that styles are being configured
-	}
+	// Basic verification that theme was created successfully
+	// The styles should be configured with different properties
 }

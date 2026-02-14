@@ -1,0 +1,7 @@
+gh-agent-viz
+dist/
+vendor/
+*.exe
+*.test
+*.out
+go.work

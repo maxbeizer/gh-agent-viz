@@ -4,16 +4,16 @@ import "github.com/charmbracelet/lipgloss"
 
 // Theme contains all Lip Gloss styles for the UI
 type Theme struct {
-	StatusRunning   lipgloss.Style
-	StatusQueued    lipgloss.Style
-	StatusCompleted lipgloss.Style
-	StatusFailed    lipgloss.Style
-	TableHeader     lipgloss.Style
-	TableRow        lipgloss.Style
+	StatusRunning    lipgloss.Style
+	StatusQueued     lipgloss.Style
+	StatusCompleted  lipgloss.Style
+	StatusFailed     lipgloss.Style
+	TableHeader      lipgloss.Style
+	TableRow         lipgloss.Style
 	TableRowSelected lipgloss.Style
-	Border          lipgloss.Style
-	Title           lipgloss.Style
-	Footer          lipgloss.Style
+	Border           lipgloss.Style
+	Title            lipgloss.Style
+	Footer           lipgloss.Style
 }
 
 // NewTheme creates a default theme

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
@@ -57,7 +57,7 @@ func (m Model) View() string {
 	}
 
 	var rows []string
-	
+
 	// Header
 	header := m.tableHeaderStyle.Render("    Repository                       Task                                                     Updated")
 	rows = append(rows, header)
@@ -141,4 +141,3 @@ func formatTime(t time.Time) string {
 		return t.Format("Jan 2")
 	}
 }
-

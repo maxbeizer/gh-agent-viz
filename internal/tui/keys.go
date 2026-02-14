@@ -4,15 +4,15 @@ import "github.com/charmbracelet/bubbles/key"
 
 // Keybindings holds all key bindings for the application
 type Keybindings struct {
-	MoveUp         key.Binding
-	MoveDown       key.Binding
-	SelectTask     key.Binding
-	ShowLogs       key.Binding
-	OpenInBrowser  key.Binding
-	RefreshData    key.Binding
-	ExitApp        key.Binding
-	ToggleFilter   key.Binding
-	NavigateBack   key.Binding
+	MoveUp        key.Binding
+	MoveDown      key.Binding
+	SelectTask    key.Binding
+	ShowLogs      key.Binding
+	OpenInBrowser key.Binding
+	RefreshData   key.Binding
+	ExitApp       key.Binding
+	ToggleFilter  key.Binding
+	NavigateBack  key.Binding
 }
 
 // NewKeybindings creates the default key bindings for the TUI

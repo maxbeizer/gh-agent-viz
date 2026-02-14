@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
-	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // Model represents the log view component state
@@ -43,7 +43,7 @@ func (m Model) View() string {
 	if !m.ready {
 		return "Loading logs..."
 	}
-	
+
 	if m.content == "" {
 		return m.titleStyle.Render("No logs available")
 	}

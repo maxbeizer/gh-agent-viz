@@ -1,0 +1,13 @@
+# Example configuration file for gh-agent-viz
+# Save this as ~/.gh-agent-viz.yml to customize the TUI behavior
+
+# List of repositories to watch (optional)
+repos:
+  - maxbeizer/gh-agent-viz
+  - owner/another-repo
+
+# Refresh interval in seconds (default: 30)
+refreshInterval: 30
+
+# Default status filter: all, active, completed, failed (default: all)
+defaultFilter: all

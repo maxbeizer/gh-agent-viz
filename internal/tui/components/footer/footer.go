@@ -19,7 +19,7 @@ func New(style lipgloss.Style, keys []key.Binding) Model {
 	for _, k := range keys {
 		hints = append(hints, k.Help().Key+" "+k.Help().Desc)
 	}
-	
+
 	return Model{
 		style: style,
 		hints: hints,

@@ -2,10 +2,10 @@ package tui
 
 // ProgramContext holds shared state and configuration for the TUI
 type ProgramContext struct {
-	Config      interface{} // Placeholder for config
-	Width       int
-	Height      int
-	Error       error
+	Config       interface{} // Placeholder for config
+	Width        int
+	Height       int
+	Error        error
 	StatusFilter string // "all", "active", "completed", "failed"
 }
 

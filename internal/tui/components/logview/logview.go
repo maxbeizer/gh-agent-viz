@@ -13,6 +13,7 @@ type Model struct {
 	titleStyle lipgloss.Style
 	viewport   viewport.Model
 	content    string
+	lineCount  int // Cache line count for performance
 	ready      bool
 }
 
@@ -54,6 +55,7 @@ func (m Model) View() string {
 // SetContent updates the log content
 func (m *Model) SetContent(content string) {
 	m.content = content
+	m.lineCount = len(strings.Split(content, "\n"))
 	m.viewport.SetContent(content)
 	m.ready = true
 }
@@ -99,7 +101,7 @@ func (m *Model) HalfPageUp() {
 
 // LineDown scrolls down one line
 func (m *Model) LineDown() {
-	if m.viewport.YOffset < len(strings.Split(m.content, "\n"))-m.viewport.Height {
+	if m.viewport.YOffset < m.lineCount-m.viewport.Height {
 		m.viewport.LineDown(1)
 	}
 }

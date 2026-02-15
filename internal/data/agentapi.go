@@ -3,7 +3,9 @@ package data
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +13,23 @@ import (
 
 // execCommand is a variable to allow mocking exec.Command in tests.
 var execCommand = exec.Command
+var debugEnabled bool
+
+const debugLogFileName = ".gh-agent-viz-debug.log"
+
+// SetDebug enables or disables debug logging for data-layer command execution.
+func SetDebug(enabled bool) {
+	debugEnabled = enabled
+}
+
+// DebugLogPath returns the location of the debug log file.
+func DebugLogPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return debugLogFileName
+	}
+	return filepath.Join(home, debugLogFileName)
+}
 
 // AgentTask represents a GitHub Copilot agent task session
 type AgentTask struct {
@@ -23,6 +42,7 @@ type AgentTask struct {
 	PRNumber   int       `json:"prNumber"`
 	CreatedAt  time.Time `json:"createdAt"`
 	UpdatedAt  time.Time `json:"updatedAt"`
+	Source     string    `json:"source"` // "agent-task" or "local"
 }
 
 // FetchAgentTasks retrieves the list of agent tasks, optionally scoped to a repository
@@ -31,11 +51,15 @@ func FetchAgentTasks(repo string) ([]AgentTask, error) {
 	if repo != "" {
 		jsonArgs = append(jsonArgs, "-R", repo)
 	}
-	jsonOutput, jsonErr := execCommand("gh", jsonArgs...).CombinedOutput()
+	jsonOutput, jsonErr := runGH(jsonArgs...)
 	if jsonErr == nil {
 		var tasks []AgentTask
 		if err := json.Unmarshal(jsonOutput, &tasks); err != nil {
 			return nil, fmt.Errorf("failed to parse agent tasks: %w", err)
+		}
+		// Set source for all tasks from agent-task CLI
+		for i := range tasks {
+			tasks[i].Source = "agent-task"
 		}
 		return tasks, nil
 	}
@@ -45,7 +69,7 @@ func FetchAgentTasks(repo string) ([]AgentTask, error) {
 		return nil, fmt.Errorf("failed to fetch agent tasks: %s", strings.TrimSpace(string(jsonOutput)))
 	}
 
-	output, err := execCommand("gh", "agent-task", "list").CombinedOutput()
+	output, err := runGH("agent-task", "list")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch agent tasks: %s", strings.TrimSpace(string(output)))
 	}
@@ -80,6 +104,7 @@ func FetchAgentTasks(repo string) ([]AgentTask, error) {
 			PRURL:      fmt.Sprintf("https://github.com/%s/pull/%d", taskRepo, prNumber),
 			PRNumber:   prNumber,
 			UpdatedAt:  updatedAt,
+			Source:     "agent-task",
 		})
 	}
 
@@ -97,12 +122,13 @@ func FetchAgentTaskDetail(id string, repo string) (*AgentTask, error) {
 		args = append(args, "-R", repo)
 	}
 
-	output, err := execCommand("gh", args...).CombinedOutput()
+	output, err := runGH(args...)
 	if err == nil {
 		var task AgentTask
 		if err := json.Unmarshal(output, &task); err != nil {
 			return nil, fmt.Errorf("failed to parse agent task detail: %w", err)
 		}
+		task.Source = "agent-task"
 		return &task, nil
 	}
 
@@ -116,7 +142,7 @@ func FetchAgentTaskDetail(id string, repo string) (*AgentTask, error) {
 		prArgs = append(prArgs, "-R", repo)
 	}
 
-	prOutput, prErr := execCommand("gh", prArgs...).CombinedOutput()
+	prOutput, prErr := runGH(prArgs...)
 	if prErr != nil {
 		return nil, fmt.Errorf("failed to fetch agent task detail: %s", strings.TrimSpace(string(prOutput)))
 	}
@@ -144,6 +170,7 @@ func FetchAgentTaskDetail(id string, repo string) (*AgentTask, error) {
 		PRNumber:   pr.Number,
 		CreatedAt:  pr.CreatedAt,
 		UpdatedAt:  pr.UpdatedAt,
+		Source:     "agent-task",
 	}, nil
 }
 
@@ -158,7 +185,7 @@ func FetchAgentTaskLog(id string, repo string) (string, error) {
 		args = append(args, "-R", repo)
 	}
 
-	output, err := execCommand("gh", args...).CombinedOutput()
+	output, err := runGH(args...)
 	if err != nil {
 		trimmed := strings.TrimSpace(string(output))
 		if strings.Contains(trimmed, "session ID is required") {
@@ -184,4 +211,34 @@ func normalizeStatus(status string) string {
 	default:
 		return normalized
 	}
+}
+
+func runGH(args ...string) ([]byte, error) {
+	output, err := execCommand("gh", args...).CombinedOutput()
+	if debugEnabled {
+		logDebugEntry(args, output, err)
+	}
+	return output, err
+}
+
+func logDebugEntry(args []string, output []byte, cmdErr error) {
+	f, err := os.OpenFile(DebugLogPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	status := "ok"
+	if cmdErr != nil {
+		status = cmdErr.Error()
+	}
+
+	_, _ = fmt.Fprintf(
+		f,
+		"[%s] gh %s\nstatus: %s\noutput:\n%s\n---\n",
+		time.Now().Format(time.RFC3339),
+		strings.Join(args, " "),
+		status,
+		strings.TrimSpace(string(output)),
+	)
 }

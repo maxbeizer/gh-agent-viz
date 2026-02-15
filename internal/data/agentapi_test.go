@@ -40,7 +40,7 @@ func TestHelperProcess(t *testing.T) {
 	}
 
 	testMode := os.Getenv("TEST_SCENARIO")
-	
+
 	if testMode == "list_success" {
 		result := []AgentTask{
 			{
@@ -55,7 +55,10 @@ func TestHelperProcess(t *testing.T) {
 				UpdatedAt:  time.Date(2024, 1, 2, 12, 0, 0, 0, time.UTC),
 			},
 		}
-		json.NewEncoder(os.Stdout).Encode(result)
+		if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 
@@ -81,7 +84,10 @@ func TestHelperProcess(t *testing.T) {
 			CreatedAt:  time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
 			UpdatedAt:  time.Date(2024, 1, 2, 12, 0, 0, 0, time.UTC),
 		}
-		json.NewEncoder(os.Stdout).Encode(result)
+		if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 
@@ -121,10 +127,10 @@ func createMockExecCommand(testScenario string) func(string, ...string) *exec.Cm
 		fullArgs := []string{"-test.run=TestHelperProcess", "--", commandName}
 		fullArgs = append(fullArgs, commandArgs...)
 		mockCmd := exec.Command(os.Args[0], fullArgs...)
-		mockCmd.Env = []string{
+		mockCmd.Env = append(os.Environ(),
 			"GO_WANT_HELPER_PROCESS=1",
-			"TEST_SCENARIO=" + testScenario,
-		}
+			"TEST_SCENARIO="+testScenario,
+		)
 		return mockCmd
 	}
 }

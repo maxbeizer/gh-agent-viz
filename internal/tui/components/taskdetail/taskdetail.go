@@ -11,7 +11,7 @@ import (
 type Model struct {
 	titleStyle  lipgloss.Style
 	borderStyle lipgloss.Style
-	task        *data.AgentTask
+	session     *data.Session
 	statusIcon  func(string) string
 }
 
@@ -24,31 +24,41 @@ func New(titleStyle, borderStyle lipgloss.Style, statusIconFunc func(string) str
 	}
 }
 
-// View renders the task detail pane
+// View renders the session detail pane
 func (m Model) View() string {
-	if m.task == nil {
-		return m.titleStyle.Render("No task selected")
+	if m.session == nil {
+		return m.titleStyle.Render("No session selected")
 	}
 
 	details := []string{
-		m.titleStyle.Render(m.task.Title),
+		m.titleStyle.Render(m.session.Title),
 		"",
-		fmt.Sprintf("Status:     %s %s", m.statusIcon(m.task.Status), m.task.Status),
-		fmt.Sprintf("Repository: %s", m.task.Repository),
-		fmt.Sprintf("Branch:     %s", m.task.Branch),
-		fmt.Sprintf("PR:         #%d", m.task.PRNumber),
-		fmt.Sprintf("PR URL:     %s", m.task.PRURL),
-		fmt.Sprintf("Created:    %s", m.task.CreatedAt.Format("2006-01-02 15:04:05")),
-		fmt.Sprintf("Updated:    %s", m.task.UpdatedAt.Format("2006-01-02 15:04:05")),
-		fmt.Sprintf("Task ID:    %s", m.task.ID),
+		fmt.Sprintf("Status:     %s %s", m.statusIcon(m.session.Status), m.session.Status),
+		fmt.Sprintf("Source:     %s", m.session.Source),
+		fmt.Sprintf("Repository: %s", m.session.Repository),
+		fmt.Sprintf("Branch:     %s", m.session.Branch),
 	}
+
+	// Add PR info for agent-task sessions
+	if m.session.Source == data.SourceAgentTask {
+		details = append(details,
+			fmt.Sprintf("PR:         #%d", m.session.PRNumber),
+			fmt.Sprintf("PR URL:     %s", m.session.PRURL),
+		)
+	}
+
+	details = append(details,
+		fmt.Sprintf("Created:    %s", m.session.CreatedAt.Format("2006-01-02 15:04:05")),
+		fmt.Sprintf("Updated:    %s", m.session.UpdatedAt.Format("2006-01-02 15:04:05")),
+		fmt.Sprintf("Session ID: %s", m.session.ID),
+	)
 
 	return m.borderStyle.Render(joinVertical(details))
 }
 
-// SetTask updates the task being displayed
-func (m *Model) SetTask(task *data.AgentTask) {
-	m.task = task
+// SetTask updates the session being displayed
+func (m *Model) SetTask(session *data.Session) {
+	m.session = session
 }
 
 func joinVertical(lines []string) string {

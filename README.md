@@ -7,9 +7,11 @@ An interactive terminal UI for visualizing GitHub Copilot coding agent sessions.
 - 📊 **Interactive TUI** - Browse agent sessions with keyboard navigation
 - 🔍 **Task Details** - View comprehensive task metadata (status, repo, branch, PR links)
 - 📝 **Log Viewer** - Scrollable, searchable agent task logs
+- 💻 **Local Sessions** - Automatically ingests local Copilot CLI sessions from `~/.copilot/session-state/`
 - 🎨 **Status Indicators** - Color-coded status icons (running, queued, completed, failed)
 - ⚡ **Quick Actions** - Open PRs in browser, refresh data, filter by status
 - ⌨️ **Vim-style Keys** - j/k navigation, familiar keybindings
+- 🛡️ **Tolerant Parsing** - Gracefully handles malformed session files without crashing
 
 ## Installation
 
@@ -120,6 +122,15 @@ Security is a core requirement for this project. See [docs/SECURITY.md](docs/SEC
 - **TUI Framework**: [Bubble Tea](https://github.com/charmbracelet/bubbletea) + [Lip Gloss](https://github.com/charmbracelet/lipgloss) + [Bubbles](https://github.com/charmbracelet/bubbles)
 - **CLI Framework**: [Cobra](https://github.com/spf13/cobra)
 - **Data Source**: `gh agent-task` commands with `--json` output
+
+### Data Sources
+
+gh-agent-viz pulls sessions from two sources:
+
+1. **Remote Agent Tasks**: Via `gh agent-task` CLI commands
+2. **Local Copilot Sessions**: From `~/.copilot/session-state/*/workspace.yaml`
+
+Both sources are displayed together in the unified session list. See [docs/LOCAL_SESSIONS.md](docs/LOCAL_SESSIONS.md) for details on local session ingestion.
 
 ### Project Structure
 

@@ -18,6 +18,19 @@ This document provides GitHub Copilot with full context about the gh-agent-viz p
 - **GitHub Integration**: [go-gh v2](https://github.com/cli/go-gh) — provides auth context from `gh auth`
 - **Build/Release**: GoReleaser for cross-platform binaries
 
+## Security-First Requirements (Critical)
+
+Security is a primary product goal, not an afterthought.
+
+- Never hardcode, print, or commit secrets, access tokens, cookies, or credentials.
+- Treat all CLI output and local files as untrusted input; parse defensively and fail safely.
+- Avoid shell command injection risks: use explicit argument arrays (`exec.Command`) instead of shell interpolation.
+- Do not silently ignore security-relevant errors; surface actionable failures to users.
+- Keep data minimization by default: collect only what is needed for UX and troubleshooting.
+- Any new telemetry or analytics capability must document privacy implications and opt-in behavior.
+- Prefer least-privilege behavior for file reads, command execution, and external calls.
+- Do not introduce network exfiltration paths for local session data without explicit user intent and documentation.
+
 ## Architecture
 
 Modeled on [`dlvhdr/gh-dash`](https://github.com/dlvhdr/gh-dash), which is the reference implementation for interactive Bubble Tea `gh` extensions (10k+ stars).
@@ -74,9 +87,11 @@ docs/
 - The Copilot CLI plugin system was evaluated and ruled out — it provides no terminal UI control (only skills, MCP servers, hooks, and custom agents within the conversation model)
 - There is no dedicated REST API for agent sessions yet — data comes from `gh agent-task` CLI commands
 - If a REST API appears in the future, switch to using `go-gh` REST client (`gh.DefaultRESTClient()`) directly
+- Changes that affect data handling, telemetry, or external integrations must update `docs/SECURITY.md`
 
 ## Testing
 
 - When writing tests, use Go's standard `testing` package
 - For TUI components, test the Model's Update function with specific messages and verify state changes
 - For the data layer, mock `exec.Command` output to test parsing without requiring `gh` to be installed
+- Add regression tests for parser hardening, malformed input handling, and error propagation paths

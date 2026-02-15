@@ -2,6 +2,7 @@ package tasklist
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -10,25 +11,19 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
-// Column widths for table alignment
-const (
-	statusWidth = 3   // Status icon (emoji)
-	sourceWidth = 6   // Source badge (emoji + padding)
-	repoWidth   = 30  // Repository name
-	titleWidth  = 52  // Task title
-)
-
 // Model represents the task list component state
 type Model struct {
-	titleStyle       lipgloss.Style
-	tableHeaderStyle lipgloss.Style
-	tableRowStyle    lipgloss.Style
-	tableRowSelected lipgloss.Style
-	tasks            []data.AgentTask
-	cursor           int
-	loading          bool
-	statusIcon       func(string) string
-	selectedTaskID   string // Store selected task ID for persistence
+	titleStyle        lipgloss.Style
+	tableHeaderStyle  lipgloss.Style
+	tableRowStyle     lipgloss.Style
+	tableRowSelected  lipgloss.Style
+	sessions          []data.Session
+	columnSessionIdx  [3][]int
+	activeColumn      int
+	rowCursor         [3]int
+	loading           bool
+	statusIcon        func(string) string
+	selectedSessionID string
 }
 
 // New creates a new task list model
@@ -38,8 +33,8 @@ func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, sta
 		tableHeaderStyle: headerStyle,
 		tableRowStyle:    rowStyle,
 		tableRowSelected: rowSelectedStyle,
-		tasks:            []data.AgentTask{},
-		cursor:           0,
+		sessions:         []data.Session{},
+		activeColumn:     0,
 		loading:          false,
 		statusIcon:       statusIconFunc,
 	}
@@ -55,106 +50,172 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// View renders the task list as a table
+// View renders the sessions as a kanban board
 func (m Model) View() string {
 	if m.loading {
-		return m.titleStyle.Render("Loading agent tasks...")
+		return m.titleStyle.Render("Loading sessions...")
 	}
 
-	if len(m.tasks) == 0 {
-		return m.titleStyle.Render("No agent tasks found\n\nTry:\n  • Refresh with 'r'\n  • Toggle filter with Tab\n  • Check your repository settings")
+	if len(m.sessions) == 0 {
+		return m.titleStyle.Render("No sessions found\n\nTry: refresh with 'r' or toggle filter with Tab")
 	}
 
-	var rows []string
-
-	// Header with count - using format string with column widths
-	headerFormat := fmt.Sprintf("%%-%ds%%-%ds%%-%ds%%-%ds Updated  (%%d tasks)",
-		statusWidth, sourceWidth, repoWidth, titleWidth)
-	header := m.tableHeaderStyle.Render(fmt.Sprintf(headerFormat,
-		"", "Source", "Repository", "Task", len(m.tasks)))
-	rows = append(rows, header)
-
-	// Task rows
-	for i, task := range m.tasks {
-		selected := i == m.cursor
-		row := m.renderRow(task, selected)
-		rows = append(rows, row)
+	columns := make([]string, 0, 3)
+	for col := 0; col < 3; col++ {
+		columns = append(columns, m.renderColumn(col))
 	}
 
-	return strings.Join(rows, "\n")
+	return lipgloss.JoinHorizontal(lipgloss.Top, columns...)
 }
 
-// renderRow formats a single task as a table row
-func (m Model) renderRow(task data.AgentTask, selected bool) string {
+func (m Model) renderColumn(column int) string {
+	headerStyle := m.tableHeaderStyle
+	if column == m.activeColumn {
+		headerStyle = m.tableRowSelected.Bold(true)
+	}
+
+	indices := m.columnSessionIdx[column]
+	rows := []string{headerStyle.Render(fmt.Sprintf("%s (%d)", columnTitle(column), len(indices)))}
+	if len(indices) == 0 {
+		rows = append(rows, m.tableRowStyle.Render("  —"))
+		return lipgloss.NewStyle().Width(42).PaddingRight(1).Render(strings.Join(rows, "\n"))
+	}
+
+	cursor := m.rowCursor[column]
+	if cursor >= len(indices) {
+		cursor = len(indices) - 1
+	}
+	if cursor < 0 {
+		cursor = 0
+	}
+
+	for i, idx := range indices {
+		session := m.sessions[idx]
+		rows = append(rows, m.renderRow(session, column == m.activeColumn && i == cursor))
+	}
+
+	return lipgloss.NewStyle().Width(42).PaddingRight(1).Render(strings.Join(rows, "\n"))
+}
+
+func (m Model) renderRow(session data.Session, selected bool) string {
 	style := m.tableRowStyle
 	if selected {
 		style = m.tableRowSelected
 	}
 
-	icon := m.statusIcon(task.Status)
-	source := sourceIcon(task.Source)
-	repo := truncate(task.Repository, repoWidth-2)  // -2 for padding
-	title := truncate(task.Title, titleWidth-2)     // -2 for padding
-	updated := formatTime(task.UpdatedAt)
+	icon := m.statusIcon(session.Status)
+	title := truncate(session.Title, 34)
+	repo := truncate(session.Repository, 16)
+	source := truncate(string(session.Source), 12)
+	updated := formatTime(session.UpdatedAt)
 
-	// Use constants for column widths
-	row := fmt.Sprintf("%-*s %-*s %-*s %-*s %s",
-		statusWidth, icon,
-		sourceWidth, source,
-		repoWidth, repo,
-		titleWidth, title,
-		updated)
+	row := fmt.Sprintf("%s %s\n  %s • %s • %s", icon, title, repo, source, updated)
 	return style.Render(row)
 }
 
-// SetTasks updates the task list and preserves selection
-func (m *Model) SetTasks(tasks []data.AgentTask) {
-	// Store selected task ID before updating
-	if m.cursor >= 0 && m.cursor < len(m.tasks) {
-		m.selectedTaskID = m.tasks[m.cursor].ID
+// SetTasks updates sessions and recategorizes columns
+func (m *Model) SetTasks(sessions []data.Session) {
+	if selected := m.SelectedTask(); selected != nil {
+		m.selectedSessionID = selected.ID
 	}
 
-	m.tasks = tasks
+	m.sessions = append([]data.Session(nil), sessions...)
+	sort.SliceStable(m.sessions, func(i, j int) bool {
+		return m.sessions[i].UpdatedAt.After(m.sessions[j].UpdatedAt)
+	})
 
-	// Try to restore cursor to the same task ID
-	if m.selectedTaskID != "" {
-		for i, task := range tasks {
-			if task.ID == m.selectedTaskID {
-				m.cursor = i
-				return
+	m.columnSessionIdx = [3][]int{}
+	for i, session := range m.sessions {
+		column := statusColumn(session.Status)
+		m.columnSessionIdx[column] = append(m.columnSessionIdx[column], i)
+	}
+
+	for col := 0; col < 3; col++ {
+		if len(m.columnSessionIdx[col]) == 0 {
+			m.rowCursor[col] = 0
+			continue
+		}
+		if m.rowCursor[col] >= len(m.columnSessionIdx[col]) {
+			m.rowCursor[col] = len(m.columnSessionIdx[col]) - 1
+		}
+		if m.rowCursor[col] < 0 {
+			m.rowCursor[col] = 0
+		}
+	}
+
+	if m.selectedSessionID != "" {
+		for idx, session := range m.sessions {
+			if session.ID != m.selectedSessionID {
+				continue
+			}
+			for col := 0; col < 3; col++ {
+				for row, sessionIdx := range m.columnSessionIdx[col] {
+					if sessionIdx == idx {
+						m.activeColumn = col
+						m.rowCursor[col] = row
+						return
+					}
+				}
 			}
 		}
 	}
 
-	// If task ID not found or no previous selection, clamp cursor
-	if m.cursor >= len(tasks) {
-		m.cursor = len(tasks) - 1
-	}
-	if m.cursor < 0 {
-		m.cursor = 0
+	if len(m.columnSessionIdx[m.activeColumn]) == 0 {
+		for col := 0; col < 3; col++ {
+			if len(m.columnSessionIdx[col]) > 0 {
+				m.activeColumn = col
+				break
+			}
+		}
 	}
 }
 
-// MoveCursor moves the cursor up or down
+// MoveCursor moves the active row cursor
 func (m *Model) MoveCursor(delta int) {
-	m.cursor += delta
-	if m.cursor < 0 {
-		m.cursor = 0
+	columnSessions := m.columnSessionIdx[m.activeColumn]
+	if len(columnSessions) == 0 {
+		m.rowCursor[m.activeColumn] = 0
+		return
 	}
-	if m.cursor >= len(m.tasks) {
-		m.cursor = len(m.tasks) - 1
+
+	m.rowCursor[m.activeColumn] += delta
+	if m.rowCursor[m.activeColumn] < 0 {
+		m.rowCursor[m.activeColumn] = 0
+	}
+	if m.rowCursor[m.activeColumn] >= len(columnSessions) {
+		m.rowCursor[m.activeColumn] = len(columnSessions) - 1
 	}
 }
 
-// SelectedTask returns the currently selected task
-func (m Model) SelectedTask() *data.AgentTask {
-	if m.cursor >= 0 && m.cursor < len(m.tasks) {
-		return &m.tasks[m.cursor]
+// MoveColumn moves the active column left/right
+func (m *Model) MoveColumn(delta int) {
+	m.activeColumn += delta
+	if m.activeColumn < 0 {
+		m.activeColumn = 0
 	}
-	return nil
+	if m.activeColumn > 2 {
+		m.activeColumn = 2
+	}
 }
 
-// Helper functions
+// SelectedTask returns the selected session
+func (m Model) SelectedTask() *data.Session {
+	columnSessions := m.columnSessionIdx[m.activeColumn]
+	if len(columnSessions) == 0 {
+		return nil
+	}
+
+	cursor := m.rowCursor[m.activeColumn]
+	if cursor >= len(columnSessions) {
+		cursor = len(columnSessions) - 1
+	}
+	if cursor < 0 {
+		cursor = 0
+	}
+
+	sessionIdx := columnSessions[cursor]
+	return &m.sessions[sessionIdx]
+}
 
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
@@ -164,6 +225,10 @@ func truncate(s string, maxLen int) string {
 }
 
 func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return "unknown"
+	}
+
 	now := time.Now()
 	diff := now.Sub(t)
 
@@ -173,19 +238,28 @@ func formatTime(t time.Time) string {
 		return fmt.Sprintf("%dm ago", int(diff.Minutes()))
 	} else if diff < 24*time.Hour {
 		return fmt.Sprintf("%dh ago", int(diff.Hours()))
-	} else {
-		return t.Format("Jan 2")
+	}
+	return t.Format("Jan 2")
+}
+
+func statusColumn(status string) int {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "failed", "cancelled", "canceled":
+		return 2
+	case "running", "queued", "in progress", "active", "open":
+		return 0
+	default:
+		return 1
 	}
 }
 
-func sourceIcon(source string) string {
-	switch source {
-	case "agent-task":
-		return "🤖"
-	case "local":
-		return "💻"
+func columnTitle(column int) string {
+	switch column {
+	case 0:
+		return "Running"
+	case 1:
+		return "Done"
 	default:
-		// Two spaces to maintain alignment with emoji characters above
-		return "  "
+		return "Failed"
 	}
 }

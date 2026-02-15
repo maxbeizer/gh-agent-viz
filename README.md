@@ -12,6 +12,7 @@ An interactive terminal UI for visualizing GitHub Copilot coding agent sessions.
 - 🎨 **Status Indicators** - Color-coded status icons (running, queued, completed, failed)
 - 🧑 **Input Needed Detection** - Highlights sessions that appear blocked waiting for human input
 - 🚦 **Action Reasons** - Every card includes an explicit `Needs your action:` reason (`waiting on your input`, `run failed`, `running but quiet`, or `no action needed`)
+- 🧭 **Action-First Ordering** - Sessions needing input/failure/quiet checks surface first, while older quiet duplicates are de-emphasized with a `↺ quiet duplicate` badge
 - ⚡ **Quick Actions** - Contextual hints only show actions available for the highlighted session
 - 🔄 **Resume Sessions** - Jump directly into active Copilot CLI sessions with one keystroke
 - ⌨️ **Vim-style Keys** - j/k navigation, familiar keybindings
@@ -98,6 +99,7 @@ Each session card is intentionally labeled for quick triage:
 
 - `Repository:` shows linked repo context (`not available` when missing)
 - `Needs your action:` explains why it needs action now (or confirms `no action needed`)
+- Older repeated quiet sessions are intentionally de-emphasized (`↺ quiet duplicate`) to reduce list noise without hiding rows
 - `Last update:` shows recency using friendly wording like `not recorded` when metadata is missing
 - The **Session Summary** panel mirrors the same plain-language fields for the highlighted row
 

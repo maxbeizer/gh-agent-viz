@@ -19,6 +19,14 @@ func newModel() Model {
 	)
 }
 
+func runningColumnIDs(model Model) []string {
+	ids := make([]string, 0, len(model.columnSessionIdx[0]))
+	for _, idx := range model.columnSessionIdx[0] {
+		ids = append(ids, model.sessions[idx].ID)
+	}
+	return ids
+}
+
 func TestSetTasksGroupsIntoColumns(t *testing.T) {
 	model := newModel()
 	model.SetTasks([]data.Session{
@@ -145,6 +153,47 @@ func TestSetTasks_PreservesSelection(t *testing.T) {
 	selected := model.SelectedTask()
 	if selected == nil || selected.ID != "2" {
 		t.Errorf("expected selected task ID '2', got '%v'", selected)
+	}
+}
+
+func TestSetTasks_PrioritizesNeedsInputAheadOfFreshRunning(t *testing.T) {
+	model := newModel()
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "fresh", Status: "running", Title: "Fresh run", UpdatedAt: now.Add(-2 * time.Minute)},
+		{ID: "needs", Status: "needs-input", Title: "Need operator", UpdatedAt: now.Add(-40 * time.Minute)},
+	})
+
+	ids := runningColumnIDs(model)
+	if len(ids) != 2 {
+		t.Fatalf("expected 2 running sessions, got %d", len(ids))
+	}
+	if ids[0] != "needs" {
+		t.Fatalf("expected needs-input session first, got order %v", ids)
+	}
+}
+
+func TestSetTasks_DeEmphasizesOlderQuietDuplicates(t *testing.T) {
+	model := newModel()
+	model.SetSize(160, 32)
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "dup-old", Status: "running", Title: "Sync roadmap", Repository: "owner/repo", Branch: "main", Source: data.SourceAgentTask, UpdatedAt: now.Add(-70 * time.Minute)},
+		{ID: "dup-new", Status: "running", Title: "Sync roadmap", Repository: "owner/repo", Branch: "main", Source: data.SourceAgentTask, UpdatedAt: now.Add(-40 * time.Minute)},
+		{ID: "active", Status: "running", Title: "Fresh implementation", UpdatedAt: now.Add(-3 * time.Minute)},
+	})
+
+	ids := runningColumnIDs(model)
+	if len(ids) != 3 {
+		t.Fatalf("expected 3 running sessions, got %d", len(ids))
+	}
+	if ids[len(ids)-1] != "dup-old" {
+		t.Fatalf("expected oldest quiet duplicate to be de-emphasized to end, got order %v", ids)
+	}
+
+	view := model.View()
+	if !strings.Contains(view, "↺ quiet duplicate") {
+		t.Fatalf("expected quiet duplicate badge in view, got: %s", view)
 	}
 }
 

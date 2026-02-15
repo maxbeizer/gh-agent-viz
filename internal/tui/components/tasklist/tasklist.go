@@ -18,6 +18,7 @@ type Model struct {
 	tableRowStyle     lipgloss.Style
 	tableRowSelected  lipgloss.Style
 	sessions          []data.Session
+	deEmphasizedIdx   map[int]struct{}
 	columnSessionIdx  [3][]int
 	activeColumn      int
 	rowCursor         [3]int
@@ -39,6 +40,7 @@ func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, sta
 		tableRowStyle:    rowStyle,
 		tableRowSelected: rowSelectedStyle,
 		sessions:         []data.Session{},
+		deEmphasizedIdx:  map[int]struct{}{},
 		activeColumn:     0,
 		loading:          false,
 		statusIcon:       statusIconFunc,
@@ -209,7 +211,7 @@ func (m Model) renderColumn(column int, width int) string {
 	for i, idx := range indices[start:end] {
 		session := m.sessions[idx]
 		selected := column == m.activeColumn && (start+i) == cursor
-		rows = append(rows, m.renderRow(session, selected, width))
+		rows = append(rows, m.renderRow(idx, session, selected, width))
 	}
 	if end < len(indices) {
 		rows = append(rows, m.tableRowStyle.Render(fmt.Sprintf("  ↓ %d more", len(indices)-end)))
@@ -218,10 +220,12 @@ func (m Model) renderColumn(column int, width int) string {
 	return lipgloss.NewStyle().Width(width).PaddingRight(1).Render(strings.Join(rows, "\n"))
 }
 
-func (m Model) renderRow(session data.Session, selected bool, width int) string {
+func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, width int) string {
 	style := m.tableRowStyle
 	if selected {
 		style = m.tableRowSelected
+	} else if m.isDeEmphasized(sessionIdx) {
+		style = style.Faint(true)
 	}
 
 	icon := m.statusIcon(session.Status)
@@ -230,7 +234,7 @@ func (m Model) renderRow(session data.Session, selected bool, width int) string 
 		titleMax = 3
 	}
 	title := truncate(sessionTitle(session), titleMax)
-	badge := sessionBadge(session)
+	badge := sessionBadge(session, m.isDeEmphasized(sessionIdx))
 	attention := fmt.Sprintf("Needs your action: %s", attentionReason(session))
 
 	titleLine := fmt.Sprintf("%s %s", icon, title)
@@ -271,10 +275,38 @@ func (m *Model) SetTasks(sessions []data.Session) {
 		m.selectedSessionID = selected.ID
 	}
 
-	m.sessions = append([]data.Session(nil), sessions...)
-	sort.SliceStable(m.sessions, func(i, j int) bool {
-		return m.sessions[i].UpdatedAt.After(m.sessions[j].UpdatedAt)
+	type rankedSession struct {
+		session      data.Session
+		deEmphasized bool
+		sortPriority int
+	}
+
+	deEmphasizedInputIdx := quietDuplicateIndices(sessions)
+	ranked := make([]rankedSession, 0, len(sessions))
+	for i, session := range sessions {
+		_, deEmphasized := deEmphasizedInputIdx[i]
+		ranked = append(ranked, rankedSession{
+			session:      session,
+			deEmphasized: deEmphasized,
+			sortPriority: sessionSortPriority(session, deEmphasized),
+		})
+	}
+
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].sortPriority != ranked[j].sortPriority {
+			return ranked[i].sortPriority < ranked[j].sortPriority
+		}
+		return ranked[i].session.UpdatedAt.After(ranked[j].session.UpdatedAt)
 	})
+
+	m.sessions = make([]data.Session, len(ranked))
+	m.deEmphasizedIdx = map[int]struct{}{}
+	for i, candidate := range ranked {
+		m.sessions[i] = candidate.session
+		if candidate.deEmphasized {
+			m.deEmphasizedIdx[i] = struct{}{}
+		}
+	}
 
 	m.columnSessionIdx = [3][]int{}
 	for i, session := range m.sessions {
@@ -438,12 +470,15 @@ func isActiveStatus(status string) bool {
 	return data.StatusIsActive(status) || strings.EqualFold(strings.TrimSpace(status), "needs-input")
 }
 
-func sessionBadge(session data.Session) string {
+func sessionBadge(session data.Session, deEmphasized bool) string {
 	if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
 		return "🧑 waiting on you"
 	}
 	if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
 		return "🚨 failed"
+	}
+	if deEmphasized {
+		return "↺ quiet duplicate"
 	}
 	if data.SessionNeedsAttention(session) {
 		return "⚠ check progress"
@@ -452,6 +487,73 @@ func sessionBadge(session data.Session) string {
 		return ""
 	}
 	return "• in progress"
+}
+
+func (m Model) isDeEmphasized(sessionIdx int) bool {
+	_, ok := m.deEmphasizedIdx[sessionIdx]
+	return ok
+}
+
+func sessionSortPriority(session data.Session, deEmphasized bool) int {
+	status := strings.ToLower(strings.TrimSpace(session.Status))
+	switch {
+	case status == "needs-input" || status == "failed":
+		return 0
+	case deEmphasized:
+		return 4
+	case data.SessionNeedsAttention(session):
+		return 1
+	case isActiveStatus(session.Status):
+		return 2
+	default:
+		return 3
+	}
+}
+
+func quietDuplicateIndices(sessions []data.Session) map[int]struct{} {
+	grouped := map[string][]int{}
+	for i, session := range sessions {
+		if !isQuietDuplicateSession(session) {
+			continue
+		}
+		key := quietDuplicateKey(session)
+		grouped[key] = append(grouped[key], i)
+	}
+
+	result := map[int]struct{}{}
+	for _, indexes := range grouped {
+		if len(indexes) < 2 {
+			continue
+		}
+
+		sort.SliceStable(indexes, func(i, j int) bool {
+			return sessions[indexes[i]].UpdatedAt.After(sessions[indexes[j]].UpdatedAt)
+		})
+
+		for _, idx := range indexes[1:] {
+			result[idx] = struct{}{}
+		}
+	}
+
+	return result
+}
+
+func isQuietDuplicateSession(session data.Session) bool {
+	status := strings.ToLower(strings.TrimSpace(session.Status))
+	if status == "needs-input" || status == "failed" {
+		return false
+	}
+	return data.SessionNeedsAttention(session)
+}
+
+func quietDuplicateKey(session data.Session) string {
+	return fmt.Sprintf(
+		"%s|%s|%s|%s",
+		strings.ToLower(strings.TrimSpace(sessionTitle(session))),
+		strings.ToLower(strings.TrimSpace(session.Repository)),
+		strings.ToLower(strings.TrimSpace(session.Branch)),
+		strings.ToLower(strings.TrimSpace(string(session.Source))),
+	)
 }
 
 func sessionTitle(session data.Session) string {

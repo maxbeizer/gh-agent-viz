@@ -13,7 +13,9 @@ gh --version
 # Verify authentication
 gh auth status
 
-# Test agent-task availability
+# Note: The `gh agent-task` command is used internally by gh-agent-viz
+# It may not be available in all GitHub CLI versions or configurations
+# You can test if it's available with:
 gh agent-task list
 ```
 
@@ -48,6 +50,8 @@ gh auth refresh -s repo,read:org
 
 **Problem:** `gh agent-task` command not recognized
 
+**Note:** The `gh agent-task` command is what `gh-agent-viz` uses internally to fetch session data. This command is part of GitHub's Copilot infrastructure and may not be publicly available or enabled for all accounts yet.
+
 **Fix:**
 
 The agent-task commands may not be available in all GitHub CLI versions. Check with your GitHub administrator if this feature is enabled for your account.
@@ -59,6 +63,8 @@ gh extension list
 # Update all extensions
 gh extension upgrade --all
 ```
+
+**Important:** Even if `gh agent-task` is not directly available to you, `gh-agent-viz` may still work if it has been provided access through other means. Try running `gh agent-viz` to see if it works.
 
 ## Data Display Problems
 

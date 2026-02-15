@@ -221,6 +221,11 @@ func runGH(args ...string) ([]byte, error) {
 	return output, err
 }
 
+// RunGH executes a gh command and participates in debug logging.
+func RunGH(args ...string) ([]byte, error) {
+	return runGH(args...)
+}
+
 func logDebugEntry(args []string, output []byte, cmdErr error) {
 	f, err := os.OpenFile(DebugLogPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {

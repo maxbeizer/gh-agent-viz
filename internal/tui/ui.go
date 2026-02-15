@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -115,6 +114,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ctx.Width = msg.Width
 		m.ctx.Height = msg.Height
 		m.logView.SetSize(msg.Width-4, msg.Height-8)
+		m.taskList.SetSize(msg.Width, msg.Height)
 		m.ready = true
 		return m, nil
 
@@ -176,12 +176,19 @@ func (m Model) View() string {
 		mainView = m.logView.View()
 	}
 
+	debugBanner := ""
+	if m.ctx.Debug {
+		debugBanner = fmt.Sprintf("DEBUG ON • command logs: %s\n", data.DebugLogPath())
+	}
+
 	if m.ctx.Error != nil {
 		errorText := fmt.Sprintf("Error: %v", m.ctx.Error)
 		if m.ctx.Debug {
-			errorText = fmt.Sprintf("%s\nDebug mode enabled. Log file: %s", errorText, data.DebugLogPath())
+			errorText = fmt.Sprintf("%s\nInspect debug log for command output.", errorText)
 		}
-		mainView = fmt.Sprintf("%s\nPress 'r' to retry or Tab to change filter\n\n%s", errorText, mainView)
+		mainView = fmt.Sprintf("%s%s\nPress 'r' to retry or Tab/Shift+Tab to change filter\n\n%s", debugBanner, errorText, mainView)
+	} else if debugBanner != "" {
+		mainView = debugBanner + mainView
 	}
 
 	return headerView + mainView + footerView
@@ -218,31 +225,44 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "k", "up":
 		m.taskList.MoveCursor(-1)
 	case "enter":
-		task := m.taskList.SelectedTask()
-		if task != nil {
+		session := m.taskList.SelectedTask()
+		if session != nil {
+			if session.Source == data.SourceLocalCopilot {
+				m.ctx.Error = nil
+				m.viewMode = ViewModeDetail
+				m.taskDetail.SetTask(session)
+				return m, nil
+			}
 			m.viewMode = ViewModeDetail
-			return m, m.fetchTaskDetail(task.ID, task.Repository)
+			return m, m.fetchTaskDetail(session.ID, session.Repository)
 		}
 	case "l":
-		task := m.taskList.SelectedTask()
-		if task != nil {
+		session := m.taskList.SelectedTask()
+		if session != nil {
+			if session.Source == data.SourceLocalCopilot {
+				m.ctx.Error = fmt.Errorf("logs are only available for remote agent-task sessions")
+				return m, nil
+			}
 			m.viewMode = ViewModeLog
-			return m, m.fetchTaskLog(task.ID, task.Repository)
+			return m, m.fetchTaskLog(session.ID, session.Repository)
 		}
 	case "o":
-		task := m.taskList.SelectedTask()
-		if task != nil {
-			return m, m.openTaskPR(task)
+		session := m.taskList.SelectedTask()
+		if session != nil {
+			return m, m.openTaskPR(session)
 		}
 	case "s":
-		task := m.taskList.SelectedTask()
-		if task != nil {
-			return m, m.resumeSession(task)
+		session := m.taskList.SelectedTask()
+		if session != nil {
+			return m, m.resumeSession(session)
 		}
 	case "r":
 		return m, m.fetchTasks
 	case "tab":
-		m.cycleFilter()
+		m.cycleFilter(1)
+		return m, m.fetchTasks
+	case "shift+tab", "backtab":
+		m.cycleFilter(-1)
 		return m, m.fetchTasks
 	}
 	return m, nil
@@ -254,15 +274,19 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.viewMode = ViewModeList
 	case "l":
-		task := m.taskList.SelectedTask()
-		if task != nil {
+		session := m.taskList.SelectedTask()
+		if session != nil {
+			if session.Source == data.SourceLocalCopilot {
+				m.ctx.Error = fmt.Errorf("logs are only available for remote agent-task sessions")
+				return m, nil
+			}
 			m.viewMode = ViewModeLog
-			return m, m.fetchTaskLog(task.ID, task.Repository)
+			return m, m.fetchTaskLog(session.ID, session.Repository)
 		}
 	case "o":
-		task := m.taskList.SelectedTask()
-		if task != nil {
-			return m, m.openTaskPR(task)
+		session := m.taskList.SelectedTask()
+		if session != nil {
+			return m, m.openTaskPR(session)
 		}
 	}
 	return m, nil
@@ -289,12 +313,16 @@ func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// cycleFilter cycles through status filters
-func (m *Model) cycleFilter() {
+// cycleFilter cycles through status filters by delta (+1 forward, -1 backward)
+func (m *Model) cycleFilter(delta int) {
 	filters := []string{"all", "active", "completed", "failed"}
 	for i, f := range filters {
 		if f == m.ctx.StatusFilter {
-			m.ctx.StatusFilter = filters[(i+1)%len(filters)]
+			next := (i + delta) % len(filters)
+			if next < 0 {
+				next += len(filters)
+			}
+			m.ctx.StatusFilter = filters[next]
 			break
 		}
 	}
@@ -330,7 +358,7 @@ func (m Model) fetchTasks() tea.Msg {
 	if m.ctx.StatusFilter != "all" {
 		filtered := []data.Session{}
 		for _, session := range sessions {
-			if m.ctx.StatusFilter == "active" && (session.Status == "running" || session.Status == "queued") {
+			if m.ctx.StatusFilter == "active" && (session.Status == "running" || session.Status == "queued" || session.Status == "needs-input") {
 				filtered = append(filtered, session)
 			} else if session.Status == m.ctx.StatusFilter {
 				filtered = append(filtered, session)
@@ -380,12 +408,12 @@ func (m Model) openTaskPR(session *data.Session) tea.Cmd {
 
 		switch {
 		case session.PRURL != "":
-			output, err := exec.Command("gh", "pr", "view", session.PRURL, "--web").CombinedOutput()
+			output, err := data.RunGH("pr", "view", session.PRURL, "--web")
 			if err != nil {
 				return errMsg{fmt.Errorf("failed to open PR: %s", strings.TrimSpace(string(output)))}
 			}
 		case session.PRNumber > 0 && session.Repository != "":
-			output, err := exec.Command("gh", "pr", "view", fmt.Sprintf("%d", session.PRNumber), "-R", session.Repository, "--web").CombinedOutput()
+			output, err := data.RunGH("pr", "view", fmt.Sprintf("%d", session.PRNumber), "-R", session.Repository, "--web")
 			if err != nil {
 				return errMsg{fmt.Errorf("failed to open PR: %s", strings.TrimSpace(string(output)))}
 			}
@@ -407,17 +435,16 @@ func (m Model) resumeSession(session *data.Session) tea.Cmd {
 			return errMsg{fmt.Errorf("only local Copilot CLI sessions can be resumed")}
 		}
 
-		// Only allow resuming active sessions (running or queued)
-		if session.Status != "running" && session.Status != "queued" {
-			return errMsg{fmt.Errorf("cannot resume session: session status is '%s' (only 'running' or 'queued' sessions can be resumed)", session.Status)}
+		// Only allow resuming active sessions (running, queued, or needs-input)
+		if session.Status != "running" && session.Status != "queued" && session.Status != "needs-input" {
+			return errMsg{fmt.Errorf("cannot resume session: session status is '%s' (only 'running', 'queued', or 'needs-input' sessions can be resumed)", session.Status)}
 		}
 
 		if session.ID == "" {
 			return errMsg{fmt.Errorf("cannot resume session: session has no ID")}
 		}
 
-		cmd := exec.Command("gh", "copilot", "--", "--resume", session.ID)
-		output, err := cmd.CombinedOutput()
+		output, err := data.RunGH("copilot", "--", "--resume", session.ID)
 		if err != nil {
 			// Provide a user-friendly error message
 			outputStr := strings.TrimSpace(string(output))

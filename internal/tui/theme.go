@@ -54,6 +54,8 @@ func StatusIcon(status string) string {
 		return "🟢"
 	case "queued":
 		return "🟡"
+	case "needs-input":
+		return "🧑"
 	case "completed":
 		return "✅"
 	case "failed":

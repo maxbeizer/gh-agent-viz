@@ -214,3 +214,24 @@ func TestView_ImprovedEmptyState(t *testing.T) {
 		t.Error("expected empty state to include helpful hints")
 	}
 }
+
+func TestVisibleRangeKeepsCursorInView(t *testing.T) {
+	start, end := visibleRange(20, 15, 6)
+	if start > 15 || end <= 15 {
+		t.Fatalf("expected cursor index 15 to be visible in range [%d,%d)", start, end)
+	}
+	if end-start != 6 {
+		t.Fatalf("expected window size 6, got %d", end-start)
+	}
+}
+
+func TestNeedsInputStatusStaysInRunningColumn(t *testing.T) {
+	model := newModel()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "needs-input", Title: "Waiting input", UpdatedAt: time.Now()},
+	})
+
+	if len(model.columnSessionIdx[0]) != 1 {
+		t.Fatalf("expected needs-input session in running column, got %+v", model.columnSessionIdx)
+	}
+}

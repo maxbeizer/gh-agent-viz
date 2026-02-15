@@ -24,7 +24,13 @@ type Model struct {
 	loading           bool
 	statusIcon        func(string) string
 	selectedSessionID string
+	width             int
+	height            int
 }
+
+const activeStaleThreshold = 20 * time.Minute
+const defaultColumnWidth = 42
+const minColumnWidth = 30
 
 // New creates a new task list model
 func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, statusIconFunc func(string) string) Model {
@@ -37,6 +43,8 @@ func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, sta
 		activeColumn:     0,
 		loading:          false,
 		statusIcon:       statusIconFunc,
+		width:            defaultColumnWidth * 3,
+		height:           24,
 	}
 }
 
@@ -57,18 +65,110 @@ func (m Model) View() string {
 	}
 
 	if len(m.sessions) == 0 {
-		return m.titleStyle.Render("No sessions found\n\nTry: refresh with 'r' or toggle filter with Tab")
+		return m.titleStyle.Render("No sessions found\n\nTry: refresh with 'r' or toggle filter with Tab/Shift+Tab")
 	}
 
+	overview := m.renderOverview()
+	board := m.renderBoard()
+	flightDeck := m.renderFlightDeck()
+
+	return lipgloss.JoinVertical(lipgloss.Left, overview, "", board, "", flightDeck)
+}
+
+func (m Model) renderBoard() string {
 	columns := make([]string, 0, 3)
+	columnWidth := m.columnWidth()
 	for col := 0; col < 3; col++ {
-		columns = append(columns, m.renderColumn(col))
+		columns = append(columns, m.renderColumn(col, columnWidth))
 	}
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, columns...)
 }
 
-func (m Model) renderColumn(column int) string {
+func (m Model) renderOverview() string {
+	activeCount := len(m.columnSessionIdx[0])
+	doneCount := len(m.columnSessionIdx[1])
+	failedCount := len(m.columnSessionIdx[2])
+	agentCount := 0
+	localCount := 0
+	staleCount := 0
+
+	for _, session := range m.sessions {
+		if session.Source == data.SourceAgentTask {
+			agentCount++
+		}
+		if session.Source == data.SourceLocalCopilot {
+			localCount++
+		}
+		if isActiveStatus(session.Status) && !session.UpdatedAt.IsZero() && time.Since(session.UpdatedAt) >= activeStaleThreshold {
+			staleCount++
+		}
+	}
+
+	chips := []string{
+		fmt.Sprintf("🛰 total %d", len(m.sessions)),
+		fmt.Sprintf("🛫 active %d", activeCount),
+		fmt.Sprintf("🛬 done %d", doneCount),
+		fmt.Sprintf("🚨 failed %d", failedCount),
+		fmt.Sprintf("🤖 agent %d", agentCount),
+		fmt.Sprintf("💻 local %d", localCount),
+	}
+	if staleCount > 0 {
+		chips = append(chips, fmt.Sprintf("⏱ stale %d", staleCount))
+	}
+
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(0, 1).
+		Render("ATC OVERVIEW  " + strings.Join(chips, "  •  "))
+}
+
+func (m Model) renderFlightDeck() string {
+	selected := m.SelectedTask()
+	if selected == nil {
+		return ""
+	}
+
+	repository := selected.Repository
+	if repository == "" {
+		repository = "no-repo"
+	}
+	branch := selected.Branch
+	if branch == "" {
+		branch = "unknown"
+	}
+
+	actions := []string{"enter details"}
+	if selected.Source == data.SourceAgentTask {
+		actions = append(actions, "l logs", "o open PR")
+	}
+	if selected.Source == data.SourceLocalCopilot && isActiveStatus(selected.Status) && selected.ID != "" {
+		actions = append(actions, "s resume")
+	}
+
+	lines := []string{
+		"FLIGHT DECK",
+		fmt.Sprintf("%s %s", m.statusIcon(selected.Status), selected.Title),
+		fmt.Sprintf("status: %s", selected.Status),
+		fmt.Sprintf("repo:   %s", repository),
+		fmt.Sprintf("branch: %s", branch),
+		fmt.Sprintf("source: %s", sourceLabel(selected.Source)),
+		fmt.Sprintf("seen:   %s", formatTime(selected.UpdatedAt)),
+		fmt.Sprintf("actions: %s", strings.Join(actions, " • ")),
+	}
+	if selected.Source == data.SourceAgentTask && selected.PRNumber > 0 {
+		lines = append(lines, fmt.Sprintf("pr: #%d", selected.PRNumber))
+	}
+
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("241")).
+		Padding(0, 1).
+		Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) renderColumn(column int, width int) string {
 	headerStyle := m.tableHeaderStyle
 	if column == m.activeColumn {
 		headerStyle = m.tableRowSelected.Bold(true)
@@ -78,7 +178,7 @@ func (m Model) renderColumn(column int) string {
 	rows := []string{headerStyle.Render(fmt.Sprintf("%s (%d)", columnTitle(column), len(indices)))}
 	if len(indices) == 0 {
 		rows = append(rows, m.tableRowStyle.Render("  —"))
-		return lipgloss.NewStyle().Width(42).PaddingRight(1).Render(strings.Join(rows, "\n"))
+		return lipgloss.NewStyle().Width(width).PaddingRight(1).Render(strings.Join(rows, "\n"))
 	}
 
 	cursor := m.rowCursor[column]
@@ -89,12 +189,20 @@ func (m Model) renderColumn(column int) string {
 		cursor = 0
 	}
 
-	for i, idx := range indices {
+	start, end := visibleRange(len(indices), cursor, m.pageSize())
+	if start > 0 {
+		rows = append(rows, m.tableRowStyle.Render(fmt.Sprintf("  ↑ %d above", start)))
+	}
+	for i, idx := range indices[start:end] {
 		session := m.sessions[idx]
-		rows = append(rows, m.renderRow(session, column == m.activeColumn && i == cursor))
+		selected := column == m.activeColumn && (start+i) == cursor
+		rows = append(rows, m.renderRow(session, selected))
+	}
+	if end < len(indices) {
+		rows = append(rows, m.tableRowStyle.Render(fmt.Sprintf("  ↓ %d more", len(indices)-end)))
 	}
 
-	return lipgloss.NewStyle().Width(42).PaddingRight(1).Render(strings.Join(rows, "\n"))
+	return lipgloss.NewStyle().Width(width).PaddingRight(1).Render(strings.Join(rows, "\n"))
 }
 
 func (m Model) renderRow(session data.Session, selected bool) string {
@@ -114,8 +222,17 @@ func (m Model) renderRow(session data.Session, selected bool) string {
 	if title == "" {
 		title = "Untitled Session"
 	}
+	badge := sessionBadge(session)
 
-	row := fmt.Sprintf("%s %s\n  %s • %s • %s", icon, title, repo, source, updated)
+	titleLine := fmt.Sprintf("%s %s", icon, title)
+	if badge != "" {
+		titleLine += " " + badge
+	}
+
+	row := fmt.Sprintf("%s\n  %s • %s • %s", titleLine, repo, source, updated)
+	if selected {
+		row += fmt.Sprintf("\n  ↳ %s", rowContext(session))
+	}
 	return style.Render(row)
 }
 
@@ -252,7 +369,7 @@ func statusColumn(status string) int {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "failed", "cancelled", "canceled":
 		return 2
-	case "running", "queued", "in progress", "active", "open":
+	case "running", "queued", "in progress", "active", "open", "needs-input":
 		return 0
 	default:
 		return 1
@@ -262,11 +379,11 @@ func statusColumn(status string) int {
 func columnTitle(column int) string {
 	switch column {
 	case 0:
-		return "Running"
+		return "🛫 Running"
 	case 1:
-		return "Done"
+		return "🛬 Done"
 	default:
-		return "Failed"
+		return "🚨 Failed"
 	}
 }
 
@@ -279,4 +396,95 @@ func sourceLabel(source data.SessionSource) string {
 	default:
 		return "other"
 	}
+}
+
+func isActiveStatus(status string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(status))
+	return normalized == "running" || normalized == "queued" || normalized == "active" || normalized == "open" || normalized == "in progress" || normalized == "needs-input"
+}
+
+func sessionBadge(session data.Session) string {
+	if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
+		return "🧑 input needed"
+	}
+	if !isActiveStatus(session.Status) || session.UpdatedAt.IsZero() {
+		return ""
+	}
+	if time.Since(session.UpdatedAt) >= activeStaleThreshold {
+		return "⏱ stale"
+	}
+	return "• live"
+}
+
+func rowContext(session data.Session) string {
+	switch session.Source {
+	case data.SourceLocalCopilot:
+		if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
+			return "waiting for your response • press 's' to resume"
+		}
+		if isActiveStatus(session.Status) {
+			return "local session can be resumed with 's'"
+		}
+		return "local session"
+	case data.SourceAgentTask:
+		if session.PRNumber > 0 {
+			return fmt.Sprintf("remote task • PR #%d", session.PRNumber)
+		}
+		return "remote task"
+	default:
+		return "session"
+	}
+}
+
+// SetSize updates the available rendering size for responsive layout.
+func (m *Model) SetSize(width, height int) {
+	if width > 0 {
+		m.width = width
+	}
+	if height > 0 {
+		m.height = height
+	}
+}
+
+func (m Model) columnWidth() int {
+	usable := m.width - 4
+	if usable <= 0 {
+		return defaultColumnWidth
+	}
+	width := usable / 3
+	if width < minColumnWidth {
+		return minColumnWidth
+	}
+	return width
+}
+
+func (m Model) pageSize() int {
+	size := (m.height - 14) / 2
+	if size < 3 {
+		return 3
+	}
+	if size > 10 {
+		return 10
+	}
+	return size
+}
+
+func visibleRange(total, cursor, size int) (int, int) {
+	if total <= 0 || size <= 0 {
+		return 0, 0
+	}
+	if total <= size {
+		return 0, total
+	}
+
+	start := cursor - (size / 2)
+	if start < 0 {
+		start = 0
+	}
+	end := start + size
+	if end > total {
+		end = total
+		start = end - size
+	}
+	return start, end
 }

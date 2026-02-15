@@ -1,4 +1,4 @@
-gh-agent-viz
+bin/
 dist/
 vendor/
 *.exe

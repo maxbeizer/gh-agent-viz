@@ -3,6 +3,7 @@ package tui
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
@@ -39,6 +40,22 @@ func TestResumeSession_ValidQueuedSession(t *testing.T) {
 	cmd := m.resumeSession(task)
 	if cmd == nil {
 		t.Error("expected cmd to be non-nil for queued session")
+	}
+}
+
+func TestResumeSession_ValidNeedsInputSession(t *testing.T) {
+	m := NewModel("", false)
+
+	task := &data.Session{
+		ID:     "test-session-needs-input",
+		Status: "needs-input",
+		Title:  "Needs Input",
+		Source: data.SourceLocalCopilot,
+	}
+
+	cmd := m.resumeSession(task)
+	if cmd == nil {
+		t.Error("expected cmd to be non-nil for needs-input session")
 	}
 }
 
@@ -147,5 +164,51 @@ func TestResumeSession_EmptySessionID(t *testing.T) {
 
 	if errMsg.err == nil {
 		t.Error("expected error for empty session ID")
+	}
+}
+
+func TestCycleFilterForwardAndBackward(t *testing.T) {
+	m := NewModel("", false)
+	m.ctx.StatusFilter = "all"
+
+	m.cycleFilter(1)
+	if m.ctx.StatusFilter != "active" {
+		t.Fatalf("expected active after forward cycle, got %q", m.ctx.StatusFilter)
+	}
+
+	m.cycleFilter(-1)
+	if m.ctx.StatusFilter != "all" {
+		t.Fatalf("expected all after backward cycle, got %q", m.ctx.StatusFilter)
+	}
+
+	m.cycleFilter(-1)
+	if m.ctx.StatusFilter != "failed" {
+		t.Fatalf("expected failed when cycling backward from all, got %q", m.ctx.StatusFilter)
+	}
+}
+
+func TestHandleListKeys_LocalSessionLogShowsHelpfulError(t *testing.T) {
+	m := NewModel("", false)
+	m.taskList.SetTasks([]data.Session{
+		{
+			ID:         "local-1",
+			Status:     "running",
+			Title:      "Local Session",
+			Repository: "owner/repo",
+			Source:     data.SourceLocalCopilot,
+		},
+	})
+
+	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	if cmd != nil {
+		t.Fatal("expected no log fetch command for local session")
+	}
+
+	updatedModel := updated.(Model)
+	if updatedModel.viewMode != ViewModeList {
+		t.Fatalf("expected list view to remain active, got %v", updatedModel.viewMode)
+	}
+	if updatedModel.ctx.Error == nil {
+		t.Fatal("expected helpful error for local session logs")
 	}
 }

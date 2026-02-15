@@ -1,6 +1,6 @@
 .PHONY: help build run test test-race coverage smoke ci lint fmt tidy clean
 
-BINARY ?= gh-agent-viz
+BINARY ?= bin/gh-agent-viz
 GO ?= go
 
 help:
@@ -19,6 +19,7 @@ help:
 	@echo "  make clean       Remove build artifacts"
 
 build:
+	@mkdir -p $(dir $(BINARY))
 	$(GO) build -o $(BINARY) ./gh-agent-viz.go
 
 run: build
@@ -53,4 +54,4 @@ tidy:
 	$(GO) mod tidy
 
 clean:
-	rm -f $(BINARY) coverage.out
+	rm -rf bin coverage.out

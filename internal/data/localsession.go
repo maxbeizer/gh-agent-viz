@@ -23,6 +23,9 @@ type LocalSessionWorkspace struct {
 	Branch              string                   `yaml:"branch"`
 	Title               string                   `yaml:"title"`
 	Summary             string                   `yaml:"summary"`
+	AwaitingUserInput   bool                     `yaml:"awaiting_user_input"`
+	NeedsHumanInput     bool                     `yaml:"needs_human_input"`
+	WaitingForUser      bool                     `yaml:"waiting_for_user"`
 	ConversationHistory []map[string]interface{} `yaml:"conversation_history"`
 }
 
@@ -90,6 +93,7 @@ func parseWorkspaceFileFallback(data []byte) (Session, error) {
 		Source: SourceLocalCopilot,
 		Status: "unknown",
 	}
+	needsInput := false
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -117,6 +121,11 @@ func parseWorkspaceFileFallback(data []byte) (Session, error) {
 			session.Branch = strings.Trim(strings.TrimPrefix(line, "branch:"), `" `)
 		} else if strings.HasPrefix(line, "status:") {
 			session.Status = strings.Trim(strings.TrimPrefix(line, "status:"), `" `)
+		} else if strings.HasPrefix(line, "awaiting_user_input:") || strings.HasPrefix(line, "needs_human_input:") || strings.HasPrefix(line, "waiting_for_user:") {
+			value := strings.ToLower(strings.TrimSpace(strings.SplitN(line, ":", 2)[1]))
+			if value == "true" {
+				needsInput = true
+			}
 		} else if strings.HasPrefix(line, "last_activity:") {
 			timeStr := strings.Trim(strings.TrimPrefix(line, "last_activity:"), `" `)
 			if t, ok := parseAnyTime(timeStr); ok {
@@ -135,6 +144,9 @@ func parseWorkspaceFileFallback(data []byte) (Session, error) {
 		session.UpdatedAt = session.CreatedAt
 	}
 	session.Status = DeriveLocalSessionStatus(session.Status, session.UpdatedAt)
+	if needsInput && isLocallyActiveStatus(session.Status) {
+		session.Status = "needs-input"
+	}
 
 	if session.Title == "" {
 		if session.ID != "" {
@@ -172,6 +184,9 @@ func convertLocalSessionToSession(workspace LocalSessionWorkspace) (Session, err
 
 	// Derive status from metadata
 	session.Status = DeriveLocalSessionStatus(workspace.Status, session.UpdatedAt)
+	if needsHumanInput(workspace) && isLocallyActiveStatus(session.Status) {
+		session.Status = "needs-input"
+	}
 
 	// Use title from conversation if not set
 	if session.Title == "" && len(workspace.ConversationHistory) > 0 {
@@ -225,6 +240,8 @@ func DeriveLocalSessionStatus(rawStatus string, lastActivity time.Time) string {
 	switch normalized {
 	case "completed", "finished", "done", "merged", "closed":
 		return "completed"
+	case "needs-input", "needs input", "awaiting user input", "waiting for user", "input required":
+		return "needs-input"
 	case "running", "in progress", "active", "open":
 		return "running"
 	case "failed", "error", "cancelled", "canceled":
@@ -245,6 +262,51 @@ func DeriveLocalSessionStatus(rawStatus string, lastActivity time.Time) string {
 
 	// Otherwise assume still running
 	return "running"
+}
+
+func needsHumanInput(workspace LocalSessionWorkspace) bool {
+	if workspace.AwaitingUserInput || workspace.NeedsHumanInput || workspace.WaitingForUser {
+		return true
+	}
+	if len(workspace.ConversationHistory) == 0 {
+		return false
+	}
+
+	last := workspace.ConversationHistory[len(workspace.ConversationHistory)-1]
+	role, _ := last["role"].(string)
+	content, _ := last["content"].(string)
+	if !strings.EqualFold(strings.TrimSpace(role), "assistant") {
+		return false
+	}
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return false
+	}
+	if strings.Contains(trimmed, "?") {
+		return true
+	}
+
+	lower := strings.ToLower(trimmed)
+	patterns := []string{
+		"please choose",
+		"which option",
+		"what would you like",
+		"can you confirm",
+		"please provide",
+		"pick one",
+		"let me know",
+	}
+	for _, pattern := range patterns {
+		if strings.Contains(lower, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+func isLocallyActiveStatus(status string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(status))
+	return normalized == "running" || normalized == "queued" || normalized == "needs-input"
 }
 
 // truncateTitle truncates a string to a reasonable title length

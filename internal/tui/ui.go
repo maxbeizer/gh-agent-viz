@@ -77,6 +77,7 @@ func NewModel(repo string, debug bool) Model {
 		keys.SelectTask,
 		keys.ShowLogs,
 		keys.OpenInBrowser,
+		keys.ResumeSession,
 		keys.ToggleFilter,
 		keys.RefreshData,
 		keys.ExitApp,
@@ -230,6 +231,11 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if task != nil {
 			return m, m.openTaskPR(task)
 		}
+	case "s":
+		task := m.taskList.SelectedTask()
+		if task != nil {
+			return m, m.resumeSession(task)
+		}
 	case "r":
 		return m, m.fetchTasks
 	case "tab":
@@ -382,6 +388,41 @@ func (m Model) openTaskPR(session *data.Session) tea.Cmd {
 			}
 		default:
 			return errMsg{fmt.Errorf("selected session has no pull request to open")}
+		}
+
+		return nil
+	}
+}
+
+func (m Model) resumeSession(session *data.Session) tea.Cmd {
+	return func() tea.Msg {
+		if session == nil {
+			return errMsg{fmt.Errorf("no session selected")}
+		}
+
+		if session.Source != data.SourceLocalCopilot {
+			return errMsg{fmt.Errorf("only local Copilot CLI sessions can be resumed")}
+		}
+
+		// Only allow resuming active sessions (running or queued)
+		if session.Status != "running" && session.Status != "queued" {
+			return errMsg{fmt.Errorf("cannot resume session: session status is '%s' (only 'running' or 'queued' sessions can be resumed)", session.Status)}
+		}
+
+		if session.ID == "" {
+			return errMsg{fmt.Errorf("cannot resume session: session has no ID")}
+		}
+
+		cmd := exec.Command("gh", "copilot", "--", "--resume", session.ID)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			// Provide a user-friendly error message
+			outputStr := strings.TrimSpace(string(output))
+			if outputStr != "" {
+				// Include output only if it provides useful context
+				return errMsg{fmt.Errorf("failed to resume session: %s", outputStr)}
+			}
+			return errMsg{fmt.Errorf("failed to resume session")}
 		}
 
 		return nil

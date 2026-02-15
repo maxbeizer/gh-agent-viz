@@ -352,7 +352,7 @@ func (m Model) openTaskPR(task *data.AgentTask) tea.Cmd {
 
 		switch {
 		case task.PRURL != "":
-			output, err := exec.Command("gh", "browse", task.PRURL).CombinedOutput()
+			output, err := exec.Command("gh", "pr", "view", task.PRURL, "--web").CombinedOutput()
 			if err != nil {
 				return errMsg{fmt.Errorf("failed to open PR: %s", strings.TrimSpace(string(output)))}
 			}

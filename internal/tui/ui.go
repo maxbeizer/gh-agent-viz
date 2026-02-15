@@ -368,9 +368,9 @@ func (m Model) fetchTasks() tea.Msg {
 		for _, session := range sessions {
 			if m.ctx.StatusFilter == "attention" && data.SessionNeedsAttention(session) {
 				filtered = append(filtered, session)
-			} else if m.ctx.StatusFilter == "active" && (session.Status == "running" || session.Status == "queued" || session.Status == "needs-input") {
+			} else if m.ctx.StatusFilter == "active" && (data.StatusIsActive(session.Status) || strings.EqualFold(session.Status, "needs-input")) {
 				filtered = append(filtered, session)
-			} else if session.Status == m.ctx.StatusFilter {
+			} else if strings.EqualFold(session.Status, m.ctx.StatusFilter) {
 				filtered = append(filtered, session)
 			}
 		}

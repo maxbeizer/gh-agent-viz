@@ -47,3 +47,11 @@ func TestSessionNeedsAttention(t *testing.T) {
 		})
 	}
 }
+
+func TestStatusIsActive_CaseInsensitive(t *testing.T) {
+	for _, status := range []string{"Running", "QUEUED", "In Progress", "active", "OPEN"} {
+		if !StatusIsActive(status) {
+			t.Fatalf("expected %q to be active", status)
+		}
+	}
+}

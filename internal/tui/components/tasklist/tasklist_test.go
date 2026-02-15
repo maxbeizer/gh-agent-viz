@@ -312,3 +312,13 @@ func TestView_ShowsAttentionChip(t *testing.T) {
 		t.Fatalf("expected attention chip, got: %s", view)
 	}
 }
+
+func TestTruncate_HandlesUnicodeSafely(t *testing.T) {
+	out := truncate("これは日本語です", 6)
+	if !strings.HasSuffix(out, "...") {
+		t.Fatalf("expected ellipsis suffix, got %q", out)
+	}
+	if strings.Contains(out, "�") {
+		t.Fatalf("expected valid UTF-8 output, got %q", out)
+	}
+}

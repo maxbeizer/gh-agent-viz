@@ -30,7 +30,6 @@ type Model struct {
 
 const defaultColumnWidth = 42
 const minColumnWidth = 30
-const minNarrowColumnWidth = 20
 
 // New creates a new task list model
 func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, statusIconFunc func(string) string) Model {
@@ -86,8 +85,8 @@ func (m Model) View() string {
 func (m Model) renderBoard() string {
 	if m.width < minColumnWidth*3+4 {
 		narrowWidth := m.width - 2
-		if narrowWidth < minNarrowColumnWidth {
-			narrowWidth = minNarrowColumnWidth
+		if narrowWidth < 3 {
+			narrowWidth = 3
 		}
 		hint := m.tableRowStyle.Render(fmt.Sprintf("NARROW MODE • showing %s lane only (use ←/→)", columnTitle(m.activeColumn)))
 		column := m.renderColumn(m.activeColumn, narrowWidth)
@@ -252,7 +251,11 @@ func (m Model) renderRow(session data.Session, selected bool, width int) string 
 		repoWithBranch = fmt.Sprintf("%s@%s", repoWithBranch, session.Branch)
 	}
 	updated := formatTime(session.UpdatedAt)
-	repo := truncate(repoWithBranch, maxInt(18, width-len(updated)-8))
+	repoMax := width - len(updated) - 5
+	if repoMax < 3 {
+		repoMax = 3
+	}
+	repo := truncate(repoWithBranch, repoMax)
 	if title == "" {
 		title = "Untitled Session"
 	}
@@ -378,10 +381,11 @@ func truncate(s string, maxLen int) string {
 	if maxLen < 3 {
 		maxLen = 3
 	}
-	if len(s) <= maxLen {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }
 
 func formatTime(t time.Time) string {
@@ -406,9 +410,12 @@ func statusColumn(status string) int {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "failed", "cancelled", "canceled":
 		return 2
-	case "running", "queued", "in progress", "active", "open", "needs-input":
+	case "needs-input":
 		return 0
 	default:
+		if data.StatusIsActive(status) {
+			return 0
+		}
 		return 1
 	}
 }
@@ -436,8 +443,7 @@ func sourceLabel(source data.SessionSource) string {
 }
 
 func isActiveStatus(status string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(status))
-	return normalized == "running" || normalized == "queued" || normalized == "active" || normalized == "open" || normalized == "in progress" || normalized == "needs-input"
+	return data.StatusIsActive(status) || strings.EqualFold(strings.TrimSpace(status), "needs-input")
 }
 
 func sessionBadge(session data.Session) string {

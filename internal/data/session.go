@@ -64,15 +64,19 @@ func (s Session) ToAgentTask() AgentTask {
 // SessionNeedsAttention indicates whether a session likely requires operator action.
 func SessionNeedsAttention(session Session) bool {
 	status := strings.ToLower(strings.TrimSpace(session.Status))
-
 	if status == "needs-input" || status == "failed" {
 		return true
 	}
 
-	active := status == "running" || status == "queued" || status == "active" || status == "open" || status == "in progress"
-	if !active || session.UpdatedAt.IsZero() {
+	if !StatusIsActive(session.Status) || session.UpdatedAt.IsZero() {
 		return false
 	}
 
 	return time.Since(session.UpdatedAt) >= AttentionStaleThreshold
+}
+
+// StatusIsActive determines if a status string represents an active session.
+func StatusIsActive(status string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(status))
+	return normalized == "running" || normalized == "queued" || normalized == "active" || normalized == "open" || normalized == "in progress"
 }

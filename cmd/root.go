@@ -5,12 +5,14 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui"
 	"github.com/spf13/cobra"
 )
 
 var (
-	repoFlag string
+	repoFlag  string
+	debugFlag bool
 )
 
 // rootCmd represents the base command
@@ -20,10 +22,12 @@ var rootCmd = &cobra.Command{
 	Long: `gh-agent-viz is a GitHub CLI extension that provides an interactive
 terminal UI for visualizing and managing GitHub Copilot coding agent sessions.
 
-View agent task status, browse details, and review logs in an easy-to-use TUI.`,
+	View agent task status, browse details, and review logs in an easy-to-use TUI.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		data.SetDebug(debugFlag)
+
 		// Create the Bubble Tea program
-		model := tui.NewModel(repoFlag)
+		model := tui.NewModel(repoFlag, debugFlag)
 		p := tea.NewProgram(model, tea.WithAltScreen())
 
 		// Run the program
@@ -45,4 +49,5 @@ func Execute() {
 func init() {
 	// Add flags
 	rootCmd.Flags().StringVarP(&repoFlag, "repo", "R", "", "Scope to a specific repository (format: owner/repo)")
+	rootCmd.Flags().BoolVar(&debugFlag, "debug", false, "Enable debug diagnostics and write command logs to ~/.gh-agent-viz-debug.log")
 }

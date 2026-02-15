@@ -7,10 +7,12 @@ An interactive terminal UI for visualizing GitHub Copilot coding agent sessions.
 - 📊 **Interactive TUI** - Browse agent sessions with keyboard navigation
 - 🔍 **Task Details** - View comprehensive task metadata (status, repo, branch, PR links)
 - 📝 **Log Viewer** - Scrollable, searchable agent task logs
+- 💻 **Local Sessions** - Automatically ingests local Copilot CLI sessions from `~/.copilot/session-state/`
 - 🎨 **Status Indicators** - Color-coded status icons (running, queued, completed, failed)
 - ⚡ **Quick Actions** - Open PRs in browser, refresh data, filter by status
 - 🔄 **Resume Sessions** - Jump directly into active Copilot CLI sessions with one keystroke
 - ⌨️ **Vim-style Keys** - j/k navigation, familiar keybindings
+- 🛡️ **Tolerant Parsing** - Gracefully handles malformed session files without crashing
 
 ## Installation
 
@@ -42,10 +44,20 @@ gh agent-viz
 gh agent-viz --repo owner/repo
 ```
 
+### Enable Debug Mode
+
+```bash
+gh agent-viz --debug
+```
+
+Debug mode writes command diagnostics to `~/.gh-agent-viz-debug.log` to speed up troubleshooting.
+
 ### Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
+| `h` / `←` | Move to previous column |
+| `→` | Move to next column |
 | `j` / `↓` | Move down |
 | `k` / `↑` | Move up |
 | `enter` | View task details |
@@ -108,12 +120,25 @@ This is a `gh` CLI extension (not a Copilot CLI plugin) because:
 
 See [docs/DECISIONS.md](docs/DECISIONS.md) for detailed architecture decisions.
 
+## Security
+
+Security is a core requirement for this project. See [docs/SECURITY.md](docs/SECURITY.md) for security principles, threat surface, and required engineering practices.
+
 ### Technology Stack
 
 - **Language**: Go
 - **TUI Framework**: [Bubble Tea](https://github.com/charmbracelet/bubbletea) + [Lip Gloss](https://github.com/charmbracelet/lipgloss) + [Bubbles](https://github.com/charmbracelet/bubbles)
 - **CLI Framework**: [Cobra](https://github.com/spf13/cobra)
 - **Data Source**: `gh agent-task` commands with `--json` output
+
+### Data Sources
+
+gh-agent-viz pulls sessions from two sources:
+
+1. **Remote Agent Tasks**: Via `gh agent-task` CLI commands
+2. **Local Copilot Sessions**: From `~/.copilot/session-state/*/workspace.yaml`
+
+Both sources are displayed together in the unified session list. See [docs/LOCAL_SESSIONS.md](docs/LOCAL_SESSIONS.md) for details on local session ingestion.
 
 ### Project Structure
 

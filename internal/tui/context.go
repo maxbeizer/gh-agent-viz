@@ -8,6 +8,7 @@ type ProgramContext struct {
 	Width        int
 	Height       int
 	Error        error
+	Debug        bool
 	StatusFilter string // "all", "active", "completed", "failed"
 }
 

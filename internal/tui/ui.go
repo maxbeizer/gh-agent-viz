@@ -43,8 +43,9 @@ type Model struct {
 }
 
 // NewModel creates a new TUI model
-func NewModel(repo string) Model {
+func NewModel(repo string, debug bool) Model {
 	ctx := NewProgramContext()
+	ctx.Debug = debug
 	cfg, err := config.Load("")
 	if err == nil {
 		ctx.Config = cfg
@@ -69,6 +70,8 @@ func NewModel(repo string) Model {
 
 	// Prepare key bindings for footer
 	footerKeys := []key.Binding{
+		keys.MoveLeft,
+		keys.MoveRight,
 		keys.MoveUp,
 		keys.MoveDown,
 		keys.SelectTask,
@@ -171,7 +174,11 @@ func (m Model) View() string {
 	}
 
 	if m.ctx.Error != nil {
-		mainView = fmt.Sprintf("Error: %v\n\n%s", m.ctx.Error, mainView)
+		errorText := fmt.Sprintf("Error: %v", m.ctx.Error)
+		if m.ctx.Debug {
+			errorText = fmt.Sprintf("%s\nDebug mode enabled. Log file: %s", errorText, data.DebugLogPath())
+		}
+		mainView = fmt.Sprintf("%s\n\n%s", errorText, mainView)
 	}
 
 	return headerView + mainView + footerView
@@ -199,6 +206,10 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleListKeys handles keys in list view mode
 func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "h", "left":
+		m.taskList.MoveColumn(-1)
+	case "right":
+		m.taskList.MoveColumn(1)
 	case "j", "down":
 		m.taskList.MoveCursor(1)
 	case "k", "up":
@@ -288,11 +299,11 @@ func (m *Model) cycleFilter() {
 
 // Message types
 type tasksLoadedMsg struct {
-	tasks []data.AgentTask
+	tasks []data.Session
 }
 
 type taskDetailLoadedMsg struct {
-	task *data.AgentTask
+	task *data.Session
 }
 
 type taskLogLoadedMsg struct {
@@ -305,37 +316,40 @@ type errMsg struct {
 	err error
 }
 
-// fetchTasks fetches the list of agent tasks
+// fetchTasks fetches the list of sessions (both agent tasks and local sessions)
 func (m Model) fetchTasks() tea.Msg {
-	tasks, err := data.FetchAgentTasks(m.repo)
+	sessions, err := data.FetchAllSessions(m.repo)
 	if err != nil {
 		return errMsg{err}
 	}
 
-	// Filter tasks based on status filter
+	// Filter sessions based on status filter
 	if m.ctx.StatusFilter != "all" {
-		filtered := []data.AgentTask{}
-		for _, task := range tasks {
-			if m.ctx.StatusFilter == "active" && (task.Status == "running" || task.Status == "queued") {
-				filtered = append(filtered, task)
-			} else if task.Status == m.ctx.StatusFilter {
-				filtered = append(filtered, task)
+		filtered := []data.Session{}
+		for _, session := range sessions {
+			if m.ctx.StatusFilter == "active" && (session.Status == "running" || session.Status == "queued") {
+				filtered = append(filtered, session)
+			} else if session.Status == m.ctx.StatusFilter {
+				filtered = append(filtered, session)
 			}
 		}
-		tasks = filtered
+		sessions = filtered
 	}
 
-	return tasksLoadedMsg{tasks}
+	return tasksLoadedMsg{sessions}
 }
 
-// fetchTaskDetail fetches detailed information for a task
+// fetchTaskDetail fetches detailed information for a session
 func (m Model) fetchTaskDetail(id string, repo string) tea.Cmd {
 	return func() tea.Msg {
+		// For now, we only support detail view for agent-task sessions
+		// Local sessions don't have a detail API yet
 		task, err := data.FetchAgentTaskDetail(id, repo)
 		if err != nil {
 			return errMsg{err}
 		}
-		return taskDetailLoadedMsg{task}
+		session := data.FromAgentTask(*task)
+		return taskDetailLoadedMsg{&session}
 	}
 }
 
@@ -350,25 +364,30 @@ func (m Model) fetchTaskLog(id string, repo string) tea.Cmd {
 	}
 }
 
-func (m Model) openTaskPR(task *data.AgentTask) tea.Cmd {
+func (m Model) openTaskPR(session *data.Session) tea.Cmd {
 	return func() tea.Msg {
-		if task == nil {
-			return errMsg{fmt.Errorf("no task selected")}
+		if session == nil {
+			return errMsg{fmt.Errorf("no session selected")}
+		}
+
+		// Local sessions don't have PR URLs
+		if session.Source == data.SourceLocalCopilot {
+			return errMsg{fmt.Errorf("local sessions don't have associated pull requests")}
 		}
 
 		switch {
-		case task.PRURL != "":
-			output, err := exec.Command("gh", "browse", task.PRURL).CombinedOutput()
+		case session.PRURL != "":
+			output, err := exec.Command("gh", "pr", "view", session.PRURL, "--web").CombinedOutput()
 			if err != nil {
 				return errMsg{fmt.Errorf("failed to open PR: %s", strings.TrimSpace(string(output)))}
 			}
-		case task.PRNumber > 0 && task.Repository != "":
-			output, err := exec.Command("gh", "pr", "view", fmt.Sprintf("%d", task.PRNumber), "-R", task.Repository, "--web").CombinedOutput()
+		case session.PRNumber > 0 && session.Repository != "":
+			output, err := exec.Command("gh", "pr", "view", fmt.Sprintf("%d", session.PRNumber), "-R", session.Repository, "--web").CombinedOutput()
 			if err != nil {
 				return errMsg{fmt.Errorf("failed to open PR: %s", strings.TrimSpace(string(output)))}
 			}
 		default:
-			return errMsg{fmt.Errorf("selected task has no pull request to open")}
+			return errMsg{fmt.Errorf("selected session has no pull request to open")}
 		}
 
 		return nil

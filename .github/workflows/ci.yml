@@ -31,6 +31,19 @@ jobs:
       - name: Coverage summary
         run: go tool cover -func=coverage.out
 
+  integration:
+    name: Integration Smoke Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Run integration smoke tests
+        run: ./test/integration/smoke_test.sh
+
   lint:
     runs-on: ubuntu-latest
     steps:

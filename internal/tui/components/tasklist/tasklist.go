@@ -13,16 +13,17 @@ import (
 
 // Model represents the task list component state
 type Model struct {
-	titleStyle       lipgloss.Style
-	tableHeaderStyle lipgloss.Style
-	tableRowStyle    lipgloss.Style
-	tableRowSelected lipgloss.Style
-	sessions         []data.Session
-	columnSessionIdx [3][]int
-	activeColumn     int
-	rowCursor        [3]int
-	loading          bool
-	statusIcon       func(string) string
+	titleStyle        lipgloss.Style
+	tableHeaderStyle  lipgloss.Style
+	tableRowStyle     lipgloss.Style
+	tableRowSelected  lipgloss.Style
+	sessions          []data.Session
+	columnSessionIdx  [3][]int
+	activeColumn      int
+	rowCursor         [3]int
+	loading           bool
+	statusIcon        func(string) string
+	selectedSessionID string
 }
 
 // New creates a new task list model
@@ -56,7 +57,7 @@ func (m Model) View() string {
 	}
 
 	if len(m.sessions) == 0 {
-		return m.titleStyle.Render("No sessions found")
+		return m.titleStyle.Render("No sessions found\n\nTry: refresh with 'r' or toggle filter with Tab")
 	}
 
 	columns := make([]string, 0, 3)
@@ -114,6 +115,10 @@ func (m Model) renderRow(session data.Session, selected bool) string {
 
 // SetTasks updates sessions and recategorizes columns
 func (m *Model) SetTasks(sessions []data.Session) {
+	if selected := m.SelectedTask(); selected != nil {
+		m.selectedSessionID = selected.ID
+	}
+
 	m.sessions = append([]data.Session(nil), sessions...)
 	sort.SliceStable(m.sessions, func(i, j int) bool {
 		return m.sessions[i].UpdatedAt.After(m.sessions[j].UpdatedAt)
@@ -135,6 +140,23 @@ func (m *Model) SetTasks(sessions []data.Session) {
 		}
 		if m.rowCursor[col] < 0 {
 			m.rowCursor[col] = 0
+		}
+	}
+
+	if m.selectedSessionID != "" {
+		for idx, session := range m.sessions {
+			if session.ID != m.selectedSessionID {
+				continue
+			}
+			for col := 0; col < 3; col++ {
+				for row, sessionIdx := range m.columnSessionIdx[col] {
+					if sessionIdx == idx {
+						m.activeColumn = col
+						m.rowCursor[col] = row
+						return
+					}
+				}
+			}
 		}
 	}
 

@@ -115,3 +115,102 @@ func TestViewEmptyAndLoadingStates(t *testing.T) {
 		t.Fatalf("expected loading state, got: %s", got)
 	}
 }
+
+func TestSetTasks_PreservesSelection(t *testing.T) {
+	model := New(
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		func(s string) string { return "" },
+	)
+
+	// Set initial sessions and select the second one in running column
+	initialTasks := []data.Session{
+		{ID: "1", Status: "running", Title: "Task 1", UpdatedAt: time.Now()},
+		{ID: "2", Status: "running", Title: "Task 2", UpdatedAt: time.Now()},
+		{ID: "3", Status: "running", Title: "Task 3", UpdatedAt: time.Now()},
+	}
+	model.SetTasks(initialTasks)
+	model.MoveCursor(1) // Select task 2
+
+	// Refresh with reordered sessions (simulating new fetch)
+	refreshedTasks := []data.Session{
+		{ID: "3", Status: "running", Title: "Task 3", UpdatedAt: time.Now().Add(-time.Minute)},
+		{ID: "2", Status: "running", Title: "Task 2", UpdatedAt: time.Now()},
+		{ID: "1", Status: "running", Title: "Task 1", UpdatedAt: time.Now().Add(-2 * time.Minute)},
+	}
+	model.SetTasks(refreshedTasks)
+
+	selected := model.SelectedTask()
+	if selected == nil || selected.ID != "2" {
+		t.Errorf("expected selected task ID '2', got '%v'", selected)
+	}
+}
+
+func TestView_ShowsSourceBadge(t *testing.T) {
+	model := New(
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		func(status string) string { return "✓" },
+	)
+
+	tasks := []data.Session{
+		{
+			ID:         "1",
+			Status:     "running",
+			Title:      "Task 1",
+			Repository: "owner/repo",
+			Source:     data.SourceAgentTask,
+			UpdatedAt:  time.Now(),
+		},
+	}
+	model.SetTasks(tasks)
+
+	view := model.View()
+	if !strings.Contains(view, "agent-task") {
+		t.Error("expected view to contain session source")
+	}
+}
+
+func TestView_ShowsTaskCount(t *testing.T) {
+	model := New(
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		func(status string) string { return "" },
+	)
+
+	tasks := []data.Session{
+		{ID: "1", Status: "running", Title: "Task 1"},
+		{ID: "2", Status: "completed", Title: "Task 2"},
+		{ID: "3", Status: "failed", Title: "Task 3"},
+	}
+	model.SetTasks(tasks)
+
+	view := model.View()
+	if !strings.Contains(view, "Running (1)") || !strings.Contains(view, "Done (1)") || !strings.Contains(view, "Failed (1)") {
+		t.Error("expected view to show per-column task counts")
+	}
+}
+
+func TestView_ImprovedEmptyState(t *testing.T) {
+	model := New(
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		func(s string) string { return "" },
+	)
+
+	view := model.View()
+	if !strings.Contains(view, "No sessions found") {
+		t.Error("expected improved empty state message")
+	}
+	if !strings.Contains(view, "refresh with 'r'") {
+		t.Error("expected empty state to include helpful hints")
+	}
+}

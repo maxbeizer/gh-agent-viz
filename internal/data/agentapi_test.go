@@ -160,6 +160,9 @@ func TestFetchAgentTasks_ValidJSON(t *testing.T) {
 	if firstTask.Title != "Fix bug" {
 		t.Errorf("wrong title: expected 'Fix bug', got '%s'", firstTask.Title)
 	}
+	if firstTask.Source != "agent-task" {
+		t.Errorf("wrong source: expected 'agent-task', got '%s'", firstTask.Source)
+	}
 }
 
 func TestFetchAgentTasks_EmptyList(t *testing.T) {
@@ -261,6 +264,9 @@ func TestFetchAgentTaskDetail_ValidData(t *testing.T) {
 	}
 	if result.Title != "Add feature" {
 		t.Errorf("wrong title: expected 'Add feature', got '%s'", result.Title)
+	}
+	if result.Source != "agent-task" {
+		t.Errorf("wrong source: expected 'agent-task', got '%s'", result.Source)
 	}
 }
 

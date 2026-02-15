@@ -4,6 +4,8 @@ import "github.com/charmbracelet/bubbles/key"
 
 // Keybindings holds all key bindings for the application
 type Keybindings struct {
+	MoveLeft      key.Binding
+	MoveRight     key.Binding
 	MoveUp        key.Binding
 	MoveDown      key.Binding
 	SelectTask    key.Binding
@@ -18,6 +20,14 @@ type Keybindings struct {
 // NewKeybindings creates the default key bindings for the TUI
 func NewKeybindings() Keybindings {
 	return Keybindings{
+		MoveLeft: key.NewBinding(
+			key.WithKeys("h", "left"),
+			key.WithHelp("h/←", "move column left"),
+		),
+		MoveRight: key.NewBinding(
+			key.WithKeys("right"),
+			key.WithHelp("→", "move column right"),
+		),
 		MoveUp: key.NewBinding(
 			key.WithKeys("k", "up"),
 			key.WithHelp("k/↑", "navigate up"),

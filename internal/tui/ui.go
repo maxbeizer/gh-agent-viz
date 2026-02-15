@@ -69,6 +69,8 @@ func NewModel(repo string) Model {
 
 	// Prepare key bindings for footer
 	footerKeys := []key.Binding{
+		keys.MoveLeft,
+		keys.MoveRight,
 		keys.MoveUp,
 		keys.MoveDown,
 		keys.SelectTask,
@@ -198,6 +200,10 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleListKeys handles keys in list view mode
 func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "h", "left":
+		m.taskList.MoveColumn(-1)
+	case "right":
+		m.taskList.MoveColumn(1)
 	case "j", "down":
 		m.taskList.MoveCursor(1)
 	case "k", "up":

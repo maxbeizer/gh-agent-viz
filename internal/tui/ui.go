@@ -157,7 +157,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the TUI
 func (m Model) View() string {
 	if !m.ready {
-		return "Initializing..."
+		return "Spinning up ATC tower..."
 	}
 
 	// Update footer hints based on current context

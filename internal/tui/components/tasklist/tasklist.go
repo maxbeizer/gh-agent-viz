@@ -16,7 +16,7 @@ type Model struct {
 	tableHeaderStyle lipgloss.Style
 	tableRowStyle    lipgloss.Style
 	tableRowSelected lipgloss.Style
-	tasks            []data.AgentTask
+	sessions         []data.Session
 	cursor           int
 	loading          bool
 	statusIcon       func(string) string
@@ -29,7 +29,7 @@ func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, sta
 		tableHeaderStyle: headerStyle,
 		tableRowStyle:    rowStyle,
 		tableRowSelected: rowSelectedStyle,
-		tasks:            []data.AgentTask{},
+		sessions:         []data.Session{},
 		cursor:           0,
 		loading:          false,
 		statusIcon:       statusIconFunc,
@@ -49,11 +49,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 // View renders the task list as a table
 func (m Model) View() string {
 	if m.loading {
-		return m.titleStyle.Render("Loading agent tasks...")
+		return m.titleStyle.Render("Loading sessions...")
 	}
 
-	if len(m.tasks) == 0 {
-		return m.titleStyle.Render("No agent tasks found")
+	if len(m.sessions) == 0 {
+		return m.titleStyle.Render("No sessions found")
 	}
 
 	var rows []string
@@ -63,36 +63,36 @@ func (m Model) View() string {
 	rows = append(rows, header)
 
 	// Task rows
-	for i, task := range m.tasks {
+	for i, session := range m.sessions {
 		selected := i == m.cursor
-		row := m.renderRow(task, selected)
+		row := m.renderRow(session, selected)
 		rows = append(rows, row)
 	}
 
 	return strings.Join(rows, "\n")
 }
 
-// renderRow formats a single task as a table row
-func (m Model) renderRow(task data.AgentTask, selected bool) string {
+// renderRow formats a single session as a table row
+func (m Model) renderRow(session data.Session, selected bool) string {
 	style := m.tableRowStyle
 	if selected {
 		style = m.tableRowSelected
 	}
 
-	icon := m.statusIcon(task.Status)
-	repo := truncate(task.Repository, 30)
-	title := truncate(task.Title, 50)
-	updated := formatTime(task.UpdatedAt)
+	icon := m.statusIcon(session.Status)
+	repo := truncate(session.Repository, 30)
+	title := truncate(session.Title, 50)
+	updated := formatTime(session.UpdatedAt)
 
 	row := fmt.Sprintf("%-3s %-32s %-52s %s", icon, repo, title, updated)
 	return style.Render(row)
 }
 
-// SetTasks updates the task list
-func (m *Model) SetTasks(tasks []data.AgentTask) {
-	m.tasks = tasks
-	if m.cursor >= len(tasks) {
-		m.cursor = len(tasks) - 1
+// SetTasks updates the session list
+func (m *Model) SetTasks(sessions []data.Session) {
+	m.sessions = sessions
+	if m.cursor >= len(sessions) {
+		m.cursor = len(sessions) - 1
 	}
 	if m.cursor < 0 {
 		m.cursor = 0
@@ -105,15 +105,15 @@ func (m *Model) MoveCursor(delta int) {
 	if m.cursor < 0 {
 		m.cursor = 0
 	}
-	if m.cursor >= len(m.tasks) {
-		m.cursor = len(m.tasks) - 1
+	if m.cursor >= len(m.sessions) {
+		m.cursor = len(m.sessions) - 1
 	}
 }
 
-// SelectedTask returns the currently selected task
-func (m Model) SelectedTask() *data.AgentTask {
-	if m.cursor >= 0 && m.cursor < len(m.tasks) {
-		return &m.tasks[m.cursor]
+// SelectedTask returns the currently selected session
+func (m Model) SelectedTask() *data.Session {
+	if m.cursor >= 0 && m.cursor < len(m.sessions) {
+		return &m.sessions[m.cursor]
 	}
 	return nil
 }

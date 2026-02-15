@@ -7,13 +7,14 @@ import (
 )
 
 func TestResumeSession_ValidRunningSession(t *testing.T) {
-	m := NewModel("")
+	m := NewModel("", false)
 
-	// Create a running task
-	task := &data.AgentTask{
+	// Create a running local session
+	task := &data.Session{
 		ID:     "test-session-123",
 		Status: "running",
 		Title:  "Test Running Task",
+		Source: data.SourceLocalCopilot,
 	}
 
 	// Test that running sessions are resumable
@@ -24,13 +25,14 @@ func TestResumeSession_ValidRunningSession(t *testing.T) {
 }
 
 func TestResumeSession_ValidQueuedSession(t *testing.T) {
-	m := NewModel("")
+	m := NewModel("", false)
 
-	// Create a queued task
-	task := &data.AgentTask{
+	// Create a queued local session
+	task := &data.Session{
 		ID:     "test-session-456",
 		Status: "queued",
 		Title:  "Test Queued Task",
+		Source: data.SourceLocalCopilot,
 	}
 
 	// Test that queued sessions are resumable
@@ -41,13 +43,14 @@ func TestResumeSession_ValidQueuedSession(t *testing.T) {
 }
 
 func TestResumeSession_CompletedSession(t *testing.T) {
-	m := NewModel("")
+	m := NewModel("", false)
 
-	// Create a completed task
-	task := &data.AgentTask{
+	// Create a completed local session
+	task := &data.Session{
 		ID:     "test-session-789",
 		Status: "completed",
 		Title:  "Test Completed Task",
+		Source: data.SourceLocalCopilot,
 	}
 
 	// Test that completed sessions return an error
@@ -69,13 +72,14 @@ func TestResumeSession_CompletedSession(t *testing.T) {
 }
 
 func TestResumeSession_FailedSession(t *testing.T) {
-	m := NewModel("")
+	m := NewModel("", false)
 
-	// Create a failed task
-	task := &data.AgentTask{
+	// Create a failed local session
+	task := &data.Session{
 		ID:     "test-session-999",
 		Status: "failed",
 		Title:  "Test Failed Task",
+		Source: data.SourceLocalCopilot,
 	}
 
 	// Test that failed sessions return an error
@@ -97,7 +101,7 @@ func TestResumeSession_FailedSession(t *testing.T) {
 }
 
 func TestResumeSession_NilTask(t *testing.T) {
-	m := NewModel("")
+	m := NewModel("", false)
 
 	// Test nil task
 	cmd := m.resumeSession(nil)
@@ -118,13 +122,14 @@ func TestResumeSession_NilTask(t *testing.T) {
 }
 
 func TestResumeSession_EmptySessionID(t *testing.T) {
-	m := NewModel("")
+	m := NewModel("", false)
 
-	// Create a task with empty ID
-	task := &data.AgentTask{
+	// Create a local session with empty ID
+	task := &data.Session{
 		ID:     "",
 		Status: "running",
 		Title:  "Test Task No ID",
+		Source: data.SourceLocalCopilot,
 	}
 
 	// Test that empty ID returns an error

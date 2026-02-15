@@ -394,23 +394,26 @@ func (m Model) openTaskPR(session *data.Session) tea.Cmd {
 	}
 }
 
-func (m Model) resumeSession(task *data.AgentTask) tea.Cmd {
+func (m Model) resumeSession(session *data.Session) tea.Cmd {
 	return func() tea.Msg {
-		if task == nil {
-			return errMsg{fmt.Errorf("no task selected")}
+		if session == nil {
+			return errMsg{fmt.Errorf("no session selected")}
+		}
+
+		if session.Source != data.SourceLocalCopilot {
+			return errMsg{fmt.Errorf("only local Copilot CLI sessions can be resumed")}
 		}
 
 		// Only allow resuming active sessions (running or queued)
-		if task.Status != "running" && task.Status != "queued" {
-			return errMsg{fmt.Errorf("cannot resume session: task status is '%s' (only 'running' or 'queued' sessions can be resumed)", task.Status)}
+		if session.Status != "running" && session.Status != "queued" {
+			return errMsg{fmt.Errorf("cannot resume session: session status is '%s' (only 'running' or 'queued' sessions can be resumed)", session.Status)}
 		}
 
-		if task.ID == "" {
-			return errMsg{fmt.Errorf("cannot resume session: task has no session ID")}
+		if session.ID == "" {
+			return errMsg{fmt.Errorf("cannot resume session: session has no ID")}
 		}
 
-		// Execute gh copilot -- --resume <session-id>
-		cmd := exec.Command("gh", "copilot", "--", "--resume", task.ID)
+		cmd := exec.Command("gh", "copilot", "--", "--resume", session.ID)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			// Provide a user-friendly error message

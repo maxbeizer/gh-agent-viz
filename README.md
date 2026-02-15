@@ -71,9 +71,9 @@ Debug mode writes command diagnostics to `~/.gh-agent-viz-debug.log` to speed up
 
 ### Resume Active Sessions
 
-Press `s` on any active session (status: `running` or `queued`) to resume it directly in your terminal. This executes `gh copilot -- --resume <session-id>` and drops you into the Copilot CLI session.
+Press `s` on any active **local Copilot CLI session** (status: `running` or `queued`) to resume it directly in your terminal. This executes `gh copilot -- --resume <session-id>` and drops you into the Copilot CLI session.
 
-**Note:** Only active sessions can be resumed. Attempting to resume a completed or failed session will show a clear error message.
+**Note:** Only active local sessions can be resumed. Attempting to resume a remote agent-task row, or a completed/failed session, shows a clear error message.
 
 ### Log Viewer Navigation
 

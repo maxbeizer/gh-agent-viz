@@ -32,6 +32,8 @@ go build -o gh-agent-viz ./gh-agent-viz.go
 
 ## Usage
 
+If you want a fast walkthrough of what the board is showing, read [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md).
+
 ### Launch the TUI
 
 ```bash
@@ -109,8 +111,11 @@ defaultFilter: all
 ## Documentation
 
 - **[Quick Docs Home](docs/index.md)** - Start here for product usage
+- **[Getting Started](docs/GETTING_STARTED.md)** - Understand what you are seeing on screen
 - **[Operator Guide](docs/OPERATOR_GUIDE.md)** - Daily workflows and keybindings
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Fast fixes for common issues
+- **[Debug Mode](docs/DEBUG_MODE.md)** - Capture actionable diagnostics
+- **[Developer Workflow](docs/DEVELOPER_WORKFLOW.md)** - Makefile commands for build/test/smoke
 - **[Architecture Decisions](docs/DECISIONS.md)** - Technical design rationale and patterns
 
 ## Requirements
@@ -175,56 +180,31 @@ gh-agent-viz/
 - Go 1.21 or later
 - GitHub CLI authenticated
 
-### Build
+### One-command workflow (recommended)
 
 ```bash
-go build -o gh-agent-viz ./gh-agent-viz.go
+make build
+make test
+make smoke
 ```
 
-### Run
+### Full local validation (CI-like)
 
 ```bash
-./gh-agent-viz
+make ci
 ```
 
-### Dependencies
+### Additional developer commands
 
 ```bash
-go get github.com/charmbracelet/bubbletea
-go get github.com/charmbracelet/lipgloss
-go get github.com/charmbracelet/bubbles
-go get github.com/spf13/cobra
-go get github.com/cli/go-gh/v2
-go get gopkg.in/yaml.v3
+make test-race
+make coverage
+make fmt
+make lint
+make clean
 ```
 
-### Testing
-
-#### Unit Tests
-
-Run all unit tests with coverage:
-
-```bash
-go test -v -race -coverprofile=coverage.out ./...
-go tool cover -func=coverage.out
-```
-
-#### Integration Smoke Tests
-
-Run integration smoke tests that validate build, help, navigation, and action paths:
-
-```bash
-./test/integration/smoke_test.sh
-```
-
-These tests run automatically in CI on all PRs and commits to main. They validate:
-- Project builds successfully
-- Help command works and displays proper usage
-- Invalid flags are handled gracefully
-- Binary starts without crashing
-- Module dependencies are satisfied
-
-See `.github/agents/integration-test.agent.md` for the complete test execution profile.
+See `make help` and [docs/DEVELOPER_WORKFLOW.md](docs/DEVELOPER_WORKFLOW.md).
 
 ## Reference
 

@@ -81,34 +81,34 @@ func (m *Model) GotoBottom() {
 
 // PageDown scrolls down one page
 func (m *Model) PageDown() {
-	m.viewport.ViewDown()
+	m.viewport.PageDown()
 }
 
 // PageUp scrolls up one page
 func (m *Model) PageUp() {
-	m.viewport.ViewUp()
+	m.viewport.PageUp()
 }
 
 // HalfPageDown scrolls down half a page
 func (m *Model) HalfPageDown() {
-	m.viewport.HalfViewDown()
+	m.viewport.HalfPageDown()
 }
 
 // HalfPageUp scrolls up half a page
 func (m *Model) HalfPageUp() {
-	m.viewport.HalfViewUp()
+	m.viewport.HalfPageUp()
 }
 
 // LineDown scrolls down one line
 func (m *Model) LineDown() {
 	if m.viewport.YOffset < m.lineCount-m.viewport.Height {
-		m.viewport.LineDown(1)
+		m.viewport.ScrollDown(1)
 	}
 }
 
 // LineUp scrolls up one line
 func (m *Model) LineUp() {
 	if m.viewport.YOffset > 0 {
-		m.viewport.LineUp(1)
+		m.viewport.ScrollUp(1)
 	}
 }

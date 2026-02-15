@@ -130,6 +130,12 @@ See [docs/DECISIONS.md](docs/DECISIONS.md) for detailed architecture decisions.
 
 Security is a core requirement for this project. See [docs/SECURITY.md](docs/SECURITY.md) for security principles, threat surface, and required engineering practices.
 
+## Documentation Site
+
+- GitHub Pages is deployed from `docs/` via `.github/workflows/docs-pages.yml`.
+- Site URL: https://maxbeizer.github.io/gh-agent-viz/
+- Keep docs in sync with shipped behavior when merging changes.
+
 ### Technology Stack
 
 - **Language**: Go

@@ -250,6 +250,22 @@ func TestView_NarrowModeShowsSingleLaneHint(t *testing.T) {
 	}
 }
 
+func TestView_VeryNarrowWidthUsesCompactRows(t *testing.T) {
+	model := newModel()
+	model.SetSize(12, 24)
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Long Session Title", UpdatedAt: time.Now()},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "NARROW MODE") {
+		t.Fatalf("expected narrow mode hint, got: %s", view)
+	}
+	if strings.Contains(view, "• just now") {
+		t.Fatalf("expected compact row without meta overflow, got: %s", view)
+	}
+}
+
 func TestView_VeryShortHeightHidesFlightDeck(t *testing.T) {
 	model := newModel()
 	model.SetSize(120, 20)

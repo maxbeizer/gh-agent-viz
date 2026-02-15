@@ -242,7 +242,11 @@ func (m Model) renderRow(session data.Session, selected bool, width int) string 
 	}
 
 	icon := m.statusIcon(session.Status)
-	title := truncate(session.Title, maxInt(16, width-10))
+	titleMax := width - 4
+	if titleMax < 3 {
+		titleMax = 3
+	}
+	title := truncate(session.Title, titleMax)
 	repoWithBranch := session.Repository
 	if repoWithBranch == "" {
 		repoWithBranch = "no-repo"
@@ -266,9 +270,21 @@ func (m Model) renderRow(session data.Session, selected bool, width int) string 
 		titleLine += " " + badge
 	}
 
+	if width < 20 {
+		row := titleLine
+		if selected {
+			row += fmt.Sprintf("\n↳ %s", truncate(rowContext(session), titleMax))
+		}
+		return style.Render(row)
+	}
+
 	row := fmt.Sprintf("%s\n  %s • %s", titleLine, repo, updated)
 	if selected {
-		row += fmt.Sprintf("\n  ↳ %s", truncate(rowContext(session), maxInt(18, width-6)))
+		contextMax := width - 6
+		if contextMax < 3 {
+			contextMax = 3
+		}
+		row += fmt.Sprintf("\n  ↳ %s", truncate(rowContext(session), contextMax))
 	}
 	return style.Render(row)
 }

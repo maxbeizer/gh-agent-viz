@@ -23,10 +23,10 @@ func TestView_UsesFriendlyFallbacks(t *testing.T) {
 	if !strings.Contains(view, "Untitled Session") {
 		t.Fatalf("expected untitled fallback, got: %s", view)
 	}
-	if !strings.Contains(view, "Repository: not linked") {
+	if !strings.Contains(view, "Repository: not available") {
 		t.Fatalf("expected repository fallback, got: %s", view)
 	}
-	if !strings.Contains(view, "Branch:     not linked") {
+	if !strings.Contains(view, "Branch:     not available") {
 		t.Fatalf("expected branch fallback, got: %s", view)
 	}
 	if !strings.Contains(view, "Created:    not recorded") || !strings.Contains(view, "Updated:    not recorded") {

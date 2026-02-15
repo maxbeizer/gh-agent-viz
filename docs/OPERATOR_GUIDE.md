@@ -19,9 +19,9 @@ gh agent-viz --debug
 
 The board includes:
 
-- **ATC Overview**: total/active/done/failed/session-source counters
+- **Sessions at a Glance**: total/running/done/failed plus `needs action` count
 - **Three status columns**: active work lanes
-- **Selected Session panel**: plain-language context and recommended actions for the highlighted row
+- **Session Summary panel**: plain-language context and recommended actions for the highlighted row
 
 Columns:
 
@@ -31,8 +31,8 @@ Columns:
 
 Each card includes explicit labels so triage is immediate:
 
-- `Repository:` shows repo context (`not linked` if missing)
-- `Attention:` explains why action is needed (`needs your input`, `failed`, `active but quiet`, or `no action needed`)
+- `Repository:` shows repo context (`not available` if missing)
+- `Needs your action:` explains why action is needed (`waiting on your input`, `run failed`, `running but quiet`, or `no action needed`)
 - `Last update:` shows freshness (`not recorded` when timestamp metadata is missing)
 
 ## 3) Core keys (daily use)
@@ -45,14 +45,14 @@ Each card includes explicit labels so triage is immediate:
 | `l` | Open log view (only shown for remote agent-task rows) |
 | `o` | Open PR in browser (only shown when selected row has a linked PR) |
 | `s` | Resume active **local** Copilot session |
-| `a` | Toggle **attention mode** (sessions needing your action) |
-| `tab` / `shift+tab` | Cycle filter: all ↔ attention ↔ active ↔ completed ↔ failed |
+| `a` | Toggle **needs-action view** (sessions needing your action) |
+| `tab` / `shift+tab` | Cycle filter: all ↔ needs action ↔ running ↔ done ↔ failed |
 | `r` | Refresh now |
 | `q` | Quit |
 
 ## 4) Typical workflow
 
-1. Start in **attention mode** (`a`) to triage what needs you now.
+1. Start in **needs-action view** (`a`) to triage what needs you now.
 2. Open details (`enter`) for a session you care about.
 3. Jump to logs (`l`) if something looks off.
 4. Open PR (`o`) for completed remote work.

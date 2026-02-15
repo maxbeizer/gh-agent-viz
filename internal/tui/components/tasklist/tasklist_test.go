@@ -106,12 +106,12 @@ func TestViewShowsKanbanColumns(t *testing.T) {
 
 func TestViewEmptyAndLoadingStates(t *testing.T) {
 	model := newModel()
-	if got := model.View(); !strings.Contains(got, "The sky is clear") {
+	if got := model.View(); !strings.Contains(got, "No sessions to show yet") {
 		t.Fatalf("expected empty state, got: %s", got)
 	}
 
 	model.loading = true
-	if got := model.View(); !strings.Contains(got, "Warming up the radar") {
+	if got := model.View(); !strings.Contains(got, "Loading sessions") {
 		t.Fatalf("expected loading state, got: %s", got)
 	}
 }
@@ -167,11 +167,12 @@ func TestView_ShowsSourceBadge(t *testing.T) {
 			UpdatedAt:  time.Now(),
 		},
 	}
+	model.SetSize(140, 36)
 	model.SetTasks(tasks)
 
 	view := model.View()
-	if !strings.Contains(view, "agent") {
-		t.Error("expected view to contain session source")
+	if !strings.Contains(view, "Source: agent") {
+		t.Error("expected session summary to contain source label")
 	}
 }
 
@@ -207,10 +208,10 @@ func TestView_ImprovedEmptyState(t *testing.T) {
 	)
 
 	view := model.View()
-	if !strings.Contains(view, "The sky is clear") {
+	if !strings.Contains(view, "No sessions to show yet") {
 		t.Error("expected improved empty state message")
 	}
-	if !strings.Contains(view, "Press 'r' to scan again") {
+	if !strings.Contains(view, "Press 'r' to refresh") {
 		t.Error("expected empty state to include helpful hints")
 	}
 }
@@ -245,7 +246,7 @@ func TestView_NarrowModeShowsSingleLaneHint(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "NARROW MODE") {
+	if !strings.Contains(view, "COMPACT VIEW") {
 		t.Fatalf("expected narrow mode hint, got: %s", view)
 	}
 }
@@ -258,7 +259,7 @@ func TestView_VeryNarrowWidthUsesCompactRows(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "NARROW MODE") {
+	if !strings.Contains(view, "COMPACT VIEW") {
 		t.Fatalf("expected narrow mode hint, got: %s", view)
 	}
 	if strings.Contains(view, "• just now") {
@@ -274,7 +275,7 @@ func TestView_VeryShortHeightHidesFlightDeck(t *testing.T) {
 	})
 
 	view := model.View()
-	if strings.Contains(view, "SELECTED SESSION") || strings.Contains(view, "Selected Session") {
+	if strings.Contains(view, "SESSION SUMMARY") || strings.Contains(view, "Session Summary") {
 		t.Fatalf("expected no selected session panel in very short layout, got: %s", view)
 	}
 }
@@ -287,7 +288,7 @@ func TestView_MediumHeightUsesCompactFlightDeck(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "Selected Session •") {
+	if !strings.Contains(view, "Session Summary •") {
 		t.Fatalf("expected compact selected session panel in medium layout, got: %s", view)
 	}
 }
@@ -324,7 +325,7 @@ func TestView_ShowsAttentionChip(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "attention 1") {
+	if !strings.Contains(view, "needs action 1") {
 		t.Fatalf("expected attention chip, got: %s", view)
 	}
 }
@@ -358,10 +359,10 @@ func TestView_CardShowsAttentionReason(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "Attention: needs your input") {
+	if !strings.Contains(view, "Needs your action: waiting on your input") {
 		t.Fatalf("expected explicit input-needed reason, got: %s", view)
 	}
-	if !strings.Contains(view, "Attention: active but quiet") {
+	if !strings.Contains(view, "Needs your action: running but quiet") {
 		t.Fatalf("expected explicit quiet-active reason, got: %s", view)
 	}
 }
@@ -379,13 +380,13 @@ func TestView_SelectedSessionUsesFriendlyFallbacks(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "SELECTED SESSION") {
+	if !strings.Contains(view, "SESSION SUMMARY") {
 		t.Fatalf("expected selected session heading, got: %s", view)
 	}
-	if !strings.Contains(view, "Repository: not linked") {
+	if !strings.Contains(view, "Repository: not available") {
 		t.Fatalf("expected friendly repository fallback, got: %s", view)
 	}
-	if !strings.Contains(view, "Branch: not linked") {
+	if !strings.Contains(view, "Branch: not available") {
 		t.Fatalf("expected friendly branch fallback, got: %s", view)
 	}
 	if !strings.Contains(view, "Last update: not recorded") {
@@ -411,7 +412,7 @@ func TestView_SelectedSessionOmitsOpenPRActionWhenNoPRLinked(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "Actions: enter details • l logs") {
+	if !strings.Contains(view, "Available actions: enter details • l logs") {
 		t.Fatalf("expected selected-session actions to include logs, got: %s", view)
 	}
 	if strings.Contains(view, "o open PR") {

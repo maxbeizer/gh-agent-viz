@@ -60,11 +60,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 // View renders the sessions as a kanban board
 func (m Model) View() string {
 	if m.loading {
-		return m.titleStyle.Render("Warming up the radar...\n\nCollecting fresh session telemetry.")
+		return m.titleStyle.Render("Loading sessions...\n\nGathering the latest Copilot session updates.")
 	}
 
 	if len(m.sessions) == 0 {
-		return m.titleStyle.Render("The sky is clear — no active flights yet.\n\nPress 'r' to scan again, or Tab/Shift+Tab to check other lanes.")
+		return m.titleStyle.Render("No sessions to show yet.\n\nPress 'r' to refresh, or Tab/Shift+Tab to switch filters.")
 	}
 
 	overview := m.renderOverview()
@@ -88,7 +88,7 @@ func (m Model) renderBoard() string {
 		if narrowWidth < 3 {
 			narrowWidth = 3
 		}
-		hint := m.tableRowStyle.Render(fmt.Sprintf("NARROW MODE • showing %s lane only (use ←/→)", columnTitle(m.activeColumn)))
+		hint := m.tableRowStyle.Render(fmt.Sprintf("COMPACT VIEW • showing %s lane only (use ←/→)", columnTitle(m.activeColumn)))
 		column := m.renderColumn(m.activeColumn, narrowWidth)
 		return lipgloss.JoinVertical(lipgloss.Left, hint, column)
 	}
@@ -106,39 +106,27 @@ func (m Model) renderOverview() string {
 	activeCount := len(m.columnSessionIdx[0])
 	doneCount := len(m.columnSessionIdx[1])
 	failedCount := len(m.columnSessionIdx[2])
-	agentCount := 0
-	localCount := 0
 	attentionCount := 0
 
 	for _, session := range m.sessions {
-		if session.Source == data.SourceAgentTask {
-			agentCount++
-		}
-		if session.Source == data.SourceLocalCopilot {
-			localCount++
-		}
 		if data.SessionNeedsAttention(session) {
 			attentionCount++
 		}
 	}
 
 	chips := []string{
-		fmt.Sprintf("🛰 total %d", len(m.sessions)),
-		fmt.Sprintf("🛫 active %d", activeCount),
-		fmt.Sprintf("🛬 done %d", doneCount),
-		fmt.Sprintf("🚨 failed %d", failedCount),
-		fmt.Sprintf("🤖 agent %d", agentCount),
-		fmt.Sprintf("💻 local %d", localCount),
-	}
-	if attentionCount > 0 {
-		chips = append(chips, fmt.Sprintf("🚦 attention %d", attentionCount))
+		fmt.Sprintf("total %d", len(m.sessions)),
+		fmt.Sprintf("running %d", activeCount),
+		fmt.Sprintf("done %d", doneCount),
+		fmt.Sprintf("failed %d", failedCount),
+		fmt.Sprintf("needs action %d", attentionCount),
 	}
 
 	return lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
 		Padding(0, 1).
-		Render("ATC OVERVIEW  " + strings.Join(chips, "  •  "))
+		Render("SESSIONS AT A GLANCE  " + strings.Join(chips, "  •  "))
 }
 
 func (m Model) renderFlightDeck() string {
@@ -159,15 +147,15 @@ func (m Model) renderFlightDeck() string {
 	}
 
 	lines := []string{
-		"SELECTED SESSION",
+		"SESSION SUMMARY",
 		fmt.Sprintf("%s %s", m.statusIcon(selected.Status), sessionTitle(*selected)),
 		fmt.Sprintf("Status: %s", selected.Status),
-		fmt.Sprintf("Attention: %s", attentionReason(*selected)),
+		fmt.Sprintf("Needs your action: %s", attentionReason(*selected)),
 		fmt.Sprintf("Repository: %s", panelRepository(*selected)),
 		fmt.Sprintf("Branch: %s", panelBranch(*selected)),
 		fmt.Sprintf("Source: %s", sourceLabel(selected.Source)),
 		fmt.Sprintf("Last update: %s", formatTime(selected.UpdatedAt)),
-		fmt.Sprintf("Actions: %s", strings.Join(actions, " • ")),
+		fmt.Sprintf("Available actions: %s", strings.Join(actions, " • ")),
 	}
 	if selected.Source == data.SourceAgentTask && selected.PRNumber > 0 {
 		lines = append(lines, fmt.Sprintf("Pull Request: #%d", selected.PRNumber))
@@ -185,7 +173,7 @@ func (m Model) renderCompactFlightDeck() string {
 	if selected == nil {
 		return ""
 	}
-	line := fmt.Sprintf("Selected Session • %s %s • Attention: %s • Last update: %s", m.statusIcon(selected.Status), truncate(sessionTitle(*selected), 32), attentionReason(*selected), formatTime(selected.UpdatedAt))
+	line := fmt.Sprintf("Session Summary • %s %s • Needs action: %s • Last update: %s", m.statusIcon(selected.Status), truncate(sessionTitle(*selected), 32), attentionReason(*selected), formatTime(selected.UpdatedAt))
 	return lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("241")).
@@ -243,7 +231,7 @@ func (m Model) renderRow(session data.Session, selected bool, width int) string 
 	}
 	title := truncate(sessionTitle(session), titleMax)
 	badge := sessionBadge(session)
-	attention := fmt.Sprintf("Attention: %s", attentionReason(session))
+	attention := fmt.Sprintf("Needs your action: %s", attentionReason(session))
 
 	titleLine := fmt.Sprintf("%s %s", icon, title)
 	if badge != "" {
@@ -452,13 +440,13 @@ func isActiveStatus(status string) bool {
 
 func sessionBadge(session data.Session) string {
 	if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
-		return "🧑 needs input"
+		return "🧑 waiting on you"
 	}
 	if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
 		return "🚨 failed"
 	}
 	if data.SessionNeedsAttention(session) {
-		return "⚠ quiet"
+		return "⚠ check progress"
 	}
 	if !isActiveStatus(session.Status) || session.UpdatedAt.IsZero() {
 		return ""
@@ -477,7 +465,7 @@ func rowRepository(session data.Session) string {
 	repository := strings.TrimSpace(session.Repository)
 	branch := strings.TrimSpace(session.Branch)
 	if repository == "" {
-		repository = "not linked"
+		repository = "not available"
 	}
 	if branch == "" {
 		return repository
@@ -488,7 +476,7 @@ func rowRepository(session data.Session) string {
 func panelRepository(session data.Session) string {
 	repository := strings.TrimSpace(session.Repository)
 	if repository == "" {
-		return "not linked"
+		return "not available"
 	}
 	return repository
 }
@@ -496,7 +484,7 @@ func panelRepository(session data.Session) string {
 func panelBranch(session data.Session) string {
 	branch := strings.TrimSpace(session.Branch)
 	if branch == "" {
-		return "not linked"
+		return "not available"
 	}
 	return branch
 }
@@ -515,11 +503,11 @@ func attentionReason(session data.Session) string {
 	status := strings.ToLower(strings.TrimSpace(session.Status))
 	switch {
 	case status == "needs-input":
-		return "needs your input"
+		return "waiting on your input"
 	case status == "failed":
-		return "failed"
+		return "run failed"
 	case data.SessionNeedsAttention(session):
-		return "active but quiet"
+		return "running but quiet"
 	case isActiveStatus(session.Status):
 		return "in progress"
 	default:

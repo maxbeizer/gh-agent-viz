@@ -65,8 +65,8 @@ func TestView_WithFilter(t *testing.T) {
 	if !strings.Contains(view, "Filter:") {
 		t.Error("expected view to contain 'Filter:' label")
 	}
-	if !strings.Contains(view, filter) {
-		t.Errorf("expected view to contain filter '%s'", filter)
+	if !strings.Contains(view, "done") {
+		t.Errorf("expected view to contain user-friendly filter label, got: %s", view)
 	}
 }
 

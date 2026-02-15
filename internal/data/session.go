@@ -1,6 +1,7 @@
 package data
 
 import (
+	"strings"
 	"time"
 )
 
@@ -8,9 +9,12 @@ import (
 type SessionSource string
 
 const (
-	SourceAgentTask   SessionSource = "agent-task"
+	SourceAgentTask    SessionSource = "agent-task"
 	SourceLocalCopilot SessionSource = "local-copilot"
 )
+
+// AttentionStaleThreshold is the quiet-window threshold for active sessions.
+const AttentionStaleThreshold = 20 * time.Minute
 
 // Session represents a unified model for both agent-task and local Copilot sessions
 type Session struct {
@@ -55,4 +59,20 @@ func (s Session) ToAgentTask() AgentTask {
 		CreatedAt:  s.CreatedAt,
 		UpdatedAt:  s.UpdatedAt,
 	}
+}
+
+// SessionNeedsAttention indicates whether a session likely requires operator action.
+func SessionNeedsAttention(session Session) bool {
+	status := strings.ToLower(strings.TrimSpace(session.Status))
+
+	if status == "needs-input" || status == "failed" {
+		return true
+	}
+
+	active := status == "running" || status == "queued" || status == "active" || status == "open" || status == "in progress"
+	if !active || session.UpdatedAt.IsZero() {
+		return false
+	}
+
+	return time.Since(session.UpdatedAt) >= AttentionStaleThreshold
 }

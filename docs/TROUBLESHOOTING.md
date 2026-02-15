@@ -15,7 +15,7 @@ gh agent-viz --help
 Try:
 
 1. Press `r` to refresh.
-2. Press `tab` to ensure filter is not hiding rows.
+2. Press `a` to check attention mode, then `tab` to cycle other filters in case rows are hidden.
 3. Run with repo scope:
    ```bash
    gh agent-viz --repo owner/repo

@@ -77,8 +77,9 @@ When enabled, the UI also shows a persistent debug banner with the log path.
 | `l` | View task logs (remote agent sessions) |
 | `o` | Open PR in browser |
 | `s` | Resume active session |
+| `a` | Toggle attention mode (sessions needing action) |
 | `r` | Refresh task list |
-| `tab` / `shift+tab` | Cycle status filter forward/backward |
+| `tab` / `shift+tab` | Cycle status filter forward/backward (`all ↔ attention ↔ active ↔ completed ↔ failed`) |
 | `esc` | Go back to task list |
 | `q` | Quit |
 
@@ -115,7 +116,7 @@ repos:
 # Refresh interval in seconds (default: 30)
 refreshInterval: 30
 
-# Default status filter: all, active, completed, failed (default: all)
+# Default status filter: all, attention, active, completed, failed (default: all)
 defaultFilter: all
 ```
 

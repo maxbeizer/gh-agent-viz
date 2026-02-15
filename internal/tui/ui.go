@@ -78,6 +78,7 @@ func NewModel(repo string, debug bool) Model {
 		keys.OpenInBrowser,
 		keys.ResumeSession,
 		keys.ToggleFilter,
+		keys.FocusAttention,
 		keys.RefreshData,
 		keys.ExitApp,
 	}
@@ -258,6 +259,13 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "r":
 		return m, m.fetchTasks
+	case "a":
+		if m.ctx.StatusFilter == "attention" {
+			m.ctx.StatusFilter = "all"
+		} else {
+			m.ctx.StatusFilter = "attention"
+		}
+		return m, m.fetchTasks
 	case "tab":
 		m.cycleFilter(1)
 		return m, m.fetchTasks
@@ -315,7 +323,7 @@ func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // cycleFilter cycles through status filters by delta (+1 forward, -1 backward)
 func (m *Model) cycleFilter(delta int) {
-	filters := []string{"all", "active", "completed", "failed"}
+	filters := []string{"all", "attention", "active", "completed", "failed"}
 	for i, f := range filters {
 		if f == m.ctx.StatusFilter {
 			next := (i + delta) % len(filters)
@@ -358,7 +366,9 @@ func (m Model) fetchTasks() tea.Msg {
 	if m.ctx.StatusFilter != "all" {
 		filtered := []data.Session{}
 		for _, session := range sessions {
-			if m.ctx.StatusFilter == "active" && (session.Status == "running" || session.Status == "queued" || session.Status == "needs-input") {
+			if m.ctx.StatusFilter == "attention" && data.SessionNeedsAttention(session) {
+				filtered = append(filtered, session)
+			} else if m.ctx.StatusFilter == "active" && (session.Status == "running" || session.Status == "queued" || session.Status == "needs-input") {
 				filtered = append(filtered, session)
 			} else if session.Status == m.ctx.StatusFilter {
 				filtered = append(filtered, session)
@@ -467,7 +477,7 @@ func (m Model) refreshCmd() tea.Cmd {
 
 func isValidFilter(filter string) bool {
 	switch filter {
-	case "all", "active", "completed", "failed":
+	case "all", "attention", "active", "completed", "failed":
 		return true
 	default:
 		return false
@@ -485,6 +495,7 @@ func (m *Model) updateFooterHints() {
 			m.keys.ShowLogs,
 			m.keys.OpenInBrowser,
 			m.keys.ToggleFilter,
+			m.keys.FocusAttention,
 			m.keys.RefreshData,
 			m.keys.ExitApp,
 		})

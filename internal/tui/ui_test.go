@@ -172,8 +172,8 @@ func TestCycleFilterForwardAndBackward(t *testing.T) {
 	m.ctx.StatusFilter = "all"
 
 	m.cycleFilter(1)
-	if m.ctx.StatusFilter != "active" {
-		t.Fatalf("expected active after forward cycle, got %q", m.ctx.StatusFilter)
+	if m.ctx.StatusFilter != "attention" {
+		t.Fatalf("expected attention after forward cycle, got %q", m.ctx.StatusFilter)
 	}
 
 	m.cycleFilter(-1)
@@ -184,6 +184,20 @@ func TestCycleFilterForwardAndBackward(t *testing.T) {
 	m.cycleFilter(-1)
 	if m.ctx.StatusFilter != "failed" {
 		t.Fatalf("expected failed when cycling backward from all, got %q", m.ctx.StatusFilter)
+	}
+}
+
+func TestHandleListKeys_AttentionToggle(t *testing.T) {
+	m := NewModel("", false)
+	m.ctx.StatusFilter = "all"
+
+	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	if cmd == nil {
+		t.Fatal("expected fetch command when toggling attention mode")
+	}
+	updatedModel := updated.(Model)
+	if updatedModel.ctx.StatusFilter != "attention" {
+		t.Fatalf("expected attention filter, got %q", updatedModel.ctx.StatusFilter)
 	}
 }
 

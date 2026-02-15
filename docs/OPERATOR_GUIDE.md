@@ -39,13 +39,14 @@ Columns:
 | `l` | Open log view (remote agent-task rows) |
 | `o` | Open PR in browser (agent-task rows) |
 | `s` | Resume active **local** Copilot session |
-| `tab` / `shift+tab` | Cycle filter: all ↔ active ↔ completed ↔ failed |
+| `a` | Toggle **attention mode** (sessions needing your action) |
+| `tab` / `shift+tab` | Cycle filter: all ↔ attention ↔ active ↔ completed ↔ failed |
 | `r` | Refresh now |
 | `q` | Quit |
 
 ## 4) Typical workflow
 
-1. Start in **Running**.
+1. Start in **attention mode** (`a`) to triage what needs you now.
 2. Open details (`enter`) for a session you care about.
 3. Jump to logs (`l`) if something looks off.
 4. Open PR (`o`) for completed remote work.

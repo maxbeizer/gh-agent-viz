@@ -28,7 +28,6 @@ type Model struct {
 	height            int
 }
 
-const activeStaleThreshold = 20 * time.Minute
 const defaultColumnWidth = 42
 const minColumnWidth = 30
 const minNarrowColumnWidth = 20
@@ -75,7 +74,7 @@ func (m Model) View() string {
 	compactFlightDeck := m.renderCompactFlightDeck()
 
 	switch {
-	case m.height <= 22:
+	case m.height <= 24:
 		return lipgloss.JoinVertical(lipgloss.Left, overview, board)
 	case m.height <= 30:
 		return lipgloss.JoinVertical(lipgloss.Left, overview, board, compactFlightDeck)
@@ -110,7 +109,7 @@ func (m Model) renderOverview() string {
 	failedCount := len(m.columnSessionIdx[2])
 	agentCount := 0
 	localCount := 0
-	staleCount := 0
+	attentionCount := 0
 
 	for _, session := range m.sessions {
 		if session.Source == data.SourceAgentTask {
@@ -119,8 +118,8 @@ func (m Model) renderOverview() string {
 		if session.Source == data.SourceLocalCopilot {
 			localCount++
 		}
-		if isActiveStatus(session.Status) && !session.UpdatedAt.IsZero() && time.Since(session.UpdatedAt) >= activeStaleThreshold {
-			staleCount++
+		if data.SessionNeedsAttention(session) {
+			attentionCount++
 		}
 	}
 
@@ -132,8 +131,8 @@ func (m Model) renderOverview() string {
 		fmt.Sprintf("🤖 agent %d", agentCount),
 		fmt.Sprintf("💻 local %d", localCount),
 	}
-	if staleCount > 0 {
-		chips = append(chips, fmt.Sprintf("⏱ stale %d", staleCount))
+	if attentionCount > 0 {
+		chips = append(chips, fmt.Sprintf("🚦 attention %d", attentionCount))
 	}
 
 	return lipgloss.NewStyle().
@@ -376,6 +375,9 @@ func (m Model) SelectedTask() *data.Session {
 }
 
 func truncate(s string, maxLen int) string {
+	if maxLen < 3 {
+		maxLen = 3
+	}
 	if len(s) <= maxLen {
 		return s
 	}
@@ -442,11 +444,14 @@ func sessionBadge(session data.Session) string {
 	if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
 		return "🧑 input needed"
 	}
+	if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
+		return "🚨 failed"
+	}
+	if data.SessionNeedsAttention(session) {
+		return "⚠ attention"
+	}
 	if !isActiveStatus(session.Status) || session.UpdatedAt.IsZero() {
 		return ""
-	}
-	if time.Since(session.UpdatedAt) >= activeStaleThreshold {
-		return "⏱ stale"
 	}
 	return "• live"
 }
@@ -457,11 +462,23 @@ func rowContext(session data.Session) string {
 		if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
 			return "waiting for your response • press 's' to resume"
 		}
+		if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
+			return "failed session • inspect logs or retry"
+		}
+		if data.SessionNeedsAttention(session) {
+			return "active session is quiet • check if it needs direction"
+		}
 		if isActiveStatus(session.Status) {
 			return "local session can be resumed with 's'"
 		}
 		return "local session"
 	case data.SourceAgentTask:
+		if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
+			return "remote task failed • open details/logs"
+		}
+		if data.SessionNeedsAttention(session) {
+			return "remote task is quiet • verify progress"
+		}
 		if session.PRNumber > 0 {
 			return fmt.Sprintf("remote task • PR #%d", session.PRNumber)
 		}
@@ -495,10 +512,10 @@ func (m Model) columnWidth() int {
 
 func (m Model) pageSize() int {
 	available := m.height - 14
-	if m.height <= 22 {
+	if m.height <= 24 {
 		available = m.height - 8
 	} else if m.height <= 30 {
-		available = m.height - 11
+		available = m.height - 9
 	}
 	size := available / 2
 	if size < 2 {

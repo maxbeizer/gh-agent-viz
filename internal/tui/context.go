@@ -9,7 +9,7 @@ type ProgramContext struct {
 	Height       int
 	Error        error
 	Debug        bool
-	StatusFilter string // "all", "active", "completed", "failed"
+	StatusFilter string // "all", "attention", "active", "completed", "failed"
 }
 
 // NewProgramContext initializes a new program context

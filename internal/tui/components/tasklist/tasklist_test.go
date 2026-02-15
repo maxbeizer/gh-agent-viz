@@ -295,3 +295,20 @@ func TestView_WideColumnShowsRepoAndBranch(t *testing.T) {
 		t.Fatalf("expected expanded repo+branch details, got: %s", view)
 	}
 }
+
+func TestView_ShowsAttentionChip(t *testing.T) {
+	model := newModel()
+	model.SetTasks([]data.Session{
+		{
+			ID:        "1",
+			Status:    "needs-input",
+			Title:     "Needs human input",
+			UpdatedAt: time.Now(),
+		},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "attention 1") {
+		t.Fatalf("expected attention chip, got: %s", view)
+	}
+}

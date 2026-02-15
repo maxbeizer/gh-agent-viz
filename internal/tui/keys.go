@@ -4,18 +4,19 @@ import "github.com/charmbracelet/bubbles/key"
 
 // Keybindings holds all key bindings for the application
 type Keybindings struct {
-	MoveLeft      key.Binding
-	MoveRight     key.Binding
-	MoveUp        key.Binding
-	MoveDown      key.Binding
-	SelectTask    key.Binding
-	ShowLogs      key.Binding
-	OpenInBrowser key.Binding
-	ResumeSession key.Binding
-	RefreshData   key.Binding
-	ExitApp       key.Binding
-	ToggleFilter  key.Binding
-	NavigateBack  key.Binding
+	MoveLeft       key.Binding
+	MoveRight      key.Binding
+	MoveUp         key.Binding
+	MoveDown       key.Binding
+	SelectTask     key.Binding
+	ShowLogs       key.Binding
+	OpenInBrowser  key.Binding
+	ResumeSession  key.Binding
+	RefreshData    key.Binding
+	FocusAttention key.Binding
+	ExitApp        key.Binding
+	ToggleFilter   key.Binding
+	NavigateBack   key.Binding
 }
 
 // NewKeybindings creates the default key bindings for the TUI
@@ -56,6 +57,10 @@ func NewKeybindings() Keybindings {
 		RefreshData: key.NewBinding(
 			key.WithKeys("r"),
 			key.WithHelp("r", "refresh tasks"),
+		),
+		FocusAttention: key.NewBinding(
+			key.WithKeys("a"),
+			key.WithHelp("a", "attention mode"),
 		),
 		ExitApp: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),

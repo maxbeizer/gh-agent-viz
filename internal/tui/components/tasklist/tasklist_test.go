@@ -249,3 +249,49 @@ func TestView_NarrowModeShowsSingleLaneHint(t *testing.T) {
 		t.Fatalf("expected narrow mode hint, got: %s", view)
 	}
 }
+
+func TestView_VeryShortHeightHidesFlightDeck(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 20)
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Running Task", UpdatedAt: time.Now()},
+	})
+
+	view := model.View()
+	if strings.Contains(view, "FLIGHT DECK") {
+		t.Fatalf("expected no flight deck in very short layout, got: %s", view)
+	}
+}
+
+func TestView_MediumHeightUsesCompactFlightDeck(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 28)
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Running Task", UpdatedAt: time.Now()},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "FLIGHT DECK •") {
+		t.Fatalf("expected compact flight deck in medium layout, got: %s", view)
+	}
+}
+
+func TestView_WideColumnShowsRepoAndBranch(t *testing.T) {
+	model := newModel()
+	model.SetSize(300, 36)
+	model.SetTasks([]data.Session{
+		{
+			ID:         "1",
+			Status:     "running",
+			Title:      "Readable Session",
+			Repository: "owner/repository-name",
+			Branch:     "feature/super-readable-output",
+			UpdatedAt:  time.Now(),
+		},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "owner/repository-name@feature/super-readable-output") {
+		t.Fatalf("expected expanded repo+branch details, got: %s", view)
+	}
+}

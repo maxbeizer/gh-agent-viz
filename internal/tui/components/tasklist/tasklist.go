@@ -31,6 +31,7 @@ type Model struct {
 const activeStaleThreshold = 20 * time.Minute
 const defaultColumnWidth = 42
 const minColumnWidth = 30
+const minNarrowColumnWidth = 20
 
 // New creates a new task list model
 func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, statusIconFunc func(string) string) Model {
@@ -71,15 +72,23 @@ func (m Model) View() string {
 	overview := m.renderOverview()
 	board := m.renderBoard()
 	flightDeck := m.renderFlightDeck()
+	compactFlightDeck := m.renderCompactFlightDeck()
 
-	return lipgloss.JoinVertical(lipgloss.Left, overview, "", board, "", flightDeck)
+	switch {
+	case m.height <= 22:
+		return lipgloss.JoinVertical(lipgloss.Left, overview, board)
+	case m.height <= 30:
+		return lipgloss.JoinVertical(lipgloss.Left, overview, board, compactFlightDeck)
+	default:
+		return lipgloss.JoinVertical(lipgloss.Left, overview, "", board, "", flightDeck)
+	}
 }
 
 func (m Model) renderBoard() string {
 	if m.width < minColumnWidth*3+4 {
 		narrowWidth := m.width - 2
-		if narrowWidth < minColumnWidth {
-			narrowWidth = minColumnWidth
+		if narrowWidth < minNarrowColumnWidth {
+			narrowWidth = minNarrowColumnWidth
 		}
 		hint := m.tableRowStyle.Render(fmt.Sprintf("NARROW MODE • showing %s lane only (use ←/→)", columnTitle(m.activeColumn)))
 		column := m.renderColumn(m.activeColumn, narrowWidth)
@@ -178,6 +187,19 @@ func (m Model) renderFlightDeck() string {
 		Render(strings.Join(lines, "\n"))
 }
 
+func (m Model) renderCompactFlightDeck() string {
+	selected := m.SelectedTask()
+	if selected == nil {
+		return ""
+	}
+	line := fmt.Sprintf("FLIGHT DECK • %s %s • %s • %s", m.statusIcon(selected.Status), truncate(selected.Title, 40), sourceLabel(selected.Source), formatTime(selected.UpdatedAt))
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("241")).
+		Padding(0, 1).
+		Render(line)
+}
+
 func (m Model) renderColumn(column int, width int) string {
 	headerStyle := m.tableHeaderStyle
 	if column == m.activeColumn {
@@ -206,7 +228,7 @@ func (m Model) renderColumn(column int, width int) string {
 	for i, idx := range indices[start:end] {
 		session := m.sessions[idx]
 		selected := column == m.activeColumn && (start+i) == cursor
-		rows = append(rows, m.renderRow(session, selected))
+		rows = append(rows, m.renderRow(session, selected, width))
 	}
 	if end < len(indices) {
 		rows = append(rows, m.tableRowStyle.Render(fmt.Sprintf("  ↓ %d more", len(indices)-end)))
@@ -215,20 +237,23 @@ func (m Model) renderColumn(column int, width int) string {
 	return lipgloss.NewStyle().Width(width).PaddingRight(1).Render(strings.Join(rows, "\n"))
 }
 
-func (m Model) renderRow(session data.Session, selected bool) string {
+func (m Model) renderRow(session data.Session, selected bool, width int) string {
 	style := m.tableRowStyle
 	if selected {
 		style = m.tableRowSelected
 	}
 
 	icon := m.statusIcon(session.Status)
-	title := truncate(session.Title, 34)
-	repo := truncate(session.Repository, 16)
-	source := sourceLabel(session.Source)
-	updated := formatTime(session.UpdatedAt)
-	if repo == "" {
-		repo = "no-repo"
+	title := truncate(session.Title, maxInt(16, width-10))
+	repoWithBranch := session.Repository
+	if repoWithBranch == "" {
+		repoWithBranch = "no-repo"
 	}
+	if session.Branch != "" {
+		repoWithBranch = fmt.Sprintf("%s@%s", repoWithBranch, session.Branch)
+	}
+	updated := formatTime(session.UpdatedAt)
+	repo := truncate(repoWithBranch, maxInt(18, width-len(updated)-8))
 	if title == "" {
 		title = "Untitled Session"
 	}
@@ -239,9 +264,9 @@ func (m Model) renderRow(session data.Session, selected bool) string {
 		titleLine += " " + badge
 	}
 
-	row := fmt.Sprintf("%s\n  %s • %s • %s", titleLine, repo, source, updated)
+	row := fmt.Sprintf("%s\n  %s • %s", titleLine, repo, updated)
 	if selected {
-		row += fmt.Sprintf("\n  ↳ %s", rowContext(session))
+		row += fmt.Sprintf("\n  ↳ %s", truncate(rowContext(session), maxInt(18, width-6)))
 	}
 	return style.Render(row)
 }
@@ -469,12 +494,18 @@ func (m Model) columnWidth() int {
 }
 
 func (m Model) pageSize() int {
-	size := (m.height - 14) / 2
-	if size < 3 {
-		return 3
+	available := m.height - 14
+	if m.height <= 22 {
+		available = m.height - 8
+	} else if m.height <= 30 {
+		available = m.height - 11
 	}
-	if size > 10 {
-		return 10
+	size := available / 2
+	if size < 2 {
+		return 2
+	}
+	if size > 12 {
+		return 12
 	}
 	return size
 }
@@ -497,4 +528,11 @@ func visibleRange(total, cursor, size int) (int, int) {
 		start = end - size
 	}
 	return start, end
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

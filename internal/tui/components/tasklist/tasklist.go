@@ -106,8 +106,14 @@ func (m Model) renderRow(session data.Session, selected bool) string {
 	icon := m.statusIcon(session.Status)
 	title := truncate(session.Title, 34)
 	repo := truncate(session.Repository, 16)
-	source := truncate(string(session.Source), 12)
+	source := sourceLabel(session.Source)
 	updated := formatTime(session.UpdatedAt)
+	if repo == "" {
+		repo = "no-repo"
+	}
+	if title == "" {
+		title = "Untitled Session"
+	}
 
 	row := fmt.Sprintf("%s %s\n  %s • %s • %s", icon, title, repo, source, updated)
 	return style.Render(row)
@@ -261,5 +267,16 @@ func columnTitle(column int) string {
 		return "Done"
 	default:
 		return "Failed"
+	}
+}
+
+func sourceLabel(source data.SessionSource) string {
+	switch source {
+	case data.SourceLocalCopilot:
+		return "local"
+	case data.SourceAgentTask:
+		return "agent"
+	default:
+		return "other"
 	}
 }

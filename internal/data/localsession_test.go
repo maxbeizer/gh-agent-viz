@@ -1,6 +1,7 @@
 package data
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -256,8 +257,46 @@ status: "running"
 	}
 
 	// Should use default title
-	if session.Title != "Untitled Session" {
-		t.Errorf("expected default title 'Untitled Session', got '%s'", session.Title)
+	if session.Title != "Session test-session-000" {
+		t.Errorf("expected default title 'Session test-session-000', got '%s'", session.Title)
+	}
+}
+
+func TestParseWorkspaceFile_CurrentWorkspaceFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	workspaceFile := filepath.Join(tmpDir, "workspace.yaml")
+
+	createdAt := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339)
+	updatedAt := time.Now().Add(-5 * time.Minute).UTC().Format(time.RFC3339)
+
+	content := fmt.Sprintf(`id: 564c025b-b5eb-4e02-ba47-425d915c4748
+cwd: /Users/maxbeizer/code/gh-agent-viz
+git_root: /Users/maxbeizer/code/gh-agent-viz
+repository: maxbeizer/gh-agent-viz
+branch: main
+summary: Review And Test PR 1
+summary_count: 1
+created_at: %q
+updated_at: %q
+`, createdAt, updatedAt)
+
+	if err := os.WriteFile(workspaceFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	session, err := parseWorkspaceFile(workspaceFile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if session.ID != "564c025b-b5eb-4e02-ba47-425d915c4748" {
+		t.Errorf("unexpected ID: %s", session.ID)
+	}
+	if session.Title != "Review And Test PR 1" {
+		t.Errorf("expected summary to be title, got %q", session.Title)
+	}
+	if session.Status != "running" {
+		t.Errorf("expected running from recent updated_at, got %q", session.Status)
 	}
 }
 
@@ -285,7 +324,7 @@ func TestFetchLocalSessions_WithSessions(t *testing.T) {
 	// Create session directories
 	session1Dir := filepath.Join(sessionDir, "session-001")
 	session2Dir := filepath.Join(sessionDir, "session-002")
-	
+
 	if err := os.MkdirAll(session1Dir, 0755); err != nil {
 		t.Fatalf("failed to create session dir: %v", err)
 	}

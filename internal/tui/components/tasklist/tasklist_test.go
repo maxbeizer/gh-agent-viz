@@ -170,7 +170,7 @@ func TestView_ShowsSourceBadge(t *testing.T) {
 	model.SetTasks(tasks)
 
 	view := model.View()
-	if !strings.Contains(view, "agent-task") {
+	if !strings.Contains(view, "agent") {
 		t.Error("expected view to contain session source")
 	}
 }

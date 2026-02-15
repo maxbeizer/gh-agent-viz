@@ -12,14 +12,17 @@ import (
 
 // LocalSessionWorkspace represents the structure of a workspace.yaml file
 type LocalSessionWorkspace struct {
-	SessionID          string                   `yaml:"session_id"`
-	StartTime          string                   `yaml:"start_time"`
-	LastActivity       string                   `yaml:"last_activity"`
-	MessageCount       int                      `yaml:"message_count"`
-	Status             string                   `yaml:"status"`
-	Repository         string                   `yaml:"repository"`
-	Branch             string                   `yaml:"branch"`
-	Title              string                   `yaml:"title"`
+	ID                  string                   `yaml:"id"`
+	SessionID           string                   `yaml:"session_id"`
+	CreatedAt           string                   `yaml:"created_at"`
+	UpdatedAt           string                   `yaml:"updated_at"`
+	StartTime           string                   `yaml:"start_time"`
+	LastActivity        string                   `yaml:"last_activity"`
+	Status              string                   `yaml:"status"`
+	Repository          string                   `yaml:"repository"`
+	Branch              string                   `yaml:"branch"`
+	Title               string                   `yaml:"title"`
+	Summary             string                   `yaml:"summary"`
 	ConversationHistory []map[string]interface{} `yaml:"conversation_history"`
 }
 
@@ -31,7 +34,7 @@ func FetchLocalSessions() ([]Session, error) {
 	}
 
 	sessionDir := filepath.Join(homeDir, ".copilot", "session-state")
-	
+
 	// Check if directory exists
 	if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
 		// Not an error - just no local sessions
@@ -90,7 +93,21 @@ func parseWorkspaceFileFallback(data []byte) (Session, error) {
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "session_id:") {
+		if strings.HasPrefix(line, "id:") {
+			session.ID = strings.Trim(strings.TrimPrefix(line, "id:"), `" `)
+		} else if strings.HasPrefix(line, "summary:") && session.Title == "" {
+			session.Title = strings.Trim(strings.TrimPrefix(line, "summary:"), `" `)
+		} else if strings.HasPrefix(line, "updated_at:") {
+			timeStr := strings.Trim(strings.TrimPrefix(line, "updated_at:"), `" `)
+			if t, ok := parseAnyTime(timeStr); ok {
+				session.UpdatedAt = t
+			}
+		} else if strings.HasPrefix(line, "created_at:") {
+			timeStr := strings.Trim(strings.TrimPrefix(line, "created_at:"), `" `)
+			if t, ok := parseAnyTime(timeStr); ok {
+				session.CreatedAt = t
+			}
+		} else if strings.HasPrefix(line, "session_id:") {
 			session.ID = strings.Trim(strings.TrimPrefix(line, "session_id:"), `" `)
 		} else if strings.HasPrefix(line, "title:") {
 			session.Title = strings.Trim(strings.TrimPrefix(line, "title:"), `" `)
@@ -102,7 +119,7 @@ func parseWorkspaceFileFallback(data []byte) (Session, error) {
 			session.Status = strings.Trim(strings.TrimPrefix(line, "status:"), `" `)
 		} else if strings.HasPrefix(line, "last_activity:") {
 			timeStr := strings.Trim(strings.TrimPrefix(line, "last_activity:"), `" `)
-			if t, err := time.Parse(time.RFC3339, timeStr); err == nil {
+			if t, ok := parseAnyTime(timeStr); ok {
 				session.UpdatedAt = t
 			}
 		}
@@ -114,7 +131,18 @@ func parseWorkspaceFileFallback(data []byte) (Session, error) {
 	}
 
 	// Apply status normalization
+	if session.UpdatedAt.IsZero() {
+		session.UpdatedAt = session.CreatedAt
+	}
 	session.Status = DeriveLocalSessionStatus(session.Status, session.UpdatedAt)
+
+	if session.Title == "" {
+		if session.ID != "" {
+			session.Title = fmt.Sprintf("Session %s", truncateTitle(session.ID))
+		} else {
+			session.Title = "Untitled Session"
+		}
+	}
 
 	return session, nil
 }
@@ -122,23 +150,24 @@ func parseWorkspaceFileFallback(data []byte) (Session, error) {
 // convertLocalSessionToSession converts a LocalSessionWorkspace to a Session
 func convertLocalSessionToSession(workspace LocalSessionWorkspace) (Session, error) {
 	session := Session{
-		ID:         workspace.SessionID,
+		ID:         workspace.ID,
 		Title:      workspace.Title,
 		Repository: workspace.Repository,
 		Branch:     workspace.Branch,
 		Source:     SourceLocalCopilot,
 	}
-
-	// Parse timestamps
-	if workspace.StartTime != "" {
-		if t, err := time.Parse(time.RFC3339, workspace.StartTime); err == nil {
-			session.CreatedAt = t
-		}
+	if session.ID == "" {
+		session.ID = workspace.SessionID
 	}
-	if workspace.LastActivity != "" {
-		if t, err := time.Parse(time.RFC3339, workspace.LastActivity); err == nil {
-			session.UpdatedAt = t
-		}
+	if session.Title == "" {
+		session.Title = workspace.Summary
+	}
+
+	// Parse timestamps from current format first, then legacy fields.
+	session.CreatedAt = parseSessionTime(workspace.CreatedAt, workspace.StartTime)
+	session.UpdatedAt = parseSessionTime(workspace.UpdatedAt, workspace.LastActivity)
+	if session.UpdatedAt.IsZero() {
+		session.UpdatedAt = session.CreatedAt
 	}
 
 	// Derive status from metadata
@@ -153,17 +182,45 @@ func convertLocalSessionToSession(workspace LocalSessionWorkspace) (Session, err
 
 	// Default title if still empty
 	if session.Title == "" {
-		session.Title = "Untitled Session"
+		if session.ID != "" {
+			session.Title = fmt.Sprintf("Session %s", truncateTitle(session.ID))
+		} else {
+			session.Title = "Untitled Session"
+		}
 	}
 
 	return session, nil
+}
+
+func parseSessionTime(primary, fallback string) time.Time {
+	if primary != "" {
+		if t, ok := parseAnyTime(primary); ok {
+			return t
+		}
+	}
+	if fallback != "" {
+		if t, ok := parseAnyTime(fallback); ok {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
+func parseAnyTime(value string) (time.Time, bool) {
+	layouts := []string{time.RFC3339Nano, time.RFC3339}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, value); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // DeriveLocalSessionStatus derives a normalized status from session metadata
 func DeriveLocalSessionStatus(rawStatus string, lastActivity time.Time) string {
 	// First normalize any explicit status
 	normalized := strings.ToLower(strings.TrimSpace(rawStatus))
-	
+
 	// Map explicit statuses
 	switch normalized {
 	case "completed", "finished", "done", "merged", "closed":

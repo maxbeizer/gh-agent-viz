@@ -61,11 +61,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 // View renders the sessions as a kanban board
 func (m Model) View() string {
 	if m.loading {
-		return m.titleStyle.Render("Loading sessions...")
+		return m.titleStyle.Render("Warming up the radar...\n\nCollecting fresh session telemetry.")
 	}
 
 	if len(m.sessions) == 0 {
-		return m.titleStyle.Render("No sessions found\n\nTry: refresh with 'r' or toggle filter with Tab/Shift+Tab")
+		return m.titleStyle.Render("The sky is clear — no active flights yet.\n\nPress 'r' to scan again, or Tab/Shift+Tab to check other lanes.")
 	}
 
 	overview := m.renderOverview()

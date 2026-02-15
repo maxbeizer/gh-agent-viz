@@ -212,3 +212,11 @@ func TestHandleListKeys_LocalSessionLogShowsHelpfulError(t *testing.T) {
 		t.Fatal("expected helpful error for local session logs")
 	}
 }
+
+func TestView_NotReadyShowsWhimsicalStartupText(t *testing.T) {
+	m := NewModel("", false)
+	view := m.View()
+	if view != "Spinning up ATC tower..." {
+		t.Fatalf("expected startup text, got %q", view)
+	}
+}

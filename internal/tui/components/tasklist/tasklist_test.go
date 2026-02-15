@@ -106,12 +106,12 @@ func TestViewShowsKanbanColumns(t *testing.T) {
 
 func TestViewEmptyAndLoadingStates(t *testing.T) {
 	model := newModel()
-	if got := model.View(); !strings.Contains(got, "No sessions found") {
+	if got := model.View(); !strings.Contains(got, "The sky is clear") {
 		t.Fatalf("expected empty state, got: %s", got)
 	}
 
 	model.loading = true
-	if got := model.View(); !strings.Contains(got, "Loading sessions") {
+	if got := model.View(); !strings.Contains(got, "Warming up the radar") {
 		t.Fatalf("expected loading state, got: %s", got)
 	}
 }
@@ -207,10 +207,10 @@ func TestView_ImprovedEmptyState(t *testing.T) {
 	)
 
 	view := model.View()
-	if !strings.Contains(view, "No sessions found") {
+	if !strings.Contains(view, "The sky is clear") {
 		t.Error("expected improved empty state message")
 	}
-	if !strings.Contains(view, "refresh with 'r'") {
+	if !strings.Contains(view, "Press 'r' to scan again") {
 		t.Error("expected empty state to include helpful hints")
 	}
 }

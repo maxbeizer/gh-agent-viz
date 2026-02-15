@@ -62,9 +62,9 @@ gh extension upgrade --all
 
 ## Data Display Problems
 
-### Empty Session List
+### Empty Task List
 
-**Problem:** No sessions appear in the table
+**Problem:** No tasks appear in the table
 
 **Possible causes and fixes:**
 
@@ -85,7 +85,7 @@ gh extension upgrade --all
 
 ### Stale Data
 
-**Problem:** Session status doesn't reflect current state
+**Problem:** Task status doesn't reflect current state
 
 **Fix:**
 
@@ -136,7 +136,7 @@ gh agent-task list
 
 **Problem:** Pressing `l` shows "agent logs require a session ID"
 
-**Explanation:** Some sessions don't have detailed log data. This happens when:
+**Explanation:** Some tasks don't have detailed log data. This happens when:
 - Session was created as a PR without agent-task tracking
 - Logs expired or were never created
 - Session predates agent-task logging
@@ -246,7 +246,7 @@ If colors still don't work, your terminal may not support them. Try a different 
 
 ### Repository Names Not Working
 
-**Problem:** Repos listed in config show no sessions
+**Problem:** Repos listed in config show no tasks
 
 **Common mistakes:**
 

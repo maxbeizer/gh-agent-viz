@@ -20,6 +20,7 @@ type Model struct {
 	cursor           int
 	loading          bool
 	statusIcon       func(string) string
+	selectedTaskID   string // Store selected task ID for persistence
 }
 
 // New creates a new task list model
@@ -53,13 +54,13 @@ func (m Model) View() string {
 	}
 
 	if len(m.tasks) == 0 {
-		return m.titleStyle.Render("No agent tasks found")
+		return m.titleStyle.Render("No agent tasks found\n\nTry:\n  • Refresh with 'r'\n  • Toggle filter with Tab\n  • Check your repository settings")
 	}
 
 	var rows []string
 
-	// Header
-	header := m.tableHeaderStyle.Render("    Repository                       Task                                                     Updated")
+	// Header with count
+	header := m.tableHeaderStyle.Render(fmt.Sprintf("    Source Repository                  Task                                                     Updated  (%d tasks)", len(m.tasks)))
 	rows = append(rows, header)
 
 	// Task rows
@@ -80,17 +81,35 @@ func (m Model) renderRow(task data.AgentTask, selected bool) string {
 	}
 
 	icon := m.statusIcon(task.Status)
-	repo := truncate(task.Repository, 30)
+	source := sourceIcon(task.Source)
+	repo := truncate(task.Repository, 28)
 	title := truncate(task.Title, 50)
 	updated := formatTime(task.UpdatedAt)
 
-	row := fmt.Sprintf("%-3s %-32s %-52s %s", icon, repo, title, updated)
+	row := fmt.Sprintf("%-3s %-6s %-30s %-52s %s", icon, source, repo, title, updated)
 	return style.Render(row)
 }
 
-// SetTasks updates the task list
+// SetTasks updates the task list and preserves selection
 func (m *Model) SetTasks(tasks []data.AgentTask) {
+	// Store selected task ID before updating
+	if m.cursor >= 0 && m.cursor < len(m.tasks) {
+		m.selectedTaskID = m.tasks[m.cursor].ID
+	}
+
 	m.tasks = tasks
+
+	// Try to restore cursor to the same task ID
+	if m.selectedTaskID != "" {
+		for i, task := range tasks {
+			if task.ID == m.selectedTaskID {
+				m.cursor = i
+				return
+			}
+		}
+	}
+
+	// If task ID not found or no previous selection, clamp cursor
 	if m.cursor >= len(tasks) {
 		m.cursor = len(tasks) - 1
 	}
@@ -139,5 +158,16 @@ func formatTime(t time.Time) string {
 		return fmt.Sprintf("%dh ago", int(diff.Hours()))
 	} else {
 		return t.Format("Jan 2")
+	}
+}
+
+func sourceIcon(source string) string {
+	switch source {
+	case "agent-task":
+		return "🤖"
+	case "local":
+		return "💻"
+	default:
+		return "  "
 	}
 }

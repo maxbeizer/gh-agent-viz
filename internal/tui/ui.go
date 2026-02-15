@@ -156,6 +156,9 @@ func (m Model) View() string {
 		return "Initializing..."
 	}
 
+	// Update footer hints based on current context
+	m.updateFooterHints()
+
 	headerView := m.header.View()
 	footerView := m.footer.View()
 
@@ -170,7 +173,7 @@ func (m Model) View() string {
 	}
 
 	if m.ctx.Error != nil {
-		mainView = fmt.Sprintf("Error: %v\n\n%s", m.ctx.Error, mainView)
+		mainView = fmt.Sprintf("Error: %v\n\nPress 'r' to retry or Tab to change filter\n\n%s", m.ctx.Error, mainView)
 	}
 
 	return headerView + mainView + footerView
@@ -381,5 +384,39 @@ func isValidFilter(filter string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// updateFooterHints updates footer hints based on current view mode and state
+func (m *Model) updateFooterHints() {
+	switch m.viewMode {
+	case ViewModeList:
+		m.footer.SetHints([]key.Binding{
+			m.keys.MoveUp,
+			m.keys.MoveDown,
+			m.keys.SelectTask,
+			m.keys.ShowLogs,
+			m.keys.OpenInBrowser,
+			m.keys.ToggleFilter,
+			m.keys.RefreshData,
+			m.keys.ExitApp,
+		})
+	case ViewModeDetail:
+		m.footer.SetHints([]key.Binding{
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
+			m.keys.ShowLogs,
+			m.keys.OpenInBrowser,
+			m.keys.ExitApp,
+		})
+	case ViewModeLog:
+		m.footer.SetHints([]key.Binding{
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
+			key.NewBinding(key.WithKeys("↑/k"), key.WithHelp("↑/k", "up")),
+			key.NewBinding(key.WithKeys("↓/j"), key.WithHelp("↓/j", "down")),
+			key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "page down")),
+			key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "page up")),
+			key.NewBinding(key.WithKeys("g/G"), key.WithHelp("g/G", "top/bottom")),
+			m.keys.ExitApp,
+		})
 	}
 }

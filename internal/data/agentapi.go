@@ -23,6 +23,7 @@ type AgentTask struct {
 	PRNumber   int       `json:"prNumber"`
 	CreatedAt  time.Time `json:"createdAt"`
 	UpdatedAt  time.Time `json:"updatedAt"`
+	Source     string    `json:"source"` // "agent-task" or "local"
 }
 
 // FetchAgentTasks retrieves the list of agent tasks, optionally scoped to a repository
@@ -36,6 +37,10 @@ func FetchAgentTasks(repo string) ([]AgentTask, error) {
 		var tasks []AgentTask
 		if err := json.Unmarshal(jsonOutput, &tasks); err != nil {
 			return nil, fmt.Errorf("failed to parse agent tasks: %w", err)
+		}
+		// Set source for all tasks from agent-task CLI
+		for i := range tasks {
+			tasks[i].Source = "agent-task"
 		}
 		return tasks, nil
 	}
@@ -80,6 +85,7 @@ func FetchAgentTasks(repo string) ([]AgentTask, error) {
 			PRURL:      fmt.Sprintf("https://github.com/%s/pull/%d", taskRepo, prNumber),
 			PRNumber:   prNumber,
 			UpdatedAt:  updatedAt,
+			Source:     "agent-task",
 		})
 	}
 
@@ -103,6 +109,7 @@ func FetchAgentTaskDetail(id string, repo string) (*AgentTask, error) {
 		if err := json.Unmarshal(output, &task); err != nil {
 			return nil, fmt.Errorf("failed to parse agent task detail: %w", err)
 		}
+		task.Source = "agent-task"
 		return &task, nil
 	}
 
@@ -144,6 +151,7 @@ func FetchAgentTaskDetail(id string, repo string) (*AgentTask, error) {
 		PRNumber:   pr.Number,
 		CreatedAt:  pr.CreatedAt,
 		UpdatedAt:  pr.UpdatedAt,
+		Source:     "agent-task",
 	}, nil
 }
 

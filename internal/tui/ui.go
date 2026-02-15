@@ -394,7 +394,13 @@ func (m Model) resumeSession(task *data.AgentTask) tea.Cmd {
 		cmd := exec.Command("gh", "copilot", "--", "--resume", task.ID)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			return errMsg{fmt.Errorf("failed to resume session: %s", strings.TrimSpace(string(output)))}
+			// Provide a user-friendly error message
+			outputStr := strings.TrimSpace(string(output))
+			if outputStr != "" {
+				// Include output only if it provides useful context
+				return errMsg{fmt.Errorf("failed to resume session: %s", outputStr)}
+			}
+			return errMsg{fmt.Errorf("failed to resume session")}
 		}
 
 		return nil

@@ -6,7 +6,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
-func TestResumeSession_ValidActiveSession(t *testing.T) {
+func TestResumeSession_ValidRunningSession(t *testing.T) {
 	m := NewModel("")
 
 	// Create a running task

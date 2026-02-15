@@ -2,6 +2,8 @@ package taskdetail
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
@@ -31,12 +33,12 @@ func (m Model) View() string {
 	}
 
 	details := []string{
-		m.titleStyle.Render(m.session.Title),
+		m.titleStyle.Render(detailTitle(m.session.Title)),
 		"",
 		fmt.Sprintf("Status:     %s %s", m.statusIcon(m.session.Status), m.session.Status),
 		fmt.Sprintf("Source:     %s", m.session.Source),
-		fmt.Sprintf("Repository: %s", m.session.Repository),
-		fmt.Sprintf("Branch:     %s", m.session.Branch),
+		fmt.Sprintf("Repository: %s", detailValue(m.session.Repository, "not linked")),
+		fmt.Sprintf("Branch:     %s", detailValue(m.session.Branch, "not linked")),
 	}
 
 	// Add PR info for agent-task sessions
@@ -48,8 +50,8 @@ func (m Model) View() string {
 	}
 
 	details = append(details,
-		fmt.Sprintf("Created:    %s", m.session.CreatedAt.Format("2006-01-02 15:04:05")),
-		fmt.Sprintf("Updated:    %s", m.session.UpdatedAt.Format("2006-01-02 15:04:05")),
+		fmt.Sprintf("Created:    %s", detailTimestamp(m.session.CreatedAt)),
+		fmt.Sprintf("Updated:    %s", detailTimestamp(m.session.UpdatedAt)),
 		fmt.Sprintf("Session ID: %s", m.session.ID),
 	)
 
@@ -67,4 +69,23 @@ func joinVertical(lines []string) string {
 		result += line + "\n"
 	}
 	return result
+}
+
+func detailValue(value string, fallback string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return fallback
+	}
+	return trimmed
+}
+
+func detailTimestamp(ts time.Time) string {
+	if ts.IsZero() {
+		return "not recorded"
+	}
+	return ts.Format("2006-01-02 15:04:05")
+}
+
+func detailTitle(title string) string {
+	return detailValue(title, "Untitled Session")
 }

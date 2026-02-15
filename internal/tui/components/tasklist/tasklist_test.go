@@ -274,8 +274,8 @@ func TestView_VeryShortHeightHidesFlightDeck(t *testing.T) {
 	})
 
 	view := model.View()
-	if strings.Contains(view, "FLIGHT DECK") {
-		t.Fatalf("expected no flight deck in very short layout, got: %s", view)
+	if strings.Contains(view, "SELECTED SESSION") || strings.Contains(view, "Selected Session") {
+		t.Fatalf("expected no selected session panel in very short layout, got: %s", view)
 	}
 }
 
@@ -287,8 +287,8 @@ func TestView_MediumHeightUsesCompactFlightDeck(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "FLIGHT DECK •") {
-		t.Fatalf("expected compact flight deck in medium layout, got: %s", view)
+	if !strings.Contains(view, "Selected Session •") {
+		t.Fatalf("expected compact selected session panel in medium layout, got: %s", view)
 	}
 }
 
@@ -307,7 +307,7 @@ func TestView_WideColumnShowsRepoAndBranch(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "owner/repository-name@feature/super-readable-output") {
+	if !strings.Contains(view, "Repository: owner/repository-name @ feature/super-readable-output") {
 		t.Fatalf("expected expanded repo+branch details, got: %s", view)
 	}
 }
@@ -336,5 +336,62 @@ func TestTruncate_HandlesUnicodeSafely(t *testing.T) {
 	}
 	if strings.Contains(out, "�") {
 		t.Fatalf("expected valid UTF-8 output, got %q", out)
+	}
+}
+
+func TestView_CardShowsAttentionReason(t *testing.T) {
+	model := newModel()
+	model.SetSize(140, 36)
+	model.SetTasks([]data.Session{
+		{
+			ID:        "1",
+			Status:    "needs-input",
+			Title:     "Waiting on operator",
+			UpdatedAt: time.Now(),
+		},
+		{
+			ID:        "2",
+			Status:    "running",
+			Title:     "Quiet but active",
+			UpdatedAt: time.Now().Add(-30 * time.Minute),
+		},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "Attention: needs your input") {
+		t.Fatalf("expected explicit input-needed reason, got: %s", view)
+	}
+	if !strings.Contains(view, "Attention: active but quiet") {
+		t.Fatalf("expected explicit quiet-active reason, got: %s", view)
+	}
+}
+
+func TestView_SelectedSessionUsesFriendlyFallbacks(t *testing.T) {
+	model := newModel()
+	model.SetSize(140, 36)
+	model.SetTasks([]data.Session{
+		{
+			ID:        "1",
+			Status:    "running",
+			Title:     "Fallback Session",
+			UpdatedAt: time.Time{},
+		},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "SELECTED SESSION") {
+		t.Fatalf("expected selected session heading, got: %s", view)
+	}
+	if !strings.Contains(view, "Repository: not linked") {
+		t.Fatalf("expected friendly repository fallback, got: %s", view)
+	}
+	if !strings.Contains(view, "Branch: not linked") {
+		t.Fatalf("expected friendly branch fallback, got: %s", view)
+	}
+	if !strings.Contains(view, "Last update: not recorded") {
+		t.Fatalf("expected friendly timestamp fallback, got: %s", view)
+	}
+	if strings.Contains(view, "no-repo") || strings.Contains(view, "unknown") {
+		t.Fatalf("expected no sentinel placeholders, got: %s", view)
 	}
 }

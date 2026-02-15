@@ -74,7 +74,7 @@ The TUI is organized into three main sections:
 4. Press `enter` on a session to view full details
 5. Press `esc` to return to the list
 
-**Tip:** Sessions marked as "running" (🔄) or "queued" (⏳) are currently active.
+**Tip:** Sessions marked as "running" (🟢) or "queued" (🟡) are currently active.
 
 ### Workflow 2: Investigating Failures
 
@@ -96,7 +96,7 @@ The TUI is organized into three main sections:
 3. Press `o` to open the associated PR in your browser
 4. Review the changes made by the agent
 
-**Tip:** Completed sessions (✓) represent finished work that may need human review.
+**Tip:** Completed sessions (✅) represent finished work that may need human review.
 
 ### Workflow 4: Refreshing Data
 
@@ -148,10 +148,11 @@ Agent session data is refreshed automatically based on your `refreshInterval` (d
 
 Sessions are marked with color-coded status icons:
 
-- **🔄 Running** (blue): Agent is actively working
-- **⏳ Queued** (yellow): Session is waiting to start
-- **✓ Completed** (green): Work finished successfully
-- **✗ Failed** (red): Session encountered an error
+- **🟢 Running** (green): Agent is actively working
+- **🟡 Queued** (yellow): Session is waiting to start
+- **✅ Completed** (green checkmark): Work finished successfully
+- **❌ Failed** (red X): Session encountered an error
+- **⚪ Unknown** (white): Status cannot be determined
 
 ## Configuration Best Practices
 

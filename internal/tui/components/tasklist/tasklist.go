@@ -147,15 +147,6 @@ func (m Model) renderFlightDeck() string {
 		return ""
 	}
 
-	repository := selected.Repository
-	if repository == "" {
-		repository = "no-repo"
-	}
-	branch := selected.Branch
-	if branch == "" {
-		branch = "unknown"
-	}
-
 	actions := []string{"enter details"}
 	if selected.Source == data.SourceAgentTask {
 		actions = append(actions, "l logs", "o open PR")
@@ -165,17 +156,18 @@ func (m Model) renderFlightDeck() string {
 	}
 
 	lines := []string{
-		"FLIGHT DECK",
-		fmt.Sprintf("%s %s", m.statusIcon(selected.Status), selected.Title),
-		fmt.Sprintf("status: %s", selected.Status),
-		fmt.Sprintf("repo:   %s", repository),
-		fmt.Sprintf("branch: %s", branch),
-		fmt.Sprintf("source: %s", sourceLabel(selected.Source)),
-		fmt.Sprintf("seen:   %s", formatTime(selected.UpdatedAt)),
-		fmt.Sprintf("actions: %s", strings.Join(actions, " • ")),
+		"SELECTED SESSION",
+		fmt.Sprintf("%s %s", m.statusIcon(selected.Status), sessionTitle(*selected)),
+		fmt.Sprintf("Status: %s", selected.Status),
+		fmt.Sprintf("Attention: %s", attentionReason(*selected)),
+		fmt.Sprintf("Repository: %s", panelRepository(*selected)),
+		fmt.Sprintf("Branch: %s", panelBranch(*selected)),
+		fmt.Sprintf("Source: %s", sourceLabel(selected.Source)),
+		fmt.Sprintf("Last update: %s", formatTime(selected.UpdatedAt)),
+		fmt.Sprintf("Actions: %s", strings.Join(actions, " • ")),
 	}
 	if selected.Source == data.SourceAgentTask && selected.PRNumber > 0 {
-		lines = append(lines, fmt.Sprintf("pr: #%d", selected.PRNumber))
+		lines = append(lines, fmt.Sprintf("Pull Request: #%d", selected.PRNumber))
 	}
 
 	return lipgloss.NewStyle().
@@ -190,7 +182,7 @@ func (m Model) renderCompactFlightDeck() string {
 	if selected == nil {
 		return ""
 	}
-	line := fmt.Sprintf("FLIGHT DECK • %s %s • %s • %s", m.statusIcon(selected.Status), truncate(selected.Title, 40), sourceLabel(selected.Source), formatTime(selected.UpdatedAt))
+	line := fmt.Sprintf("Selected Session • %s %s • Attention: %s • Last update: %s", m.statusIcon(selected.Status), truncate(sessionTitle(*selected), 32), attentionReason(*selected), formatTime(selected.UpdatedAt))
 	return lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("241")).
@@ -246,24 +238,9 @@ func (m Model) renderRow(session data.Session, selected bool, width int) string 
 	if titleMax < 3 {
 		titleMax = 3
 	}
-	title := truncate(session.Title, titleMax)
-	repoWithBranch := session.Repository
-	if repoWithBranch == "" {
-		repoWithBranch = "no-repo"
-	}
-	if session.Branch != "" {
-		repoWithBranch = fmt.Sprintf("%s@%s", repoWithBranch, session.Branch)
-	}
-	updated := formatTime(session.UpdatedAt)
-	repoMax := width - len(updated) - 5
-	if repoMax < 3 {
-		repoMax = 3
-	}
-	repo := truncate(repoWithBranch, repoMax)
-	if title == "" {
-		title = "Untitled Session"
-	}
+	title := truncate(sessionTitle(session), titleMax)
 	badge := sessionBadge(session)
+	attention := fmt.Sprintf("Attention: %s", attentionReason(session))
 
 	titleLine := fmt.Sprintf("%s %s", icon, title)
 	if badge != "" {
@@ -271,22 +248,30 @@ func (m Model) renderRow(session data.Session, selected bool, width int) string 
 	}
 
 	if width < 20 {
-		row := titleLine
+		row := fmt.Sprintf("%s\n  %s", titleLine, truncate(attention, titleMax))
 		if selected {
-			row += fmt.Sprintf("\n↳ %s", truncate(rowContext(session), titleMax))
+			row += fmt.Sprintf("\n  ↳ %s", truncate(rowContext(session), titleMax))
 		}
 		return style.Render(row)
 	}
 
-	row := fmt.Sprintf("%s\n  %s • %s", titleLine, repo, updated)
+	metaMax := width - 4
+	if metaMax < 3 {
+		metaMax = 3
+	}
+	rowLines := []string{
+		titleLine,
+		fmt.Sprintf("  %s", truncate(fmt.Sprintf("Repository: %s", rowRepository(session)), metaMax)),
+		fmt.Sprintf("  %s", truncate(fmt.Sprintf("%s • Last update: %s", attention, formatTime(session.UpdatedAt)), metaMax)),
+	}
 	if selected {
 		contextMax := width - 6
 		if contextMax < 3 {
 			contextMax = 3
 		}
-		row += fmt.Sprintf("\n  ↳ %s", truncate(rowContext(session), contextMax))
+		rowLines = append(rowLines, fmt.Sprintf("  ↳ %s", truncate(rowContext(session), contextMax)))
 	}
-	return style.Render(row)
+	return style.Render(strings.Join(rowLines, "\n"))
 }
 
 // SetTasks updates sessions and recategorizes columns
@@ -406,7 +391,7 @@ func truncate(s string, maxLen int) string {
 
 func formatTime(t time.Time) string {
 	if t.IsZero() {
-		return "unknown"
+		return "not recorded"
 	}
 
 	now := time.Now()
@@ -464,18 +449,69 @@ func isActiveStatus(status string) bool {
 
 func sessionBadge(session data.Session) string {
 	if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
-		return "🧑 input needed"
+		return "🧑 needs input"
 	}
 	if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
 		return "🚨 failed"
 	}
 	if data.SessionNeedsAttention(session) {
-		return "⚠ attention"
+		return "⚠ quiet"
 	}
 	if !isActiveStatus(session.Status) || session.UpdatedAt.IsZero() {
 		return ""
 	}
-	return "• live"
+	return "• in progress"
+}
+
+func sessionTitle(session data.Session) string {
+	if strings.TrimSpace(session.Title) == "" {
+		return "Untitled Session"
+	}
+	return session.Title
+}
+
+func rowRepository(session data.Session) string {
+	repository := strings.TrimSpace(session.Repository)
+	branch := strings.TrimSpace(session.Branch)
+	if repository == "" {
+		repository = "not linked"
+	}
+	if branch == "" {
+		return repository
+	}
+	return fmt.Sprintf("%s @ %s", repository, branch)
+}
+
+func panelRepository(session data.Session) string {
+	repository := strings.TrimSpace(session.Repository)
+	if repository == "" {
+		return "not linked"
+	}
+	return repository
+}
+
+func panelBranch(session data.Session) string {
+	branch := strings.TrimSpace(session.Branch)
+	if branch == "" {
+		return "not linked"
+	}
+	return branch
+}
+
+func attentionReason(session data.Session) string {
+	status := strings.ToLower(strings.TrimSpace(session.Status))
+	switch {
+	case status == "needs-input":
+		return "needs your input"
+	case status == "failed":
+		return "failed"
+	case data.SessionNeedsAttention(session):
+		return "active but quiet"
+	case isActiveStatus(session.Status):
+		return "in progress"
+	default:
+		return "no action needed"
+	}
 }
 
 func rowContext(session data.Session) string {

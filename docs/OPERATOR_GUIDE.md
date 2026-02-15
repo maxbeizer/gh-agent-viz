@@ -21,13 +21,19 @@ The board includes:
 
 - **ATC Overview**: total/active/done/failed/session-source counters
 - **Three status columns**: active work lanes
-- **Flight Deck**: selected-session context and recommended actions
+- **Selected Session panel**: plain-language context and recommended actions for the highlighted row
 
 Columns:
 
 - **Running**: active or queued sessions
 - **Done**: completed sessions
 - **Failed**: sessions that need attention
+
+Each card includes explicit labels so triage is immediate:
+
+- `Repository:` shows repo context (`not linked` if missing)
+- `Attention:` explains why action is needed (`needs your input`, `failed`, `active but quiet`, or `no action needed`)
+- `Last update:` shows freshness (`not recorded` when timestamp metadata is missing)
 
 ## 3) Core keys (daily use)
 

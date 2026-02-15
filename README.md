@@ -5,12 +5,13 @@ An interactive terminal UI for visualizing GitHub Copilot coding agent sessions.
 ## Features
 
 - 📊 **Interactive TUI** - Browse agent sessions with keyboard navigation
-- 🛩️ **ATC Overview + Flight Deck** - Live session counters and selected-session command hints
+- 🛩️ **ATC Overview + Selected Session panel** - Live counters plus plain-language details/actions for the highlighted row
 - 🔍 **Task Details** - View comprehensive task metadata (status, repo, branch, PR links)
 - 📝 **Log Viewer** - Scrollable, searchable agent task logs
 - 💻 **Local Sessions** - Automatically ingests local Copilot CLI sessions from `~/.copilot/session-state/`
 - 🎨 **Status Indicators** - Color-coded status icons (running, queued, completed, failed)
 - 🧑 **Input Needed Detection** - Highlights sessions that appear blocked waiting for human input
+- 🚦 **Attention Reasons** - Every card includes an explicit `Attention:` reason (`needs your input`, `failed`, `active but quiet`, or `no action needed`)
 - ⚡ **Quick Actions** - Open PRs in browser, refresh data, filter by status
 - 🔄 **Resume Sessions** - Jump directly into active Copilot CLI sessions with one keystroke
 - ⌨️ **Vim-style Keys** - j/k navigation, familiar keybindings
@@ -88,6 +89,15 @@ When enabled, the UI also shows a persistent debug banner with the log path.
 Press `s` on any active **local Copilot CLI session** (status: `running` or `queued`) to resume it directly in your terminal. This executes `gh copilot -- --resume <session-id>` and drops you into the Copilot CLI session.
 
 **Note:** Only active local sessions can be resumed. Attempting to resume a remote agent-task row, or a completed/failed session, shows a clear error message.
+
+### At-a-glance card semantics
+
+Each session card is intentionally labeled for quick triage:
+
+- `Repository:` shows linked repo context (`not linked` when missing)
+- `Attention:` explains why it needs action now (or confirms `no action needed`)
+- `Last update:` shows recency using friendly wording like `not recorded` when metadata is missing
+- The **Selected Session** panel mirrors the same plain-language fields for the highlighted row
 
 ### Log Viewer Navigation
 

@@ -12,7 +12,7 @@ Starting with one repo makes the board much easier to read.
 
 ## 2) What you are looking at
 
-The main screen has an **ATC overview strip**, a **3-column board**, and a **Flight Deck** panel for the selected row.
+The main screen has an **ATC overview strip**, a **3-column board**, and a **Selected Session** panel for the highlighted row.
 
 Columns:
 
@@ -20,25 +20,32 @@ Columns:
 - **Done** = completed sessions
 - **Failed** = sessions that need attention
 
-Each row is:
+Each row is labeled for fast scanning:
 
-`status icon + title`
-`repository • source • last updated`
-`↳ contextual hint (for selected row)`
+`status icon + title (+ badge)`
+`Repository: ...`
+`Attention: ... • Last update: ...`
 
-When a session likely needs your reply, you'll see a `🧑 input needed` badge.
+Attention reasons are explicit:
+
+- `needs your input`
+- `failed`
+- `active but quiet` (running/queued but stale)
+- `no action needed`
 
 Example:
 
 `🟢 Add retry logic`
-`maxbeizer/gh-agent-viz • local • 5m ago`
+`Repository: maxbeizer/gh-agent-viz`
+`Attention: no action needed • Last update: 5m ago`
 
-## 3) Why you may see “Untitled Session” or “unknown”
+## 3) Why you may see “Untitled Session” or “not linked / not recorded”
 
 This usually means older/local session metadata is incomplete.
 
 - `Untitled Session` = session didn’t store a usable summary/title
-- `unknown` = no reliable timestamp/status signal was found
+- `not linked` = repository/branch metadata was unavailable
+- `not recorded` = no reliable timestamp signal was found
 
 To reduce noise:
 

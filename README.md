@@ -45,6 +45,8 @@ gh agent-viz --repo owner/repo
 
 | Key | Action |
 |-----|--------|
+| `h` / `←` | Move to previous column |
+| `→` | Move to next column |
 | `j` / `↓` | Move down |
 | `k` / `↑` | Move up |
 | `enter` | View task details |

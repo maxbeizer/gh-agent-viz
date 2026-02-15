@@ -1,285 +1,117 @@
 package tasklist
 
 import (
-	"strings"
-	"testing"
-	"time"
+"strings"
+"testing"
+"time"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/maxbeizer/gh-agent-viz/internal/data"
+"github.com/charmbracelet/lipgloss"
+"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
-func TestNew(t *testing.T) {
-	titleStyle := lipgloss.NewStyle().Bold(true)
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("99"))
-	rowStyle := lipgloss.NewStyle().Padding(0, 1)
-	rowSelectedStyle := lipgloss.NewStyle().Background(lipgloss.Color("237"))
-	statusIconFunc := func(status string) string { return "icon" }
-
-	model := New(titleStyle, headerStyle, rowStyle, rowSelectedStyle, statusIconFunc)
-
-	if model.cursor != 0 {
-		t.Errorf("expected initial cursor to be 0, got %d", model.cursor)
-	}
-	if len(model.tasks) != 0 {
-		t.Errorf("expected empty tasks list, got %d tasks", len(model.tasks))
-	}
-	if model.loading {
-		t.Error("expected loading to be false initially")
-	}
+func newModel() Model {
+return New(
+lipgloss.NewStyle(),
+lipgloss.NewStyle(),
+lipgloss.NewStyle(),
+lipgloss.NewStyle(),
+func(string) string { return "•" },
+)
 }
 
-func TestSetTasks(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
+func TestSetTasksGroupsIntoColumns(t *testing.T) {
+model := newModel()
+model.SetTasks([]data.AgentTask{
+{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: time.Now()},
+{ID: "2", Status: "completed", Title: "Done 1", UpdatedAt: time.Now()},
+{ID: "3", Status: "failed", Title: "Failed 1", UpdatedAt: time.Now()},
+{ID: "4", Status: "queued", Title: "Running 2", UpdatedAt: time.Now()},
+})
 
-	tasks := []data.AgentTask{
-		{ID: "1", Status: "running", Title: "Task 1"},
-		{ID: "2", Status: "completed", Title: "Task 2"},
-		{ID: "3", Status: "failed", Title: "Task 3"},
-	}
-
-	model.SetTasks(tasks)
-
-	if len(model.tasks) != 3 {
-		t.Errorf("expected 3 tasks, got %d", len(model.tasks))
-	}
-	if model.cursor != 0 {
-		t.Errorf("expected cursor to be 0, got %d", model.cursor)
-	}
+if got := len(model.columnTaskIdx[0]); got != 2 {
+t.Fatalf("expected 2 running tasks, got %d", got)
+}
+if got := len(model.columnTaskIdx[1]); got != 1 {
+t.Fatalf("expected 1 done task, got %d", got)
+}
+if got := len(model.columnTaskIdx[2]); got != 1 {
+t.Fatalf("expected 1 failed task, got %d", got)
+}
 }
 
-func TestSetTasks_ResetsCursor(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
+func TestMoveCursorWithinActiveColumn(t *testing.T) {
+model := newModel()
+model.SetTasks([]data.AgentTask{
+{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: time.Now()},
+{ID: "2", Status: "running", Title: "Running 2", UpdatedAt: time.Now()},
+{ID: "3", Status: "completed", Title: "Done 1", UpdatedAt: time.Now()},
+})
 
-	// Set initial tasks and move cursor
-	initialTasks := []data.AgentTask{
-		{ID: "1", Status: "running", Title: "Task 1"},
-		{ID: "2", Status: "completed", Title: "Task 2"},
-		{ID: "3", Status: "failed", Title: "Task 3"},
-	}
-	model.SetTasks(initialTasks)
-	model.MoveCursor(2)
-
-	// Now set new tasks with fewer items
-	newTasks := []data.AgentTask{
-		{ID: "4", Status: "running", Title: "Task 4"},
-	}
-	model.SetTasks(newTasks)
-
-	if model.cursor >= len(newTasks) {
-		t.Errorf("cursor should be adjusted to within bounds, got cursor=%d for %d tasks", model.cursor, len(newTasks))
-	}
+model.MoveCursor(1)
+if model.rowCursor[model.activeColumn] != 1 {
+t.Fatalf("expected row cursor to move to 1, got %d", model.rowCursor[model.activeColumn])
 }
 
-func TestMoveCursor(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
-
-	tasks := []data.AgentTask{
-		{ID: "1", Status: "running", Title: "Task 1"},
-		{ID: "2", Status: "completed", Title: "Task 2"},
-		{ID: "3", Status: "failed", Title: "Task 3"},
-	}
-	model.SetTasks(tasks)
-
-	// Move down
-	model.MoveCursor(1)
-	if model.cursor != 1 {
-		t.Errorf("expected cursor to be 1, got %d", model.cursor)
-	}
-
-	// Move down again
-	model.MoveCursor(1)
-	if model.cursor != 2 {
-		t.Errorf("expected cursor to be 2, got %d", model.cursor)
-	}
-
-	// Try to move past the end
-	model.MoveCursor(1)
-	if model.cursor != 2 {
-		t.Errorf("cursor should not move past last item, got %d", model.cursor)
-	}
-
-	// Move up
-	model.MoveCursor(-1)
-	if model.cursor != 1 {
-		t.Errorf("expected cursor to be 1, got %d", model.cursor)
-	}
-
-	// Move to start
-	model.MoveCursor(-10)
-	if model.cursor != 0 {
-		t.Errorf("cursor should not move before first item, got %d", model.cursor)
-	}
+model.MoveCursor(10)
+if model.rowCursor[model.activeColumn] != 1 {
+t.Fatalf("expected row cursor capped at last item, got %d", model.rowCursor[model.activeColumn])
+}
 }
 
-func TestSelectedTask(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
+func TestMoveColumnAndSelectedTask(t *testing.T) {
+model := newModel()
+model.SetTasks([]data.AgentTask{
+{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: time.Now()},
+{ID: "2", Status: "completed", Title: "Done 1", UpdatedAt: time.Now()},
+{ID: "3", Status: "failed", Title: "Failed 1", UpdatedAt: time.Now()},
+})
 
-	tasks := []data.AgentTask{
-		{ID: "1", Status: "running", Title: "Task 1"},
-		{ID: "2", Status: "completed", Title: "Task 2"},
-	}
-	model.SetTasks(tasks)
-
-	selected := model.SelectedTask()
-	if selected == nil {
-		t.Fatal("expected selected task, got nil")
-	}
-	if selected.ID != "1" {
-		t.Errorf("expected selected task ID '1', got '%s'", selected.ID)
-	}
-
-	model.MoveCursor(1)
-	selected = model.SelectedTask()
-	if selected == nil {
-		t.Fatal("expected selected task, got nil")
-	}
-	if selected.ID != "2" {
-		t.Errorf("expected selected task ID '2', got '%s'", selected.ID)
-	}
+model.MoveColumn(1)
+selected := model.SelectedTask()
+if selected == nil || selected.ID != "2" {
+t.Fatalf("expected done task selected, got %#v", selected)
 }
 
-func TestSelectedTask_EmptyList(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
-
-	selected := model.SelectedTask()
-	if selected != nil {
-		t.Error("expected nil for empty task list")
-	}
+model.MoveColumn(1)
+selected = model.SelectedTask()
+if selected == nil || selected.ID != "3" {
+t.Fatalf("expected failed task selected, got %#v", selected)
+}
 }
 
-func TestView_EmptyTasks(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
+func TestViewShowsKanbanColumns(t *testing.T) {
+model := newModel()
+model.SetTasks([]data.AgentTask{
+{ID: "1", Status: "running", Title: "Running Task", Repository: "owner/repo", UpdatedAt: time.Now()},
+{ID: "2", Status: "completed", Title: "Done Task", Repository: "owner/repo", UpdatedAt: time.Now()},
+})
 
-	view := model.View()
-	if !strings.Contains(view, "No agent tasks found") {
-		t.Errorf("expected message about no tasks, got: %s", view)
-	}
+view := model.View()
+if !strings.Contains(view, "Running") {
+t.Fatal("expected running column header in view")
+}
+if !strings.Contains(view, "Done") {
+t.Fatal("expected done column header in view")
+}
+if !strings.Contains(view, "Failed") {
+t.Fatal("expected failed column header in view")
+}
+if !strings.Contains(view, "Running Task") {
+t.Fatal("expected running task in view")
+}
+if !strings.Contains(view, "Done Task") {
+t.Fatal("expected done task in view")
+}
 }
 
-func TestView_Loading(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
-	model.loading = true
-
-	view := model.View()
-	if !strings.Contains(view, "Loading") {
-		t.Errorf("expected loading message, got: %s", view)
-	}
+func TestViewEmptyAndLoadingStates(t *testing.T) {
+model := newModel()
+if got := model.View(); !strings.Contains(got, "No sessions found") {
+t.Fatalf("expected empty state, got: %s", got)
 }
 
-func TestView_WithTasks(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(status string) string { return "📝" },
-	)
-
-	tasks := []data.AgentTask{
-		{
-			ID:         "abc123",
-			Status:     "running",
-			Title:      "Fix bug in handler",
-			Repository: "owner/repo",
-			UpdatedAt:  time.Now().Add(-30 * time.Minute),
-		},
-	}
-	model.SetTasks(tasks)
-
-	view := model.View()
-	if !strings.Contains(view, "Repository") {
-		t.Error("expected view to contain header with 'Repository'")
-	}
-	if !strings.Contains(view, "owner/repo") {
-		t.Error("expected view to contain repository name")
-	}
-	if !strings.Contains(view, "Fix bug") {
-		t.Error("expected view to contain task title")
-	}
+model.loading = true
+if got := model.View(); !strings.Contains(got, "Loading sessions") {
+t.Fatalf("expected loading state, got: %s", got)
 }
-
-func TestFilterByStatus(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
-
-	allTasks := []data.AgentTask{
-		{ID: "1", Status: "running", Title: "Task 1"},
-		{ID: "2", Status: "completed", Title: "Task 2"},
-		{ID: "3", Status: "failed", Title: "Task 3"},
-		{ID: "4", Status: "running", Title: "Task 4"},
-	}
-
-	// Test filtering for running tasks
-	var runningTasks []data.AgentTask
-	for _, task := range allTasks {
-		if task.Status == "running" {
-			runningTasks = append(runningTasks, task)
-		}
-	}
-
-	model.SetTasks(runningTasks)
-	if len(model.tasks) != 2 {
-		t.Errorf("expected 2 running tasks, got %d", len(model.tasks))
-	}
-
-	// Test filtering for completed tasks
-	var completedTasks []data.AgentTask
-	for _, task := range allTasks {
-		if task.Status == "completed" {
-			completedTasks = append(completedTasks, task)
-		}
-	}
-
-	model.SetTasks(completedTasks)
-	if len(model.tasks) != 1 {
-		t.Errorf("expected 1 completed task, got %d", len(model.tasks))
-	}
 }

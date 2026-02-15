@@ -568,10 +568,3 @@ func visibleRange(total, cursor, size int) (int, int) {
 	}
 	return start, end
 }
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}

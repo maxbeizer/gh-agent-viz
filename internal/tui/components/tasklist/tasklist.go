@@ -10,6 +10,14 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
+// Column widths for table alignment
+const (
+	statusWidth = 3   // Status icon (emoji)
+	sourceWidth = 6   // Source badge (emoji + padding)
+	repoWidth   = 30  // Repository name
+	titleWidth  = 52  // Task title
+)
+
 // Model represents the task list component state
 type Model struct {
 	titleStyle       lipgloss.Style
@@ -59,8 +67,11 @@ func (m Model) View() string {
 
 	var rows []string
 
-	// Header with count
-	header := m.tableHeaderStyle.Render(fmt.Sprintf("    Source Repository                  Task                                                     Updated  (%d tasks)", len(m.tasks)))
+	// Header with count - using format string with column widths
+	headerFormat := fmt.Sprintf("%%-%ds%%-%ds%%-%ds%%-%ds Updated  (%%d tasks)",
+		statusWidth, sourceWidth, repoWidth, titleWidth)
+	header := m.tableHeaderStyle.Render(fmt.Sprintf(headerFormat,
+		"", "Source", "Repository", "Task", len(m.tasks)))
 	rows = append(rows, header)
 
 	// Task rows
@@ -82,11 +93,17 @@ func (m Model) renderRow(task data.AgentTask, selected bool) string {
 
 	icon := m.statusIcon(task.Status)
 	source := sourceIcon(task.Source)
-	repo := truncate(task.Repository, 28)
-	title := truncate(task.Title, 50)
+	repo := truncate(task.Repository, repoWidth-2)  // -2 for padding
+	title := truncate(task.Title, titleWidth-2)     // -2 for padding
 	updated := formatTime(task.UpdatedAt)
 
-	row := fmt.Sprintf("%-3s %-6s %-30s %-52s %s", icon, source, repo, title, updated)
+	// Use constants for column widths
+	row := fmt.Sprintf("%-*s %-*s %-*s %-*s %s",
+		statusWidth, icon,
+		sourceWidth, source,
+		repoWidth, repo,
+		titleWidth, title,
+		updated)
 	return style.Render(row)
 }
 
@@ -168,6 +185,7 @@ func sourceIcon(source string) string {
 	case "local":
 		return "💻"
 	default:
+		// Two spaces to maintain alignment with emoji characters above
 		return "  "
 	}
 }

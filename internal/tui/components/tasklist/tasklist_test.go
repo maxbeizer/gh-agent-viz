@@ -395,3 +395,41 @@ func TestView_SelectedSessionUsesFriendlyFallbacks(t *testing.T) {
 		t.Fatalf("expected no sentinel placeholders, got: %s", view)
 	}
 }
+
+func TestView_SelectedSessionOmitsOpenPRActionWhenNoPRLinked(t *testing.T) {
+	model := newModel()
+	model.SetSize(140, 36)
+	model.SetTasks([]data.Session{
+		{
+			ID:         "1",
+			Status:     "running",
+			Title:      "Agent Session",
+			Repository: "owner/repo",
+			Source:     data.SourceAgentTask,
+			UpdatedAt:  time.Now(),
+		},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "Actions: enter details • l logs") {
+		t.Fatalf("expected selected-session actions to include logs, got: %s", view)
+	}
+	if strings.Contains(view, "o open PR") {
+		t.Fatalf("expected open PR action to be hidden when no PR is linked, got: %s", view)
+	}
+}
+
+func TestSessionHasLinkedPR(t *testing.T) {
+	if sessionHasLinkedPR(data.Session{Source: data.SourceLocalCopilot, PRURL: "https://github.com/maxbeizer/gh-agent-viz/pull/1"}) {
+		t.Fatal("expected local sessions to never report linked PR")
+	}
+	if !sessionHasLinkedPR(data.Session{Source: data.SourceAgentTask, PRURL: "https://github.com/maxbeizer/gh-agent-viz/pull/1"}) {
+		t.Fatal("expected agent task with PR URL to report linked PR")
+	}
+	if !sessionHasLinkedPR(data.Session{Source: data.SourceAgentTask, PRNumber: 42, Repository: "maxbeizer/gh-agent-viz"}) {
+		t.Fatal("expected agent task with PR number and repo to report linked PR")
+	}
+	if sessionHasLinkedPR(data.Session{Source: data.SourceAgentTask, PRNumber: 42}) {
+		t.Fatal("expected missing repository to prevent linked PR action")
+	}
+}

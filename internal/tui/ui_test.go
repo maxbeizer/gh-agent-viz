@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -232,5 +233,53 @@ func TestView_NotReadyShowsWhimsicalStartupText(t *testing.T) {
 	view := m.View()
 	if view != "Spinning up ATC tower..." {
 		t.Fatalf("expected startup text, got %q", view)
+	}
+}
+
+func TestUpdateFooterHints_LocalSessionShowsOnlyAvailableActions(t *testing.T) {
+	m := NewModel("", false)
+	m.viewMode = ViewModeList
+	m.taskList.SetTasks([]data.Session{
+		{
+			ID:     "local-1",
+			Status: "running",
+			Title:  "Local",
+			Source: data.SourceLocalCopilot,
+		},
+	})
+
+	m.updateFooterHints()
+	footerView := m.footer.View()
+	if !strings.Contains(footerView, "resume session") {
+		t.Fatalf("expected resume hint for resumable local session, got: %s", footerView)
+	}
+	if strings.Contains(footerView, "show task logs") {
+		t.Fatalf("expected logs hint to be hidden for local session, got: %s", footerView)
+	}
+	if strings.Contains(footerView, "open PR URL") {
+		t.Fatalf("expected open PR hint to be hidden for local session, got: %s", footerView)
+	}
+}
+
+func TestUpdateFooterHints_AgentSessionWithoutPRHidesOpenPRHint(t *testing.T) {
+	m := NewModel("", false)
+	m.viewMode = ViewModeList
+	m.taskList.SetTasks([]data.Session{
+		{
+			ID:         "agent-1",
+			Status:     "running",
+			Title:      "Agent",
+			Repository: "owner/repo",
+			Source:     data.SourceAgentTask,
+		},
+	})
+
+	m.updateFooterHints()
+	footerView := m.footer.View()
+	if !strings.Contains(footerView, "show task logs") {
+		t.Fatalf("expected logs hint for agent session, got: %s", footerView)
+	}
+	if strings.Contains(footerView, "open PR URL") {
+		t.Fatalf("expected open PR hint to be hidden when PR is not linked, got: %s", footerView)
 	}
 }

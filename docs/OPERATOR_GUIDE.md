@@ -42,8 +42,8 @@ Each card includes explicit labels so triage is immediate:
 | `h` / `←` and `→` | Move between columns |
 | `j` / `k` | Move up/down in a column |
 | `enter` | Open details pane |
-| `l` | Open log view (remote agent-task rows) |
-| `o` | Open PR in browser (agent-task rows) |
+| `l` | Open log view (only shown for remote agent-task rows) |
+| `o` | Open PR in browser (only shown when selected row has a linked PR) |
 | `s` | Resume active **local** Copilot session |
 | `a` | Toggle **attention mode** (sessions needing your action) |
 | `tab` / `shift+tab` | Cycle filter: all ↔ attention ↔ active ↔ completed ↔ failed |
@@ -57,6 +57,8 @@ Each card includes explicit labels so triage is immediate:
 3. Jump to logs (`l`) if something looks off.
 4. Open PR (`o`) for completed remote work.
 5. Resume local active work (`s`) when you want to continue in Copilot CLI.
+
+Footer hints are contextual: if an action is unavailable for the selected row, it is hidden.
 
 ## 5) Recommended config
 

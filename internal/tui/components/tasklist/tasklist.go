@@ -149,7 +149,10 @@ func (m Model) renderFlightDeck() string {
 
 	actions := []string{"enter details"}
 	if selected.Source == data.SourceAgentTask {
-		actions = append(actions, "l logs", "o open PR")
+		actions = append(actions, "l logs")
+		if sessionHasLinkedPR(*selected) {
+			actions = append(actions, "o open PR")
+		}
 	}
 	if selected.Source == data.SourceLocalCopilot && isActiveStatus(selected.Status) && selected.ID != "" {
 		actions = append(actions, "s resume")
@@ -496,6 +499,16 @@ func panelBranch(session data.Session) string {
 		return "not linked"
 	}
 	return branch
+}
+
+func sessionHasLinkedPR(session data.Session) bool {
+	if session.Source != data.SourceAgentTask {
+		return false
+	}
+	if strings.TrimSpace(session.PRURL) != "" {
+		return true
+	}
+	return session.PRNumber > 0 && strings.TrimSpace(session.Repository) != ""
 }
 
 func attentionReason(session data.Session) string {

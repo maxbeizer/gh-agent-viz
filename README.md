@@ -12,7 +12,7 @@ An interactive terminal UI for visualizing GitHub Copilot coding agent sessions.
 - 🎨 **Status Indicators** - Color-coded status icons (running, queued, completed, failed)
 - 🧑 **Input Needed Detection** - Highlights sessions that appear blocked waiting for human input
 - 🚦 **Attention Reasons** - Every card includes an explicit `Attention:` reason (`needs your input`, `failed`, `active but quiet`, or `no action needed`)
-- ⚡ **Quick Actions** - Open PRs in browser, refresh data, filter by status
+- ⚡ **Quick Actions** - Contextual hints only show actions available for the highlighted session
 - 🔄 **Resume Sessions** - Jump directly into active Copilot CLI sessions with one keystroke
 - ⌨️ **Vim-style Keys** - j/k navigation, familiar keybindings
 - 🛡️ **Tolerant Parsing** - Gracefully handles malformed session files without crashing
@@ -76,13 +76,15 @@ When enabled, the UI also shows a persistent debug banner with the log path.
 | `k` / `↑` | Move up |
 | `enter` | View task details |
 | `l` | View task logs (remote agent sessions) |
-| `o` | Open PR in browser |
-| `s` | Resume active session |
+| `o` | Open linked PR in browser (only when a PR is available) |
+| `s` | Resume active local session (running/queued/needs-input) |
 | `a` | Toggle attention mode (sessions needing action) |
 | `r` | Refresh task list |
 | `tab` / `shift+tab` | Cycle status filter forward/backward (`all ↔ attention ↔ active ↔ completed ↔ failed`) |
 | `esc` | Go back to task list |
 | `q` | Quit |
+
+Action hints in the footer are contextual: unavailable actions are hidden for the currently highlighted session.
 
 ### Resume Active Sessions
 

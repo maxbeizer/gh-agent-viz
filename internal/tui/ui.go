@@ -488,24 +488,36 @@ func isValidFilter(filter string) bool {
 func (m *Model) updateFooterHints() {
 	switch m.viewMode {
 	case ViewModeList:
-		m.footer.SetHints([]key.Binding{
+		hints := []key.Binding{
 			m.keys.MoveUp,
 			m.keys.MoveDown,
 			m.keys.SelectTask,
-			m.keys.ShowLogs,
-			m.keys.OpenInBrowser,
-			m.keys.ToggleFilter,
-			m.keys.FocusAttention,
-			m.keys.RefreshData,
-			m.keys.ExitApp,
-		})
+		}
+		selected := m.taskList.SelectedTask()
+		if canShowLogs(selected) {
+			hints = append(hints, m.keys.ShowLogs)
+		}
+		if canOpenPR(selected) {
+			hints = append(hints, m.keys.OpenInBrowser)
+		}
+		if canResumeLocalSession(selected) {
+			hints = append(hints, m.keys.ResumeSession)
+		}
+		hints = append(hints, m.keys.ToggleFilter, m.keys.FocusAttention, m.keys.RefreshData, m.keys.ExitApp)
+		m.footer.SetHints(hints)
 	case ViewModeDetail:
-		m.footer.SetHints([]key.Binding{
+		hints := []key.Binding{
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
-			m.keys.ShowLogs,
-			m.keys.OpenInBrowser,
-			m.keys.ExitApp,
-		})
+		}
+		selected := m.taskList.SelectedTask()
+		if canShowLogs(selected) {
+			hints = append(hints, m.keys.ShowLogs)
+		}
+		if canOpenPR(selected) {
+			hints = append(hints, m.keys.OpenInBrowser)
+		}
+		hints = append(hints, m.keys.ExitApp)
+		m.footer.SetHints(hints)
 	case ViewModeLog:
 		m.footer.SetHints([]key.Binding{
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
@@ -517,4 +529,26 @@ func (m *Model) updateFooterHints() {
 			m.keys.ExitApp,
 		})
 	}
+}
+
+func canShowLogs(session *data.Session) bool {
+	return session != nil && session.Source == data.SourceAgentTask && strings.TrimSpace(session.ID) != ""
+}
+
+func canOpenPR(session *data.Session) bool {
+	if session == nil || session.Source != data.SourceAgentTask {
+		return false
+	}
+	if strings.TrimSpace(session.PRURL) != "" {
+		return true
+	}
+	return session.PRNumber > 0 && strings.TrimSpace(session.Repository) != ""
+}
+
+func canResumeLocalSession(session *data.Session) bool {
+	if session == nil || session.Source != data.SourceLocalCopilot || strings.TrimSpace(session.ID) == "" {
+		return false
+	}
+	status := strings.ToLower(strings.TrimSpace(session.Status))
+	return status == "running" || status == "queued" || status == "needs-input"
 }

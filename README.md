@@ -151,6 +151,34 @@ go get github.com/cli/go-gh/v2
 go get gopkg.in/yaml.v3
 ```
 
+### Testing
+
+#### Unit Tests
+
+Run all unit tests with coverage:
+
+```bash
+go test -v -race -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
+```
+
+#### Integration Smoke Tests
+
+Run integration smoke tests that validate build, help, navigation, and action paths:
+
+```bash
+./test/integration/smoke_test.sh
+```
+
+These tests run automatically in CI on all PRs and commits to main. They validate:
+- Project builds successfully
+- Help command works and displays proper usage
+- Invalid flags are handled gracefully
+- Binary starts without crashing
+- Module dependencies are satisfied
+
+See `.github/agents/integration-test.agent.md` for the complete test execution profile.
+
 ## Reference
 
 This project follows patterns from [gh-dash](https://github.com/dlvhdr/gh-dash), the gold standard for interactive Bubble Tea `gh` extensions.

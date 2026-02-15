@@ -231,7 +231,7 @@ func TestHandleListKeys_LocalSessionLogShowsHelpfulError(t *testing.T) {
 func TestView_NotReadyShowsWhimsicalStartupText(t *testing.T) {
 	m := NewModel("", false)
 	view := m.View()
-	if view != "Spinning up ATC tower..." {
+	if view != "Loading board..." {
 		t.Fatalf("expected startup text, got %q", view)
 	}
 }

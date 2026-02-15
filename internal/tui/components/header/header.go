@@ -31,9 +31,22 @@ func (m Model) View() string {
 	title := m.titleStyle.Render(m.title)
 	filterText := ""
 	if m.filter != nil && *m.filter != "" {
-		filterText = m.filterStyle.Render("Filter: " + *m.filter)
+		filterText = m.filterStyle.Render("Filter: " + filterLabel(*m.filter))
 	}
 
 	header := lipgloss.JoinHorizontal(lipgloss.Top, title, filterText)
 	return header + "\n"
+}
+
+func filterLabel(filter string) string {
+	switch filter {
+	case "attention":
+		return "needs action"
+	case "active":
+		return "running"
+	case "completed":
+		return "done"
+	default:
+		return filter
+	}
 }

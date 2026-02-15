@@ -12,7 +12,7 @@ Starting with one repo makes the board much easier to read.
 
 ## 2) What you are looking at
 
-The main screen has an **ATC overview strip**, a **3-column board**, and a **Selected Session** panel for the highlighted row.
+The main screen has a **Sessions at a Glance strip**, a **3-column board**, and a **Session Summary** panel for the highlighted row.
 
 Columns:
 
@@ -24,27 +24,27 @@ Each row is labeled for fast scanning:
 
 `status icon + title (+ badge)`
 `Repository: ...`
-`Attention: ... • Last update: ...`
+`Needs your action: ... • Last update: ...`
 
 Attention reasons are explicit:
 
-- `needs your input`
-- `failed`
-- `active but quiet` (running/queued but stale)
+- `waiting on your input`
+- `run failed`
+- `running but quiet` (running/queued but stale)
 - `no action needed`
 
 Example:
 
 `🟢 Add retry logic`
 `Repository: maxbeizer/gh-agent-viz`
-`Attention: no action needed • Last update: 5m ago`
+`Needs your action: no action needed • Last update: 5m ago`
 
-## 3) Why you may see “Untitled Session” or “not linked / not recorded”
+## 3) Why you may see “Untitled Session” or “not available / not recorded”
 
 This usually means older/local session metadata is incomplete.
 
 - `Untitled Session` = session didn’t store a usable summary/title
-- `not linked` = repository/branch metadata was unavailable
+- `not available` = repository/branch metadata was unavailable
 - `not recorded` = no reliable timestamp signal was found
 
 To reduce noise:
@@ -62,12 +62,12 @@ To reduce noise:
 - `o`: open PR (remote agent rows)
 - `s`: resume active local session
 - `tab` / `shift+tab`: change filter forward/backward
-- `a`: toggle attention mode
+- `a`: toggle needs-action view
 - `q`: quit
 
 ## 5) First useful workflow
 
-1. Filter to `attention` (`a`)
+1. Filter to needs-action view (`a`)
 2. Open a row (`enter`)
 3. Check logs (`l`) if needed
 4. Open PR (`o`) or resume (`s`) depending on row source

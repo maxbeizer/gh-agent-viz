@@ -37,8 +37,8 @@ func (m Model) View() string {
 		"",
 		fmt.Sprintf("Status:     %s %s", m.statusIcon(m.session.Status), m.session.Status),
 		fmt.Sprintf("Source:     %s", m.session.Source),
-		fmt.Sprintf("Repository: %s", detailValue(m.session.Repository, "not linked")),
-		fmt.Sprintf("Branch:     %s", detailValue(m.session.Branch, "not linked")),
+		fmt.Sprintf("Repository: %s", detailValue(m.session.Repository, "not available")),
+		fmt.Sprintf("Branch:     %s", detailValue(m.session.Branch, "not available")),
 	}
 
 	// Add PR info for agent-task sessions

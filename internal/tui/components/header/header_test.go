@@ -42,7 +42,7 @@ func TestNew_NilFilter(t *testing.T) {
 func TestView_RendersTitle(t *testing.T) {
 	titleStyle := lipgloss.NewStyle()
 	title := "My Application"
-	
+
 	model := New(titleStyle, title, nil)
 	view := model.View()
 

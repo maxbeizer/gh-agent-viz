@@ -9,6 +9,7 @@ An interactive terminal UI for visualizing GitHub Copilot coding agent sessions.
 - 📝 **Log Viewer** - Scrollable, searchable agent task logs
 - 🎨 **Status Indicators** - Color-coded status icons (running, queued, completed, failed)
 - ⚡ **Quick Actions** - Open PRs in browser, refresh data, filter by status
+- 🔄 **Resume Sessions** - Jump directly into active Copilot CLI sessions with one keystroke
 - ⌨️ **Vim-style Keys** - j/k navigation, familiar keybindings
 
 ## Installation
@@ -50,10 +51,17 @@ gh agent-viz --repo owner/repo
 | `enter` | View task details |
 | `l` | View task logs |
 | `o` | Open PR in browser |
+| `s` | Resume active session |
 | `r` | Refresh task list |
 | `tab` | Cycle status filter (all → active → completed → failed) |
 | `esc` | Go back to task list |
 | `q` | Quit |
+
+### Resume Active Sessions
+
+Press `s` on any active session (status: `running` or `queued`) to resume it directly in your terminal. This executes `gh copilot -- --resume <session-id>` and drops you into the Copilot CLI session.
+
+**Note:** Only active sessions can be resumed. Attempting to resume a completed or failed session will show a clear error message.
 
 ### Log Viewer Navigation
 

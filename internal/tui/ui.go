@@ -74,6 +74,7 @@ func NewModel(repo string) Model {
 		keys.SelectTask,
 		keys.ShowLogs,
 		keys.OpenInBrowser,
+		keys.ResumeSession,
 		keys.ToggleFilter,
 		keys.RefreshData,
 		keys.ExitApp,
@@ -219,6 +220,11 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if task != nil {
 			return m, m.openTaskPR(task)
 		}
+	case "s":
+		task := m.taskList.SelectedTask()
+		if task != nil {
+			return m, m.resumeSession(task)
+		}
 	case "r":
 		return m, m.fetchTasks
 	case "tab":
@@ -363,6 +369,32 @@ func (m Model) openTaskPR(task *data.AgentTask) tea.Cmd {
 			}
 		default:
 			return errMsg{fmt.Errorf("selected task has no pull request to open")}
+		}
+
+		return nil
+	}
+}
+
+func (m Model) resumeSession(task *data.AgentTask) tea.Cmd {
+	return func() tea.Msg {
+		if task == nil {
+			return errMsg{fmt.Errorf("no task selected")}
+		}
+
+		// Only allow resuming active sessions (running or queued)
+		if task.Status != "running" && task.Status != "queued" {
+			return errMsg{fmt.Errorf("cannot resume session: task status is '%s' (only 'running' or 'queued' sessions can be resumed)", task.Status)}
+		}
+
+		if task.ID == "" {
+			return errMsg{fmt.Errorf("cannot resume session: task has no session ID")}
+		}
+
+		// Execute gh copilot -- --resume <session-id>
+		cmd := exec.Command("gh", "copilot", "--", "--resume", task.ID)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return errMsg{fmt.Errorf("failed to resume session: %s", strings.TrimSpace(string(output)))}
 		}
 
 		return nil

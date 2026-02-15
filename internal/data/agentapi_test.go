@@ -40,7 +40,7 @@ func TestHelperProcess(t *testing.T) {
 	}
 
 	testMode := os.Getenv("TEST_SCENARIO")
-	
+
 	if testMode == "list_success" {
 		result := []AgentTask{
 			{

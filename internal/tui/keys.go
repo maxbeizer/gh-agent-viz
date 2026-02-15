@@ -9,6 +9,7 @@ type Keybindings struct {
 	SelectTask    key.Binding
 	ShowLogs      key.Binding
 	OpenInBrowser key.Binding
+	ResumeSession key.Binding
 	RefreshData   key.Binding
 	ExitApp       key.Binding
 	ToggleFilter  key.Binding
@@ -37,6 +38,10 @@ func NewKeybindings() Keybindings {
 		OpenInBrowser: key.NewBinding(
 			key.WithKeys("o"),
 			key.WithHelp("o", "open PR URL"),
+		),
+		ResumeSession: key.NewBinding(
+			key.WithKeys("s"),
+			key.WithHelp("s", "resume session"),
 		),
 		RefreshData: key.NewBinding(
 			key.WithKeys("r"),

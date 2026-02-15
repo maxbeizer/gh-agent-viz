@@ -263,8 +263,6 @@ func TestFetchAgentTaskDetail_ValidData(t *testing.T) {
 		t.Errorf("wrong source: expected 'agent-task', got '%s'", result.Source)
 	}
 }
-	}
-}
 
 func TestFetchAgentTaskDetail_CommandError(t *testing.T) {
 	originalExecCommand := execCommand

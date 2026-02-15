@@ -21,6 +21,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      pages_ready: ${{ steps.pages_ready.outputs.ready }}
     environment:
       name: github-pages
     steps:
@@ -28,23 +30,43 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Pages
+        id: pages
+        continue-on-error: true
         uses: actions/configure-pages@v5
         with:
           enablement: true
 
+      - name: Mark Pages readiness
+        id: pages_ready
+        run: |
+          if [ "${{ steps.pages.outcome }}" = "success" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pages setup guidance
+        if: steps.pages.outcome != 'success'
+        run: |
+          echo "::warning::GitHub Pages is not enabled for this repository or token permissions are insufficient."
+          echo "::warning::Enable Pages once in repository settings, then rerun this workflow."
+
       - name: Build with Jekyll
+        if: steps.pages.outcome == 'success'
         uses: actions/jekyll-build-pages@v1
         with:
           source: docs
           destination: _site
 
       - name: Upload artifact
+        if: steps.pages.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
   deploy:
     needs: build
+    if: needs.build.outputs.pages_ready == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

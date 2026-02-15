@@ -134,6 +134,7 @@ Security is a core requirement for this project. See [docs/SECURITY.md](docs/SEC
 
 - GitHub Pages is deployed from `docs/` via `.github/workflows/docs-pages.yml`.
 - Site URL: https://maxbeizer.github.io/gh-agent-viz/
+- If initial deploy cannot enable Pages automatically, enable GitHub Pages once in repository settings and rerun the Docs workflow.
 - Keep docs in sync with shipped behavior when merging changes.
 
 ### Technology Stack

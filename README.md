@@ -86,6 +86,12 @@ refreshInterval: 30
 defaultFilter: all
 ```
 
+## Documentation
+
+- **[Operator Guide](docs/OPERATOR_GUIDE.md)** - Supervising multiple Copilot workstreams, advanced workflows, and configuration
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues, error messages, and solutions
+- **[Architecture Decisions](docs/DECISIONS.md)** - Technical design rationale and patterns
+
 ## Requirements
 
 - [GitHub CLI](https://cli.github.com/) (`gh`) installed and authenticated

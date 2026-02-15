@@ -9,6 +9,9 @@ import (
 	"time"
 )
 
+// execCommand is a variable to allow mocking exec.Command in tests.
+var execCommand = exec.Command
+
 // AgentTask represents a GitHub Copilot agent task session
 type AgentTask struct {
 	ID         string    `json:"id"`
@@ -24,22 +27,17 @@ type AgentTask struct {
 
 // FetchAgentTasks retrieves the list of agent tasks, optionally scoped to a repository
 func FetchAgentTasks(repo string) ([]AgentTask, error) {
-	jsonOutput, jsonErr := exec.Command("gh", "agent-task", "list", "--json").CombinedOutput()
+	jsonArgs := []string{"agent-task", "list", "--json"}
+	if repo != "" {
+		jsonArgs = append(jsonArgs, "-R", repo)
+	}
+	jsonOutput, jsonErr := execCommand("gh", jsonArgs...).CombinedOutput()
 	if jsonErr == nil {
 		var tasks []AgentTask
 		if err := json.Unmarshal(jsonOutput, &tasks); err != nil {
 			return nil, fmt.Errorf("failed to parse agent tasks: %w", err)
 		}
-		if repo == "" {
-			return tasks, nil
-		}
-		filtered := make([]AgentTask, 0, len(tasks))
-		for _, task := range tasks {
-			if task.Repository == repo {
-				filtered = append(filtered, task)
-			}
-		}
-		return filtered, nil
+		return tasks, nil
 	}
 
 	// Fallback for current gh agent-task CLI versions that don't support --json.
@@ -47,7 +45,7 @@ func FetchAgentTasks(repo string) ([]AgentTask, error) {
 		return nil, fmt.Errorf("failed to fetch agent tasks: %s", strings.TrimSpace(string(jsonOutput)))
 	}
 
-	output, err := exec.Command("gh", "agent-task", "list").CombinedOutput()
+	output, err := execCommand("gh", "agent-task", "list").CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch agent tasks: %s", strings.TrimSpace(string(output)))
 	}
@@ -99,7 +97,7 @@ func FetchAgentTaskDetail(id string, repo string) (*AgentTask, error) {
 		args = append(args, "-R", repo)
 	}
 
-	output, err := exec.Command("gh", args...).CombinedOutput()
+	output, err := execCommand("gh", args...).CombinedOutput()
 	if err == nil {
 		var task AgentTask
 		if err := json.Unmarshal(output, &task); err != nil {
@@ -118,7 +116,7 @@ func FetchAgentTaskDetail(id string, repo string) (*AgentTask, error) {
 		prArgs = append(prArgs, "-R", repo)
 	}
 
-	prOutput, prErr := exec.Command("gh", prArgs...).CombinedOutput()
+	prOutput, prErr := execCommand("gh", prArgs...).CombinedOutput()
 	if prErr != nil {
 		return nil, fmt.Errorf("failed to fetch agent task detail: %s", strings.TrimSpace(string(prOutput)))
 	}
@@ -160,7 +158,7 @@ func FetchAgentTaskLog(id string, repo string) (string, error) {
 		args = append(args, "-R", repo)
 	}
 
-	output, err := exec.Command("gh", args...).CombinedOutput()
+	output, err := execCommand("gh", args...).CombinedOutput()
 	if err != nil {
 		trimmed := strings.TrimSpace(string(output))
 		if strings.Contains(trimmed, "session ID is required") {

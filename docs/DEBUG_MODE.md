@@ -11,8 +11,9 @@ gh agent-viz --debug
 ## What it does
 
 - Logs data-layer `gh` command execution details
+- Logs UI action commands (resume session, open PR)
 - Captures command, status, and output
-- Keeps normal product behavior unchanged
+- Shows an in-app `DEBUG ON` banner with the active log path
 
 Log file:
 

@@ -17,7 +17,13 @@ gh agent-viz --debug
 
 ## 2) Read the board
 
-The board is split into columns:
+The board includes:
+
+- **ATC Overview**: total/active/done/failed/session-source counters
+- **Three status columns**: active work lanes
+- **Flight Deck**: selected-session context and recommended actions
+
+Columns:
 
 - **Running**: active or queued sessions
 - **Done**: completed sessions
@@ -30,10 +36,10 @@ The board is split into columns:
 | `h` / `←` and `→` | Move between columns |
 | `j` / `k` | Move up/down in a column |
 | `enter` | Open details pane |
-| `l` | Open log view |
+| `l` | Open log view (remote agent-task rows) |
 | `o` | Open PR in browser (agent-task rows) |
 | `s` | Resume active **local** Copilot session |
-| `tab` | Cycle filter: all → active → completed → failed |
+| `tab` / `shift+tab` | Cycle filter: all ↔ active ↔ completed ↔ failed |
 | `r` | Refresh now |
 | `q` | Quit |
 

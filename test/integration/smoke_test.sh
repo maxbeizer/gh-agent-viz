@@ -27,6 +27,9 @@ echo "========================================"
 echo "Project root: $PROJECT_ROOT"
 echo ""
 
+BIN_PATH="$PROJECT_ROOT/bin/gh-agent-viz-smoke"
+mkdir -p "$(dirname "$BIN_PATH")"
+
 # Helper function to print test status
 pass_test() {
     TESTS_RUN=$((TESTS_RUN + 1))
@@ -45,14 +48,14 @@ fail_test() {
 echo "Testing Build Path..."
 echo "---"
 
-if go build -o gh-agent-viz ./gh-agent-viz.go 2>&1; then
+if go build -o "$BIN_PATH" ./gh-agent-viz.go 2>&1; then
     pass_test "Project builds successfully"
 else
     fail_test "Project build" "Failed to build binary"
 fi
 
 # Verify binary exists and is executable
-if [ -f "gh-agent-viz" ] && [ -x "gh-agent-viz" ]; then
+if [ -f "$BIN_PATH" ] && [ -x "$BIN_PATH" ]; then
     pass_test "Binary is executable"
 else
     fail_test "Binary executable check" "Binary not found or not executable"
@@ -64,7 +67,7 @@ echo ""
 echo "Testing Help Path..."
 echo "---"
 
-HELP_OUTPUT=$(./gh-agent-viz --help 2>&1 || true)
+HELP_OUTPUT=$("$BIN_PATH" --help 2>&1 || true)
 
 if echo "$HELP_OUTPUT" | grep -iq "interactive" && echo "$HELP_OUTPUT" | grep -iq "terminal UI"; then
     pass_test "Help text contains description"
@@ -97,7 +100,7 @@ echo "Testing Navigation Path..."
 echo "---"
 
 # Test invalid flag (should fail gracefully with error message)
-INVALID_OUTPUT=$(./gh-agent-viz --invalid-flag 2>&1 || true)
+INVALID_OUTPUT=$("$BIN_PATH" --invalid-flag 2>&1 || true)
 if echo "$INVALID_OUTPUT" | grep -q "unknown flag"; then
     pass_test "Invalid flag produces error message"
 else
@@ -106,7 +109,7 @@ fi
 
 # Test --repo flag accepts valid format
 # Note: We can't test actual execution without gh CLI, but we can verify it parses
-if ./gh-agent-viz --repo "owner/repo" --help 2>&1 | grep -q "Usage:"; then
+if "$BIN_PATH" --repo "owner/repo" --help 2>&1 | grep -q "Usage:"; then
     pass_test "Valid --repo flag is accepted"
 else
     fail_test "Repo flag parsing" "Failed to accept --repo flag"
@@ -122,7 +125,7 @@ echo "---"
 # This will fail to connect to gh agent-task, but should handle it gracefully
 # We're just checking it doesn't panic or crash immediately on startup
 TIMEOUT=2
-timeout $TIMEOUT ./gh-agent-viz >/dev/null 2>&1 &
+timeout $TIMEOUT "$BIN_PATH" >/dev/null 2>&1 &
 BIN_PID=$!
 sleep 0.5
 
@@ -166,7 +169,7 @@ fi
 echo ""
 
 # Clean up binary
-rm -f gh-agent-viz
+rm -f "$BIN_PATH"
 
 if [ $TESTS_FAILED -eq 0 ]; then
     echo -e "${GREEN}All tests passed!${NC}"

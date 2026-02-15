@@ -5,10 +5,12 @@ An interactive terminal UI for visualizing GitHub Copilot coding agent sessions.
 ## Features
 
 - 📊 **Interactive TUI** - Browse agent sessions with keyboard navigation
+- 🛩️ **ATC Overview + Flight Deck** - Live session counters and selected-session command hints
 - 🔍 **Task Details** - View comprehensive task metadata (status, repo, branch, PR links)
 - 📝 **Log Viewer** - Scrollable, searchable agent task logs
 - 💻 **Local Sessions** - Automatically ingests local Copilot CLI sessions from `~/.copilot/session-state/`
 - 🎨 **Status Indicators** - Color-coded status icons (running, queued, completed, failed)
+- 🧑 **Input Needed Detection** - Highlights sessions that appear blocked waiting for human input
 - ⚡ **Quick Actions** - Open PRs in browser, refresh data, filter by status
 - 🔄 **Resume Sessions** - Jump directly into active Copilot CLI sessions with one keystroke
 - ⌨️ **Vim-style Keys** - j/k navigation, familiar keybindings
@@ -27,8 +29,16 @@ gh extension install maxbeizer/gh-agent-viz
 ```bash
 git clone https://github.com/maxbeizer/gh-agent-viz.git
 cd gh-agent-viz
-go build -o gh-agent-viz ./gh-agent-viz.go
+go build -o bin/gh-agent-viz ./gh-agent-viz.go
 ```
+
+### Install from Local Checkout (Development)
+
+```bash
+gh extension install .
+```
+
+This local install path uses the repository's executable wrapper and runs with your installed Go toolchain.
 
 ## Usage
 
@@ -53,6 +63,7 @@ gh agent-viz --debug
 ```
 
 Debug mode writes command diagnostics to `~/.gh-agent-viz-debug.log` to speed up troubleshooting.
+When enabled, the UI also shows a persistent debug banner with the log path.
 
 ### Keyboard Shortcuts
 
@@ -63,11 +74,11 @@ Debug mode writes command diagnostics to `~/.gh-agent-viz-debug.log` to speed up
 | `j` / `↓` | Move down |
 | `k` / `↑` | Move up |
 | `enter` | View task details |
-| `l` | View task logs |
+| `l` | View task logs (remote agent sessions) |
 | `o` | Open PR in browser |
 | `s` | Resume active session |
 | `r` | Refresh task list |
-| `tab` | Cycle status filter (all → active → completed → failed) |
+| `tab` / `shift+tab` | Cycle status filter forward/backward |
 | `esc` | Go back to task list |
 | `q` | Quit |
 

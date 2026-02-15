@@ -62,8 +62,8 @@ func NewKeybindings() Keybindings {
 			key.WithHelp("q", "exit"),
 		),
 		ToggleFilter: key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("tab", "switch status filter"),
+			key.WithKeys("tab", "shift+tab"),
+			key.WithHelp("tab/shift+tab", "switch status filter"),
 		),
 		NavigateBack: key.NewBinding(
 			key.WithKeys("esc"),

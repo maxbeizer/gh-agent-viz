@@ -20,6 +20,14 @@ func TestStatusIcon_Queued(t *testing.T) {
 	}
 }
 
+func TestStatusIcon_NeedsInput(t *testing.T) {
+	icon := StatusIcon("needs-input")
+	expected := "🧑"
+	if icon != expected {
+		t.Errorf("expected icon '%s' for needs-input status, got '%s'", expected, icon)
+	}
+}
+
 func TestStatusIcon_Completed(t *testing.T) {
 	icon := StatusIcon("completed")
 	expected := "✅"

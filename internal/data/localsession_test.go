@@ -55,6 +55,13 @@ func TestDeriveLocalSessionStatus_ExplicitRunning(t *testing.T) {
 	}
 }
 
+func TestDeriveLocalSessionStatus_ExplicitNeedsInput(t *testing.T) {
+	result := DeriveLocalSessionStatus("awaiting user input", time.Now())
+	if result != "needs-input" {
+		t.Fatalf("expected needs-input, got %s", result)
+	}
+}
+
 func TestDeriveLocalSessionStatus_ExplicitFailed(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -259,6 +266,84 @@ status: "running"
 	// Should use default title
 	if session.Title != "Session test-session-000" {
 		t.Errorf("expected default title 'Session test-session-000', got '%s'", session.Title)
+	}
+}
+
+func TestParseWorkspaceFile_AwaitingUserInputFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	workspaceFile := filepath.Join(tmpDir, "workspace.yaml")
+
+	content := `id: "session-input-1"
+created_at: "2026-02-15T03:10:00Z"
+updated_at: "2026-02-15T03:30:00Z"
+status: "running"
+awaiting_user_input: true
+summary: "Need user confirmation"
+`
+
+	if err := os.WriteFile(workspaceFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	session, err := parseWorkspaceFile(workspaceFile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if session.Status != "needs-input" {
+		t.Fatalf("expected needs-input status, got %s", session.Status)
+	}
+}
+
+func TestParseWorkspaceFile_AssistantQuestionNeedsInput(t *testing.T) {
+	tmpDir := t.TempDir()
+	workspaceFile := filepath.Join(tmpDir, "workspace.yaml")
+
+	content := `id: "session-input-2"
+created_at: "2026-02-15T03:10:00Z"
+updated_at: "2026-02-15T03:30:00Z"
+status: "running"
+summary: "Question pending"
+conversation_history:
+  - role: user
+    content: "Add retries"
+  - role: assistant
+    content: "Should I apply retries to all endpoints or only write operations?"
+`
+
+	if err := os.WriteFile(workspaceFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	session, err := parseWorkspaceFile(workspaceFile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if session.Status != "needs-input" {
+		t.Fatalf("expected needs-input status, got %s", session.Status)
+	}
+}
+
+func TestParseWorkspaceFileFallback_InputFlagBeforeStatus(t *testing.T) {
+	tmpDir := t.TempDir()
+	workspaceFile := filepath.Join(tmpDir, "workspace.yaml")
+
+	content := `session_id: "fallback-input-order"
+awaiting_user_input: true
+status: running
+last_activity: "2026-02-15T03:30:00Z"
+{ invalid yaml here
+`
+
+	if err := os.WriteFile(workspaceFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	session, err := parseWorkspaceFile(workspaceFile)
+	if err != nil {
+		t.Fatalf("expected fallback parsing to succeed, got error: %v", err)
+	}
+	if session.Status != "needs-input" {
+		t.Fatalf("expected needs-input status, got %s", session.Status)
 	}
 }
 

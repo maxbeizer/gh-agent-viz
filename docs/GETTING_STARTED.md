@@ -12,7 +12,9 @@ Starting with one repo makes the board much easier to read.
 
 ## 2) What you are looking at
 
-The main screen has three columns:
+The main screen has an **ATC overview strip**, a **3-column board**, and a **Flight Deck** panel for the selected row.
+
+Columns:
 
 - **Running** = active or queued sessions
 - **Done** = completed sessions
@@ -22,6 +24,9 @@ Each row is:
 
 `status icon + title`
 `repository • source • last updated`
+`↳ contextual hint (for selected row)`
+
+When a session likely needs your reply, you'll see a `🧑 input needed` badge.
 
 Example:
 
@@ -38,7 +43,7 @@ This usually means older/local session metadata is incomplete.
 To reduce noise:
 
 1. Use `--repo owner/repo`
-2. Press `tab` and focus on `active`
+2. Press `tab`/`shift+tab` and focus on `active`
 3. Press `r` to refresh
 
 ## 4) Core controls (minimum set)
@@ -46,15 +51,15 @@ To reduce noise:
 - `h` / `→`: switch columns
 - `j` / `k`: move selection
 - `enter`: open details
-- `l`: open logs
+- `l`: open logs (remote rows)
 - `o`: open PR (remote agent rows)
 - `s`: resume active local session
-- `tab`: change filter
+- `tab` / `shift+tab`: change filter forward/backward
 - `q`: quit
 
 ## 5) First useful workflow
 
-1. Filter to `active` (`tab`)
+1. Filter to `active` (`tab` / `shift+tab`)
 2. Open a row (`enter`)
 3. Check logs (`l`) if needed
 4. Open PR (`o`) or resume (`s`) depending on row source

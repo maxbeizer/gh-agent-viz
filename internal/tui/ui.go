@@ -2,9 +2,13 @@ package tui
 
 import (
 	"fmt"
+	"os/exec"
+	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/maxbeizer/gh-agent-viz/internal/config"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/footer"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
@@ -35,11 +39,31 @@ type Model struct {
 	viewMode   ViewMode
 	ready      bool
 	repo       string
+	refreshInt time.Duration
 }
 
 // NewModel creates a new TUI model
 func NewModel(repo string) Model {
 	ctx := NewProgramContext()
+	cfg, err := config.Load("")
+	if err == nil {
+		ctx.Config = cfg
+	} else {
+		ctx.Error = fmt.Errorf("failed to load config: %w", err)
+	}
+
+	if repo == "" && len(ctx.Config.Repos) > 0 {
+		repo = ctx.Config.Repos[0]
+	}
+	if isValidFilter(ctx.Config.DefaultFilter) {
+		ctx.StatusFilter = ctx.Config.DefaultFilter
+	}
+
+	refreshSeconds := ctx.Config.RefreshInterval
+	if refreshSeconds <= 0 {
+		refreshSeconds = 30
+	}
+
 	theme := NewTheme()
 	keys := NewKeybindings()
 
@@ -49,6 +73,8 @@ func NewModel(repo string) Model {
 		keys.MoveDown,
 		keys.SelectTask,
 		keys.ShowLogs,
+		keys.OpenInBrowser,
+		keys.ToggleFilter,
 		keys.RefreshData,
 		keys.ExitApp,
 	}
@@ -65,6 +91,7 @@ func NewModel(repo string) Model {
 		viewMode:   ViewModeList,
 		ready:      false,
 		repo:       repo,
+		refreshInt: time.Duration(refreshSeconds) * time.Second,
 	}
 }
 
@@ -72,6 +99,7 @@ func NewModel(repo string) Model {
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.fetchTasks,
+		m.refreshCmd(),
 		tea.EnterAltScreen,
 	)
 }
@@ -90,16 +118,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKeyPress(msg)
 
 	case tasksLoadedMsg:
+		m.ctx.Error = nil
 		m.taskList.SetTasks(msg.tasks)
 		return m, nil
 
 	case taskDetailLoadedMsg:
+		m.ctx.Error = nil
 		m.taskDetail.SetTask(msg.task)
 		return m, nil
 
 	case taskLogLoadedMsg:
+		m.ctx.Error = nil
 		m.logView.SetContent(msg.log)
 		return m, nil
+
+	case refreshTickMsg:
+		return m, tea.Batch(m.fetchTasks, m.refreshCmd())
 
 	case errMsg:
 		m.ctx.Error = msg.err
@@ -172,13 +206,18 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		task := m.taskList.SelectedTask()
 		if task != nil {
 			m.viewMode = ViewModeDetail
-			return m, m.fetchTaskDetail(task.ID)
+			return m, m.fetchTaskDetail(task.ID, task.Repository)
 		}
 	case "l":
 		task := m.taskList.SelectedTask()
 		if task != nil {
 			m.viewMode = ViewModeLog
-			return m, m.fetchTaskLog(task.ID)
+			return m, m.fetchTaskLog(task.ID, task.Repository)
+		}
+	case "o":
+		task := m.taskList.SelectedTask()
+		if task != nil {
+			return m, m.openTaskPR(task)
 		}
 	case "r":
 		return m, m.fetchTasks
@@ -198,7 +237,12 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		task := m.taskList.SelectedTask()
 		if task != nil {
 			m.viewMode = ViewModeLog
-			return m, m.fetchTaskLog(task.ID)
+			return m, m.fetchTaskLog(task.ID, task.Repository)
+		}
+	case "o":
+		task := m.taskList.SelectedTask()
+		if task != nil {
+			return m, m.openTaskPR(task)
 		}
 	}
 	return m, nil
@@ -249,6 +293,8 @@ type taskLogLoadedMsg struct {
 	log string
 }
 
+type refreshTickMsg struct{}
+
 type errMsg struct {
 	err error
 }
@@ -277,9 +323,9 @@ func (m Model) fetchTasks() tea.Msg {
 }
 
 // fetchTaskDetail fetches detailed information for a task
-func (m Model) fetchTaskDetail(id string) tea.Cmd {
+func (m Model) fetchTaskDetail(id string, repo string) tea.Cmd {
 	return func() tea.Msg {
-		task, err := data.FetchAgentTaskDetail(id, m.repo)
+		task, err := data.FetchAgentTaskDetail(id, repo)
 		if err != nil {
 			return errMsg{err}
 		}
@@ -288,12 +334,52 @@ func (m Model) fetchTaskDetail(id string) tea.Cmd {
 }
 
 // fetchTaskLog fetches the log for a task
-func (m Model) fetchTaskLog(id string) tea.Cmd {
+func (m Model) fetchTaskLog(id string, repo string) tea.Cmd {
 	return func() tea.Msg {
-		log, err := data.FetchAgentTaskLog(id, m.repo)
+		log, err := data.FetchAgentTaskLog(id, repo)
 		if err != nil {
 			return errMsg{err}
 		}
 		return taskLogLoadedMsg{log}
+	}
+}
+
+func (m Model) openTaskPR(task *data.AgentTask) tea.Cmd {
+	return func() tea.Msg {
+		if task == nil {
+			return errMsg{fmt.Errorf("no task selected")}
+		}
+
+		switch {
+		case task.PRURL != "":
+			output, err := exec.Command("gh", "browse", task.PRURL).CombinedOutput()
+			if err != nil {
+				return errMsg{fmt.Errorf("failed to open PR: %s", strings.TrimSpace(string(output)))}
+			}
+		case task.PRNumber > 0 && task.Repository != "":
+			output, err := exec.Command("gh", "pr", "view", fmt.Sprintf("%d", task.PRNumber), "-R", task.Repository, "--web").CombinedOutput()
+			if err != nil {
+				return errMsg{fmt.Errorf("failed to open PR: %s", strings.TrimSpace(string(output)))}
+			}
+		default:
+			return errMsg{fmt.Errorf("selected task has no pull request to open")}
+		}
+
+		return nil
+	}
+}
+
+func (m Model) refreshCmd() tea.Cmd {
+	return tea.Tick(m.refreshInt, func(time.Time) tea.Msg {
+		return refreshTickMsg{}
+	})
+}
+
+func isValidFilter(filter string) bool {
+	switch filter {
+	case "all", "active", "completed", "failed":
+		return true
+	default:
+		return false
 	}
 }

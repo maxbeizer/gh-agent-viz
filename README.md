@@ -102,6 +102,10 @@ This is a `gh` CLI extension (not a Copilot CLI plugin) because:
 
 See [docs/DECISIONS.md](docs/DECISIONS.md) for detailed architecture decisions.
 
+## Security
+
+Security is a core requirement for this project. See [docs/SECURITY.md](docs/SECURITY.md) for security principles, threat surface, and required engineering practices.
+
 ### Technology Stack
 
 - **Language**: Go

@@ -41,6 +41,14 @@ gh agent-viz
 gh agent-viz --repo owner/repo
 ```
 
+### Enable Debug Mode
+
+```bash
+gh agent-viz --debug
+```
+
+Debug mode writes command diagnostics to `~/.gh-agent-viz-debug.log` to speed up troubleshooting.
+
 ### Keyboard Shortcuts
 
 | Key | Action |

@@ -43,8 +43,9 @@ type Model struct {
 }
 
 // NewModel creates a new TUI model
-func NewModel(repo string) Model {
+func NewModel(repo string, debug bool) Model {
 	ctx := NewProgramContext()
+	ctx.Debug = debug
 	cfg, err := config.Load("")
 	if err == nil {
 		ctx.Config = cfg
@@ -172,7 +173,11 @@ func (m Model) View() string {
 	}
 
 	if m.ctx.Error != nil {
-		mainView = fmt.Sprintf("Error: %v\n\n%s", m.ctx.Error, mainView)
+		errorText := fmt.Sprintf("Error: %v", m.ctx.Error)
+		if m.ctx.Debug {
+			errorText = fmt.Sprintf("%s\nDebug mode enabled. Log file: %s", errorText, data.DebugLogPath())
+		}
+		mainView = fmt.Sprintf("%s\n\n%s", errorText, mainView)
 	}
 
 	return headerView + mainView + footerView

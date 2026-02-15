@@ -9,278 +9,109 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
-func TestNew(t *testing.T) {
-	titleStyle := lipgloss.NewStyle().Bold(true)
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("99"))
-	rowStyle := lipgloss.NewStyle().Padding(0, 1)
-	rowSelectedStyle := lipgloss.NewStyle().Background(lipgloss.Color("237"))
-	statusIconFunc := func(status string) string { return "icon" }
+func newModel() Model {
+	return New(
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		func(string) string { return "•" },
+	)
+}
 
-	model := New(titleStyle, headerStyle, rowStyle, rowSelectedStyle, statusIconFunc)
+func TestSetTasksGroupsIntoColumns(t *testing.T) {
+	model := newModel()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: time.Now()},
+		{ID: "2", Status: "completed", Title: "Done 1", UpdatedAt: time.Now()},
+		{ID: "3", Status: "failed", Title: "Failed 1", UpdatedAt: time.Now()},
+		{ID: "4", Status: "queued", Title: "Running 2", UpdatedAt: time.Now()},
+	})
 
-	if model.cursor != 0 {
-		t.Errorf("expected initial cursor to be 0, got %d", model.cursor)
+	if got := len(model.columnSessionIdx[0]); got != 2 {
+		t.Fatalf("expected 2 running tasks, got %d", got)
 	}
-	if len(model.sessions) != 0 {
-		t.Errorf("expected empty sessions list, got %d sessions", len(model.sessions))
+	if got := len(model.columnSessionIdx[1]); got != 1 {
+		t.Fatalf("expected 1 done task, got %d", got)
 	}
-	if model.loading {
-		t.Error("expected loading to be false initially")
+	if got := len(model.columnSessionIdx[2]); got != 1 {
+		t.Fatalf("expected 1 failed task, got %d", got)
 	}
 }
 
-func TestSetTasks(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
+func TestMoveCursorWithinActiveColumn(t *testing.T) {
+	model := newModel()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: time.Now()},
+		{ID: "2", Status: "running", Title: "Running 2", UpdatedAt: time.Now()},
+		{ID: "3", Status: "completed", Title: "Done 1", UpdatedAt: time.Now()},
+	})
 
-	sessions := []data.Session{
-		{ID: "1", Status: "running", Title: "Task 1", Source: data.SourceAgentTask},
-		{ID: "2", Status: "completed", Title: "Task 2", Source: data.SourceAgentTask},
-		{ID: "3", Status: "failed", Title: "Task 3", Source: data.SourceLocalCopilot},
-	}
-
-	model.SetTasks(sessions)
-
-	if len(model.sessions) != 3 {
-		t.Errorf("expected 3 sessions, got %d", len(model.sessions))
-	}
-	if model.cursor != 0 {
-		t.Errorf("expected cursor to be 0, got %d", model.cursor)
-	}
-}
-
-func TestSetTasks_ResetsCursor(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
-
-	// Set initial sessions and move cursor
-	initialSessions := []data.Session{
-		{ID: "1", Status: "running", Title: "Task 1", Source: data.SourceAgentTask},
-		{ID: "2", Status: "completed", Title: "Task 2", Source: data.SourceAgentTask},
-		{ID: "3", Status: "failed", Title: "Task 3", Source: data.SourceLocalCopilot},
-	}
-	model.SetTasks(initialSessions)
-	model.MoveCursor(2)
-
-	// Now set new sessions with fewer items
-	newSessions := []data.Session{
-		{ID: "4", Status: "running", Title: "Task 4", Source: data.SourceAgentTask},
-	}
-	model.SetTasks(newSessions)
-
-	if model.cursor >= len(newSessions) {
-		t.Errorf("cursor should be adjusted to within bounds, got cursor=%d for %d sessions", model.cursor, len(newSessions))
-	}
-}
-
-func TestMoveCursor(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
-
-	sessions := []data.Session{
-		{ID: "1", Status: "running", Title: "Task 1", Source: data.SourceAgentTask},
-		{ID: "2", Status: "completed", Title: "Task 2", Source: data.SourceAgentTask},
-		{ID: "3", Status: "failed", Title: "Task 3", Source: data.SourceLocalCopilot},
-	}
-	model.SetTasks(sessions)
-
-	// Move down
 	model.MoveCursor(1)
-	if model.cursor != 1 {
-		t.Errorf("expected cursor to be 1, got %d", model.cursor)
+	if model.rowCursor[model.activeColumn] != 1 {
+		t.Fatalf("expected row cursor to move to 1, got %d", model.rowCursor[model.activeColumn])
 	}
 
-	// Move down again
-	model.MoveCursor(1)
-	if model.cursor != 2 {
-		t.Errorf("expected cursor to be 2, got %d", model.cursor)
-	}
-
-	// Try to move past the end
-	model.MoveCursor(1)
-	if model.cursor != 2 {
-		t.Errorf("cursor should not move past last item, got %d", model.cursor)
-	}
-
-	// Move up
-	model.MoveCursor(-1)
-	if model.cursor != 1 {
-		t.Errorf("expected cursor to be 1, got %d", model.cursor)
-	}
-
-	// Move to start
-	model.MoveCursor(-10)
-	if model.cursor != 0 {
-		t.Errorf("cursor should not move before first item, got %d", model.cursor)
+	model.MoveCursor(10)
+	if model.rowCursor[model.activeColumn] != 1 {
+		t.Fatalf("expected row cursor capped at last item, got %d", model.rowCursor[model.activeColumn])
 	}
 }
 
-func TestSelectedTask(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
+func TestMoveColumnAndSelectedTask(t *testing.T) {
+	model := newModel()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: time.Now()},
+		{ID: "2", Status: "completed", Title: "Done 1", UpdatedAt: time.Now()},
+		{ID: "3", Status: "failed", Title: "Failed 1", UpdatedAt: time.Now()},
+	})
 
-	sessions := []data.Session{
-		{ID: "1", Status: "running", Title: "Task 1", Source: data.SourceAgentTask},
-		{ID: "2", Status: "completed", Title: "Task 2", Source: data.SourceLocalCopilot},
-	}
-	model.SetTasks(sessions)
-
+	model.MoveColumn(1)
 	selected := model.SelectedTask()
-	if selected == nil {
-		t.Fatal("expected selected session, got nil")
-	}
-	if selected.ID != "1" {
-		t.Errorf("expected selected session ID '1', got '%s'", selected.ID)
+	if selected == nil || selected.ID != "2" {
+		t.Fatalf("expected done task selected, got %#v", selected)
 	}
 
-	model.MoveCursor(1)
+	model.MoveColumn(1)
 	selected = model.SelectedTask()
-	if selected == nil {
-		t.Fatal("expected selected session, got nil")
-	}
-	if selected.ID != "2" {
-		t.Errorf("expected selected session ID '2', got '%s'", selected.ID)
+	if selected == nil || selected.ID != "3" {
+		t.Fatalf("expected failed task selected, got %#v", selected)
 	}
 }
 
-func TestSelectedTask_EmptyList(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
-
-	selected := model.SelectedTask()
-	if selected != nil {
-		t.Error("expected nil for empty session list")
-	}
-}
-
-func TestView_EmptyTasks(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
+func TestViewShowsKanbanColumns(t *testing.T) {
+	model := newModel()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Running Task", Repository: "owner/repo", Source: data.SourceAgentTask, UpdatedAt: time.Now()},
+		{ID: "2", Status: "completed", Title: "Done Task", Repository: "owner/repo", Source: data.SourceLocalCopilot, UpdatedAt: time.Now()},
+	})
 
 	view := model.View()
-	if !strings.Contains(view, "No sessions found") {
-		t.Errorf("expected message about no sessions, got: %s", view)
+	if !strings.Contains(view, "Running") {
+		t.Fatal("expected running column header in view")
+	}
+	if !strings.Contains(view, "Done") {
+		t.Fatal("expected done column header in view")
+	}
+	if !strings.Contains(view, "Failed") {
+		t.Fatal("expected failed column header in view")
+	}
+	if !strings.Contains(view, "Running Task") {
+		t.Fatal("expected running task in view")
+	}
+	if !strings.Contains(view, "Done Task") {
+		t.Fatal("expected done task in view")
 	}
 }
 
-func TestView_Loading(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
+func TestViewEmptyAndLoadingStates(t *testing.T) {
+	model := newModel()
+	if got := model.View(); !strings.Contains(got, "No sessions found") {
+		t.Fatalf("expected empty state, got: %s", got)
+	}
+
 	model.loading = true
-
-	view := model.View()
-	if !strings.Contains(view, "Loading") {
-		t.Errorf("expected loading message, got: %s", view)
-	}
-}
-
-func TestView_WithTasks(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(status string) string { return "📝" },
-	)
-
-	sessions := []data.Session{
-		{
-			ID:         "abc123",
-			Status:     "running",
-			Title:      "Fix bug in handler",
-			Repository: "owner/repo",
-			UpdatedAt:  time.Now().Add(-30 * time.Minute),
-			Source:     data.SourceAgentTask,
-		},
-	}
-	model.SetTasks(sessions)
-
-	view := model.View()
-	if !strings.Contains(view, "Repository") {
-		t.Error("expected view to contain header with 'Repository'")
-	}
-	if !strings.Contains(view, "owner/repo") {
-		t.Error("expected view to contain repository name")
-	}
-	if !strings.Contains(view, "Fix bug") {
-		t.Error("expected view to contain task title")
-	}
-}
-
-func TestFilterByStatus(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(s string) string { return "" },
-	)
-
-	allSessions := []data.Session{
-		{ID: "1", Status: "running", Title: "Task 1", Source: data.SourceAgentTask},
-		{ID: "2", Status: "completed", Title: "Task 2", Source: data.SourceAgentTask},
-		{ID: "3", Status: "failed", Title: "Task 3", Source: data.SourceLocalCopilot},
-		{ID: "4", Status: "running", Title: "Task 4", Source: data.SourceLocalCopilot},
-	}
-
-	// Test filtering for running sessions
-	var runningSessions []data.Session
-	for _, session := range allSessions {
-		if session.Status == "running" {
-			runningSessions = append(runningSessions, session)
-		}
-	}
-
-	model.SetTasks(runningSessions)
-	if len(model.sessions) != 2 {
-		t.Errorf("expected 2 running sessions, got %d", len(model.sessions))
-	}
-
-	// Test filtering for completed sessions
-	var completedSessions []data.Session
-	for _, session := range allSessions {
-		if session.Status == "completed" {
-			completedSessions = append(completedSessions, session)
-		}
-	}
-
-	model.SetTasks(completedSessions)
-	if len(model.sessions) != 1 {
-		t.Errorf("expected 1 completed session, got %d", len(model.sessions))
+	if got := model.View(); !strings.Contains(got, "Loading sessions") {
+		t.Fatalf("expected loading state, got: %s", got)
 	}
 }

@@ -43,8 +43,9 @@ type Model struct {
 }
 
 // NewModel creates a new TUI model
-func NewModel(repo string) Model {
+func NewModel(repo string, debug bool) Model {
 	ctx := NewProgramContext()
+	ctx.Debug = debug
 	cfg, err := config.Load("")
 	if err == nil {
 		ctx.Config = cfg
@@ -69,6 +70,8 @@ func NewModel(repo string) Model {
 
 	// Prepare key bindings for footer
 	footerKeys := []key.Binding{
+		keys.MoveLeft,
+		keys.MoveRight,
 		keys.MoveUp,
 		keys.MoveDown,
 		keys.SelectTask,
@@ -170,7 +173,11 @@ func (m Model) View() string {
 	}
 
 	if m.ctx.Error != nil {
-		mainView = fmt.Sprintf("Error: %v\n\n%s", m.ctx.Error, mainView)
+		errorText := fmt.Sprintf("Error: %v", m.ctx.Error)
+		if m.ctx.Debug {
+			errorText = fmt.Sprintf("%s\nDebug mode enabled. Log file: %s", errorText, data.DebugLogPath())
+		}
+		mainView = fmt.Sprintf("%s\n\n%s", errorText, mainView)
 	}
 
 	return headerView + mainView + footerView
@@ -198,6 +205,10 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleListKeys handles keys in list view mode
 func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "h", "left":
+		m.taskList.MoveColumn(-1)
+	case "right":
+		m.taskList.MoveColumn(1)
 	case "j", "down":
 		m.taskList.MoveCursor(1)
 	case "k", "up":
@@ -360,7 +371,7 @@ func (m Model) openTaskPR(session *data.Session) tea.Cmd {
 
 		switch {
 		case session.PRURL != "":
-			output, err := exec.Command("gh", "browse", session.PRURL).CombinedOutput()
+			output, err := exec.Command("gh", "pr", "view", session.PRURL, "--web").CombinedOutput()
 			if err != nil {
 				return errMsg{fmt.Errorf("failed to open PR: %s", strings.TrimSpace(string(output)))}
 			}

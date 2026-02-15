@@ -43,10 +43,20 @@ gh agent-viz
 gh agent-viz --repo owner/repo
 ```
 
+### Enable Debug Mode
+
+```bash
+gh agent-viz --debug
+```
+
+Debug mode writes command diagnostics to `~/.gh-agent-viz-debug.log` to speed up troubleshooting.
+
 ### Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
+| `h` / `←` | Move to previous column |
+| `→` | Move to next column |
 | `j` / `↓` | Move down |
 | `k` / `↑` | Move up |
 | `enter` | View task details |
@@ -101,6 +111,10 @@ This is a `gh` CLI extension (not a Copilot CLI plugin) because:
 - **`gh` extensions** have full control over the terminal, enabling interactive TUI experiences
 
 See [docs/DECISIONS.md](docs/DECISIONS.md) for detailed architecture decisions.
+
+## Security
+
+Security is a core requirement for this project. See [docs/SECURITY.md](docs/SECURITY.md) for security principles, threat surface, and required engineering practices.
 
 ### Technology Stack
 

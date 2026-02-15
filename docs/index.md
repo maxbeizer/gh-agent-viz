@@ -2,23 +2,36 @@
 title: gh-agent-viz Docs
 ---
 
-# gh-agent-viz Documentation
+# gh-agent-viz: Quick Docs
 
-Terminal-first Copilot ATC for monitoring session state, actions, and diagnostics.
+Welcome to your Copilot **mission control** in the terminal.
 
-## Core docs
+## Start here
 
+1. **Install**
+   ```bash
+   gh extension install maxbeizer/gh-agent-viz
+   ```
+2. **Launch**
+   ```bash
+   gh agent-viz
+   ```
+3. **Navigate**
+   - `h` / `→` switch columns (Running / Done / Failed)
+   - `j` / `k` move selection
+   - `enter` details, `l` logs, `o` open PR, `s` resume local session
+
+## Product usage guides
+
+- [Operator Guide](OPERATOR_GUIDE.md) - daily workflows and keybindings
+- [Troubleshooting](TROUBLESHOOTING.md) - fastest fixes for common errors
+- [Local Sessions](LOCAL_SESSIONS.md) - how local Copilot sessions are detected
+- [Security](SECURITY.md) - safety expectations and controls
+
+## Product references
+
+- [ATC strategy](ATC_STRATEGY.md)
 - [Product brief](PRODUCT_BRIEF.md)
 - [Product plan](PRODUCT_PLAN.md)
-- [ATC strategy](ATC_STRATEGY.md)
-- [Security](SECURITY.md)
-- [Local sessions](LOCAL_SESSIONS.md)
-- [Operator guide](OPERATOR_GUIDE.md)
-- [Troubleshooting](TROUBLESHOOTING.md)
-- [Test scenarios](TEST_SCENARIOS.md)
 - [CLI ↔ analytics contract](CLI_ANALYTICS_CONTRACT.md)
-
-## Notes
-
-- This site is deployed from `docs/` on pushes to `main`.
-- Keep docs current with shipped behavior and keybindings.
+- [Test scenarios](TEST_SCENARIOS.md)

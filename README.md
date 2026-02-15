@@ -108,8 +108,9 @@ defaultFilter: all
 
 ## Documentation
 
-- **[Operator Guide](docs/OPERATOR_GUIDE.md)** - Supervising multiple Copilot workstreams, advanced workflows, and configuration
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues, error messages, and solutions
+- **[Quick Docs Home](docs/index.md)** - Start here for product usage
+- **[Operator Guide](docs/OPERATOR_GUIDE.md)** - Daily workflows and keybindings
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Fast fixes for common issues
 - **[Architecture Decisions](docs/DECISIONS.md)** - Technical design rationale and patterns
 
 ## Requirements

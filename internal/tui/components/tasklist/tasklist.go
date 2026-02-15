@@ -76,6 +76,16 @@ func (m Model) View() string {
 }
 
 func (m Model) renderBoard() string {
+	if m.width < minColumnWidth*3+4 {
+		narrowWidth := m.width - 2
+		if narrowWidth < minColumnWidth {
+			narrowWidth = minColumnWidth
+		}
+		hint := m.tableRowStyle.Render(fmt.Sprintf("NARROW MODE • showing %s lane only (use ←/→)", columnTitle(m.activeColumn)))
+		column := m.renderColumn(m.activeColumn, narrowWidth)
+		return lipgloss.JoinVertical(lipgloss.Left, hint, column)
+	}
+
 	columns := make([]string, 0, 3)
 	columnWidth := m.columnWidth()
 	for col := 0; col < 3; col++ {

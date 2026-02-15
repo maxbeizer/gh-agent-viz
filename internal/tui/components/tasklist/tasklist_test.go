@@ -235,3 +235,17 @@ func TestNeedsInputStatusStaysInRunningColumn(t *testing.T) {
 		t.Fatalf("expected needs-input session in running column, got %+v", model.columnSessionIdx)
 	}
 }
+
+func TestView_NarrowModeShowsSingleLaneHint(t *testing.T) {
+	model := newModel()
+	model.SetSize(70, 24)
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Running Task", UpdatedAt: time.Now()},
+		{ID: "2", Status: "completed", Title: "Done Task", UpdatedAt: time.Now()},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "NARROW MODE") {
+		t.Fatalf("expected narrow mode hint, got: %s", view)
+	}
+}

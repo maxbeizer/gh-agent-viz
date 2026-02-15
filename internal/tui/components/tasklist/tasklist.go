@@ -28,7 +28,6 @@ type Model struct {
 	height            int
 }
 
-const activeStaleThreshold = 20 * time.Minute
 const defaultColumnWidth = 42
 const minColumnWidth = 30
 
@@ -71,15 +70,23 @@ func (m Model) View() string {
 	overview := m.renderOverview()
 	board := m.renderBoard()
 	flightDeck := m.renderFlightDeck()
+	compactFlightDeck := m.renderCompactFlightDeck()
 
-	return lipgloss.JoinVertical(lipgloss.Left, overview, "", board, "", flightDeck)
+	switch {
+	case m.height <= 24:
+		return lipgloss.JoinVertical(lipgloss.Left, overview, board)
+	case m.height <= 30:
+		return lipgloss.JoinVertical(lipgloss.Left, overview, board, compactFlightDeck)
+	default:
+		return lipgloss.JoinVertical(lipgloss.Left, overview, "", board, "", flightDeck)
+	}
 }
 
 func (m Model) renderBoard() string {
 	if m.width < minColumnWidth*3+4 {
 		narrowWidth := m.width - 2
-		if narrowWidth < minColumnWidth {
-			narrowWidth = minColumnWidth
+		if narrowWidth < 3 {
+			narrowWidth = 3
 		}
 		hint := m.tableRowStyle.Render(fmt.Sprintf("NARROW MODE • showing %s lane only (use ←/→)", columnTitle(m.activeColumn)))
 		column := m.renderColumn(m.activeColumn, narrowWidth)
@@ -101,7 +108,7 @@ func (m Model) renderOverview() string {
 	failedCount := len(m.columnSessionIdx[2])
 	agentCount := 0
 	localCount := 0
-	staleCount := 0
+	attentionCount := 0
 
 	for _, session := range m.sessions {
 		if session.Source == data.SourceAgentTask {
@@ -110,8 +117,8 @@ func (m Model) renderOverview() string {
 		if session.Source == data.SourceLocalCopilot {
 			localCount++
 		}
-		if isActiveStatus(session.Status) && !session.UpdatedAt.IsZero() && time.Since(session.UpdatedAt) >= activeStaleThreshold {
-			staleCount++
+		if data.SessionNeedsAttention(session) {
+			attentionCount++
 		}
 	}
 
@@ -123,8 +130,8 @@ func (m Model) renderOverview() string {
 		fmt.Sprintf("🤖 agent %d", agentCount),
 		fmt.Sprintf("💻 local %d", localCount),
 	}
-	if staleCount > 0 {
-		chips = append(chips, fmt.Sprintf("⏱ stale %d", staleCount))
+	if attentionCount > 0 {
+		chips = append(chips, fmt.Sprintf("🚦 attention %d", attentionCount))
 	}
 
 	return lipgloss.NewStyle().
@@ -178,6 +185,19 @@ func (m Model) renderFlightDeck() string {
 		Render(strings.Join(lines, "\n"))
 }
 
+func (m Model) renderCompactFlightDeck() string {
+	selected := m.SelectedTask()
+	if selected == nil {
+		return ""
+	}
+	line := fmt.Sprintf("FLIGHT DECK • %s %s • %s • %s", m.statusIcon(selected.Status), truncate(selected.Title, 40), sourceLabel(selected.Source), formatTime(selected.UpdatedAt))
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("241")).
+		Padding(0, 1).
+		Render(line)
+}
+
 func (m Model) renderColumn(column int, width int) string {
 	headerStyle := m.tableHeaderStyle
 	if column == m.activeColumn {
@@ -206,7 +226,7 @@ func (m Model) renderColumn(column int, width int) string {
 	for i, idx := range indices[start:end] {
 		session := m.sessions[idx]
 		selected := column == m.activeColumn && (start+i) == cursor
-		rows = append(rows, m.renderRow(session, selected))
+		rows = append(rows, m.renderRow(session, selected, width))
 	}
 	if end < len(indices) {
 		rows = append(rows, m.tableRowStyle.Render(fmt.Sprintf("  ↓ %d more", len(indices)-end)))
@@ -215,20 +235,31 @@ func (m Model) renderColumn(column int, width int) string {
 	return lipgloss.NewStyle().Width(width).PaddingRight(1).Render(strings.Join(rows, "\n"))
 }
 
-func (m Model) renderRow(session data.Session, selected bool) string {
+func (m Model) renderRow(session data.Session, selected bool, width int) string {
 	style := m.tableRowStyle
 	if selected {
 		style = m.tableRowSelected
 	}
 
 	icon := m.statusIcon(session.Status)
-	title := truncate(session.Title, 34)
-	repo := truncate(session.Repository, 16)
-	source := sourceLabel(session.Source)
-	updated := formatTime(session.UpdatedAt)
-	if repo == "" {
-		repo = "no-repo"
+	titleMax := width - 4
+	if titleMax < 3 {
+		titleMax = 3
 	}
+	title := truncate(session.Title, titleMax)
+	repoWithBranch := session.Repository
+	if repoWithBranch == "" {
+		repoWithBranch = "no-repo"
+	}
+	if session.Branch != "" {
+		repoWithBranch = fmt.Sprintf("%s@%s", repoWithBranch, session.Branch)
+	}
+	updated := formatTime(session.UpdatedAt)
+	repoMax := width - len(updated) - 5
+	if repoMax < 3 {
+		repoMax = 3
+	}
+	repo := truncate(repoWithBranch, repoMax)
 	if title == "" {
 		title = "Untitled Session"
 	}
@@ -239,9 +270,21 @@ func (m Model) renderRow(session data.Session, selected bool) string {
 		titleLine += " " + badge
 	}
 
-	row := fmt.Sprintf("%s\n  %s • %s • %s", titleLine, repo, source, updated)
+	if width < 20 {
+		row := titleLine
+		if selected {
+			row += fmt.Sprintf("\n↳ %s", truncate(rowContext(session), titleMax))
+		}
+		return style.Render(row)
+	}
+
+	row := fmt.Sprintf("%s\n  %s • %s", titleLine, repo, updated)
 	if selected {
-		row += fmt.Sprintf("\n  ↳ %s", rowContext(session))
+		contextMax := width - 6
+		if contextMax < 3 {
+			contextMax = 3
+		}
+		row += fmt.Sprintf("\n  ↳ %s", truncate(rowContext(session), contextMax))
 	}
 	return style.Render(row)
 }
@@ -351,10 +394,14 @@ func (m Model) SelectedTask() *data.Session {
 }
 
 func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	if maxLen < 3 {
+		maxLen = 3
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }
 
 func formatTime(t time.Time) string {
@@ -379,9 +426,12 @@ func statusColumn(status string) int {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "failed", "cancelled", "canceled":
 		return 2
-	case "running", "queued", "in progress", "active", "open", "needs-input":
+	case "needs-input":
 		return 0
 	default:
+		if data.StatusIsActive(status) {
+			return 0
+		}
 		return 1
 	}
 }
@@ -409,19 +459,21 @@ func sourceLabel(source data.SessionSource) string {
 }
 
 func isActiveStatus(status string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(status))
-	return normalized == "running" || normalized == "queued" || normalized == "active" || normalized == "open" || normalized == "in progress" || normalized == "needs-input"
+	return data.StatusIsActive(status) || strings.EqualFold(strings.TrimSpace(status), "needs-input")
 }
 
 func sessionBadge(session data.Session) string {
 	if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
 		return "🧑 input needed"
 	}
+	if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
+		return "🚨 failed"
+	}
+	if data.SessionNeedsAttention(session) {
+		return "⚠ attention"
+	}
 	if !isActiveStatus(session.Status) || session.UpdatedAt.IsZero() {
 		return ""
-	}
-	if time.Since(session.UpdatedAt) >= activeStaleThreshold {
-		return "⏱ stale"
 	}
 	return "• live"
 }
@@ -432,11 +484,23 @@ func rowContext(session data.Session) string {
 		if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
 			return "waiting for your response • press 's' to resume"
 		}
+		if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
+			return "failed session • inspect logs or retry"
+		}
+		if data.SessionNeedsAttention(session) {
+			return "active session is quiet • check if it needs direction"
+		}
 		if isActiveStatus(session.Status) {
 			return "local session can be resumed with 's'"
 		}
 		return "local session"
 	case data.SourceAgentTask:
+		if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
+			return "remote task failed • open details/logs"
+		}
+		if data.SessionNeedsAttention(session) {
+			return "remote task is quiet • verify progress"
+		}
 		if session.PRNumber > 0 {
 			return fmt.Sprintf("remote task • PR #%d", session.PRNumber)
 		}
@@ -469,12 +533,18 @@ func (m Model) columnWidth() int {
 }
 
 func (m Model) pageSize() int {
-	size := (m.height - 14) / 2
-	if size < 3 {
-		return 3
+	available := m.height - 14
+	if m.height <= 24 {
+		available = m.height - 8
+	} else if m.height <= 30 {
+		available = m.height - 9
 	}
-	if size > 10 {
-		return 10
+	size := available / 2
+	if size < 2 {
+		return 2
+	}
+	if size > 12 {
+		return 12
 	}
 	return size
 }

@@ -43,7 +43,7 @@ This usually means older/local session metadata is incomplete.
 To reduce noise:
 
 1. Use `--repo owner/repo`
-2. Press `tab`/`shift+tab` and focus on `active`
+2. Press `a` to jump straight to sessions that need your attention
 3. Press `r` to refresh
 
 ## 4) Core controls (minimum set)
@@ -55,11 +55,12 @@ To reduce noise:
 - `o`: open PR (remote agent rows)
 - `s`: resume active local session
 - `tab` / `shift+tab`: change filter forward/backward
+- `a`: toggle attention mode
 - `q`: quit
 
 ## 5) First useful workflow
 
-1. Filter to `active` (`tab` / `shift+tab`)
+1. Filter to `attention` (`a`)
 2. Open a row (`enter`)
 3. Check logs (`l`) if needed
 4. Open PR (`o`) or resume (`s`) depending on row source

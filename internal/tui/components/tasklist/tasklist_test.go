@@ -249,3 +249,92 @@ func TestView_NarrowModeShowsSingleLaneHint(t *testing.T) {
 		t.Fatalf("expected narrow mode hint, got: %s", view)
 	}
 }
+
+func TestView_VeryNarrowWidthUsesCompactRows(t *testing.T) {
+	model := newModel()
+	model.SetSize(12, 24)
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Long Session Title", UpdatedAt: time.Now()},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "NARROW MODE") {
+		t.Fatalf("expected narrow mode hint, got: %s", view)
+	}
+	if strings.Contains(view, "• just now") {
+		t.Fatalf("expected compact row without meta overflow, got: %s", view)
+	}
+}
+
+func TestView_VeryShortHeightHidesFlightDeck(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 20)
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Running Task", UpdatedAt: time.Now()},
+	})
+
+	view := model.View()
+	if strings.Contains(view, "FLIGHT DECK") {
+		t.Fatalf("expected no flight deck in very short layout, got: %s", view)
+	}
+}
+
+func TestView_MediumHeightUsesCompactFlightDeck(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 28)
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Running Task", UpdatedAt: time.Now()},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "FLIGHT DECK •") {
+		t.Fatalf("expected compact flight deck in medium layout, got: %s", view)
+	}
+}
+
+func TestView_WideColumnShowsRepoAndBranch(t *testing.T) {
+	model := newModel()
+	model.SetSize(300, 36)
+	model.SetTasks([]data.Session{
+		{
+			ID:         "1",
+			Status:     "running",
+			Title:      "Readable Session",
+			Repository: "owner/repository-name",
+			Branch:     "feature/super-readable-output",
+			UpdatedAt:  time.Now(),
+		},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "owner/repository-name@feature/super-readable-output") {
+		t.Fatalf("expected expanded repo+branch details, got: %s", view)
+	}
+}
+
+func TestView_ShowsAttentionChip(t *testing.T) {
+	model := newModel()
+	model.SetTasks([]data.Session{
+		{
+			ID:        "1",
+			Status:    "needs-input",
+			Title:     "Needs human input",
+			UpdatedAt: time.Now(),
+		},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "attention 1") {
+		t.Fatalf("expected attention chip, got: %s", view)
+	}
+}
+
+func TestTruncate_HandlesUnicodeSafely(t *testing.T) {
+	out := truncate("これは日本語です", 6)
+	if !strings.HasSuffix(out, "...") {
+		t.Fatalf("expected ellipsis suffix, got %q", out)
+	}
+	if strings.Contains(out, "�") {
+		t.Fatalf("expected valid UTF-8 output, got %q", out)
+	}
+}

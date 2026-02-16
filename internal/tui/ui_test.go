@@ -221,16 +221,22 @@ func TestUpdateFooterHints_DetailViewShowsResumeForResumableSession(t *testing.T
 
 func TestCycleFilterForwardAndBackward(t *testing.T) {
 	m := NewModel("", false)
-	m.ctx.StatusFilter = "all"
+	// New order: attention → active → completed → failed → all
+	m.ctx.StatusFilter = "attention"
 
 	m.cycleFilter(1)
+	if m.ctx.StatusFilter != "active" {
+		t.Fatalf("expected active after forward cycle from attention, got %q", m.ctx.StatusFilter)
+	}
+
+	m.cycleFilter(-1)
 	if m.ctx.StatusFilter != "attention" {
-		t.Fatalf("expected attention after forward cycle, got %q", m.ctx.StatusFilter)
+		t.Fatalf("expected attention after backward cycle from active, got %q", m.ctx.StatusFilter)
 	}
 
 	m.cycleFilter(-1)
 	if m.ctx.StatusFilter != "all" {
-		t.Fatalf("expected all after backward cycle, got %q", m.ctx.StatusFilter)
+		t.Fatalf("expected all when cycling backward from attention, got %q", m.ctx.StatusFilter)
 	}
 
 	m.cycleFilter(-1)
@@ -239,17 +245,17 @@ func TestCycleFilterForwardAndBackward(t *testing.T) {
 	}
 }
 
-func TestHandleListKeys_AttentionToggle(t *testing.T) {
+func TestHandleListKeys_ACyclesForward(t *testing.T) {
 	m := NewModel("", false)
-	m.ctx.StatusFilter = "all"
+	m.ctx.StatusFilter = "attention"
 
 	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
 	if cmd == nil {
-		t.Fatal("expected fetch command when toggling attention mode")
+		t.Fatal("expected fetch command when pressing 'a'")
 	}
 	updatedModel := updated.(Model)
-	if updatedModel.ctx.StatusFilter != "attention" {
-		t.Fatalf("expected attention filter, got %q", updatedModel.ctx.StatusFilter)
+	if updatedModel.ctx.StatusFilter != "active" {
+		t.Fatalf("expected active after 'a' from attention, got %q", updatedModel.ctx.StatusFilter)
 	}
 }
 

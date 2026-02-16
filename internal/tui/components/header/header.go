@@ -48,7 +48,7 @@ func (m *Model) SetCounts(counts FilterCounts) {
 func (m Model) View() string {
 	title := m.titleStyle.Render(m.title)
 
-	activeFilter := "all"
+	activeFilter := "attention"
 	if m.filter != nil && *m.filter != "" {
 		activeFilter = *m.filter
 	}
@@ -58,11 +58,11 @@ func (m Model) View() string {
 		label string
 		count int
 	}{
-		{"all", "ALL", m.counts.All},
 		{"attention", "ACTION", m.counts.Attention},
 		{"active", "RUNNING", m.counts.Active},
 		{"completed", "DONE", m.counts.Completed},
 		{"failed", "FAILED", m.counts.Failed},
+		{"all", "ALL", m.counts.All},
 	}
 
 	renderedTabs := make([]string, 0, len(tabs))

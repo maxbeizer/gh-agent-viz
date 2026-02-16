@@ -96,13 +96,15 @@ func TestViewShowsFocusedList(t *testing.T) {
 
 func TestViewEmptyAndLoadingStates(t *testing.T) {
 	model := newModel()
-	if got := model.View(); !strings.Contains(got, "All quiet on the agent front") {
-		t.Fatalf("expected empty state, got: %s", got)
+	// Default state is loading
+	if got := model.View(); !strings.Contains(got, "Loading sessions") {
+		t.Fatalf("expected loading state on init, got: %s", got)
 	}
 
-	model.loading = true
-	if got := model.View(); !strings.Contains(got, "Switching gears") {
-		t.Fatalf("expected loading state, got: %s", got)
+	// After data arrives, loading is false — show empty state
+	model.loading = false
+	if got := model.View(); !strings.Contains(got, "All quiet on the agent front") {
+		t.Fatalf("expected empty state, got: %s", got)
 	}
 }
 
@@ -215,6 +217,7 @@ func TestView_ImprovedEmptyState(t *testing.T) {
 		lipgloss.NewStyle(),
 		func(s string) string { return "" },
 	)
+	model.loading = false
 
 	view := model.View()
 	if !strings.Contains(view, "All quiet on the agent front") {

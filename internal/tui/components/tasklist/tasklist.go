@@ -50,7 +50,7 @@ func NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.S
 		dismissedIDs:     dismissed,
 		dismissedStore:   store,
 		rowCursor:        0,
-		loading:          false,
+		loading:          true,
 		statusIcon:       statusIconFunc,
 		width:            80,
 		height:           24,
@@ -75,7 +75,7 @@ func (m *Model) SetLoading(loading bool) {
 // View renders the sessions as a focused single-column list
 func (m Model) View() string {
 	if m.loading {
-		return m.titleStyle.Render("🔄 Switching gears...\n\nFetching sessions, one moment.")
+		return m.titleStyle.Render("🔄 Loading sessions...\n\nFetching your agent sessions, one moment.")
 	}
 
 	if len(m.sessions) == 0 {
@@ -215,6 +215,7 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 
 // SetTasks updates sessions with sorting and de-emphasis
 func (m *Model) SetTasks(sessions []data.Session) {
+	m.loading = false
 	if selected := m.SelectedTask(); selected != nil {
 		m.selectedSessionID = selected.ID
 	}

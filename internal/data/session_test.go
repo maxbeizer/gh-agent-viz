@@ -32,6 +32,26 @@ func TestSessionNeedsAttention(t *testing.T) {
 			want:    false,
 		},
 		{
+			name:    "active session idle 2h needs attention",
+			session: Session{Status: "running", UpdatedAt: time.Now().Add(-2 * time.Hour)},
+			want:    true,
+		},
+		{
+			name:    "active session idle 5h past max",
+			session: Session{Status: "running", UpdatedAt: time.Now().Add(-5 * time.Hour)},
+			want:    false,
+		},
+		{
+			name:    "needs-input idle 5h always needs attention",
+			session: Session{Status: "needs-input", UpdatedAt: time.Now().Add(-5 * time.Hour)},
+			want:    true,
+		},
+		{
+			name:    "failed idle 5h always needs attention",
+			session: Session{Status: "failed", UpdatedAt: time.Now().Add(-5 * time.Hour)},
+			want:    true,
+		},
+		{
 			name:    "completed session",
 			session: Session{Status: "completed", UpdatedAt: time.Now().Add(-2 * time.Hour)},
 			want:    false,

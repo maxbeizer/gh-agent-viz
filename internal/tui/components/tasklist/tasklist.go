@@ -20,6 +20,7 @@ type Model struct {
 	sessions          []data.Session
 	deEmphasizedIdx   map[int]struct{}
 	dismissedIDs      map[string]struct{}
+	dismissedStore    *data.DismissedStore
 	rowCursor         int
 	loading           bool
 	statusIcon        func(string) string
@@ -30,6 +31,15 @@ type Model struct {
 
 // New creates a new task list model
 func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, statusIconFunc func(string) string) Model {
+	return NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle, statusIconFunc, nil)
+}
+
+// NewWithStore creates a new task list model backed by a persistent dismissed store.
+func NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, statusIconFunc func(string) string, store *data.DismissedStore) Model {
+	dismissed := map[string]struct{}{}
+	if store != nil {
+		dismissed = store.IDs()
+	}
 	return Model{
 		titleStyle:       titleStyle,
 		tableHeaderStyle: headerStyle,
@@ -37,7 +47,8 @@ func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, sta
 		tableRowSelected: rowSelectedStyle,
 		sessions:         []data.Session{},
 		deEmphasizedIdx:  map[int]struct{}{},
-		dismissedIDs:     map[string]struct{}{},
+		dismissedIDs:     dismissed,
+		dismissedStore:   store,
 		rowCursor:        0,
 		loading:          false,
 		statusIcon:       statusIconFunc,
@@ -311,6 +322,9 @@ func (m *Model) DismissSelected() {
 		return
 	}
 	m.dismissedIDs[selected.ID] = struct{}{}
+	if m.dismissedStore != nil {
+		m.dismissedStore.Add(selected.ID)
+	}
 	// Remove from current sessions
 	newSessions := make([]data.Session, 0, len(m.sessions)-1)
 	for _, s := range m.sessions {

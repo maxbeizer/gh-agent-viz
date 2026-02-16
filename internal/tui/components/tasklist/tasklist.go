@@ -29,6 +29,7 @@ type Model struct {
 	selectedSessionID string
 	width             int
 	height            int
+	splitMode         bool
 }
 
 // New creates a new task list model
@@ -75,6 +76,12 @@ func (m *Model) SetLoading(loading bool) {
 	m.loading = loading
 }
 
+// SetSplitMode sets whether the list is rendered in split-pane mode.
+// When split mode is active, the inline detail panel is not shown.
+func (m *Model) SetSplitMode(split bool) {
+	m.splitMode = split
+}
+
 // View renders the sessions as a focused single-column list
 func (m Model) View() string {
 	if m.loading {
@@ -85,14 +92,7 @@ func (m Model) View() string {
 		return m.titleStyle.Render("✨ All quiet on the agent front.\n\nNo sessions match this filter — your agents are either napping or haven't checked in yet.\nPress 'r' to refresh, or tab to try another filter.")
 	}
 
-	list := m.renderFocusedList()
-	detail := m.renderInlineDetail()
-
-	if m.height <= 20 {
-		return list
-	}
-
-	return lipgloss.JoinVertical(lipgloss.Left, list, "", detail)
+	return m.renderFocusedList()
 }
 
 func (m Model) renderFocusedList() string {
@@ -131,46 +131,6 @@ func (m Model) renderFocusedList() string {
 	}
 
 	return strings.Join(rows, "\n")
-}
-
-func (m Model) renderInlineDetail() string {
-	selected := m.SelectedTask()
-	if selected == nil {
-		return ""
-	}
-
-	actions := []string{"enter details"}
-	if selected.Source == data.SourceAgentTask {
-		actions = append(actions, "l logs")
-		if sessionHasLinkedPR(*selected) {
-			actions = append(actions, "o open PR")
-		}
-	}
-	if selected.Source == data.SourceLocalCopilot && isActiveStatus(selected.Status) && selected.ID != "" {
-		actions = append(actions, "s resume")
-	}
-
-	maxW := m.width - 6
-	if maxW < 20 {
-		maxW = 20
-	}
-
-	lines := []string{
-		fmt.Sprintf("  %s %s", m.currentStatusIcon(selected.Status), truncate(sessionTitle(*selected), maxW)),
-		fmt.Sprintf("  Status: %s  •  Needs action: %s", selected.Status, attentionReason(*selected)),
-		fmt.Sprintf("  Repository: %s  •  Branch: %s", panelRepository(*selected), panelBranch(*selected)),
-		fmt.Sprintf("  Source: %s  •  Last update: %s", sourceLabel(selected.Source), formatTime(selected.UpdatedAt)),
-		fmt.Sprintf("  Actions: %s", strings.Join(actions, " • ")),
-	}
-	if selected.Source == data.SourceAgentTask && selected.PRNumber > 0 {
-		lines = append(lines, fmt.Sprintf("  Pull Request: #%d", selected.PRNumber))
-	}
-
-	return lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63")).
-		Padding(0, 1).
-		Render(strings.Join(lines, "\n"))
 }
 
 func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, width int) string {
@@ -392,17 +352,6 @@ func formatTime(t time.Time) string {
 	return t.Format("Jan 2")
 }
 
-func sourceLabel(source data.SessionSource) string {
-	switch source {
-	case data.SourceLocalCopilot:
-		return "local"
-	case data.SourceAgentTask:
-		return "agent"
-	default:
-		return "other"
-	}
-}
-
 func isActiveStatus(status string) bool {
 	return data.StatusIsActive(status) || strings.EqualFold(strings.TrimSpace(status), "needs-input")
 }
@@ -512,21 +461,6 @@ func rowRepository(session data.Session) string {
 	return fmt.Sprintf("%s @ %s", repository, branch)
 }
 
-func panelRepository(session data.Session) string {
-	repository := strings.TrimSpace(session.Repository)
-	if repository == "" {
-		return "not available"
-	}
-	return repository
-}
-
-func panelBranch(session data.Session) string {
-	branch := strings.TrimSpace(session.Branch)
-	if branch == "" {
-		return "not available"
-	}
-	return branch
-}
 
 func sessionHasLinkedPR(session data.Session) bool {
 	if session.Source != data.SourceAgentTask {
@@ -578,11 +512,8 @@ func (m Model) currentStatusIcon(status string) string {
 }
 
 func (m Model) pageSize() int {
-	// Reserve space for detail panel + padding
-	available := m.height - 12
-	if m.height <= 20 {
-		available = m.height - 4
-	}
+	// Use full height (minus minimal chrome)
+	available := m.height - 4
 	// Each row is 2 lines
 	size := available / 2
 	if size < 3 {

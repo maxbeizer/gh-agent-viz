@@ -16,6 +16,7 @@ type Keybindings struct {
 	ExitApp        key.Binding
 	ToggleFilter   key.Binding
 	NavigateBack   key.Binding
+	TogglePreview  key.Binding
 }
 
 // NewKeybindings creates the default key bindings for the TUI
@@ -68,6 +69,10 @@ func NewKeybindings() Keybindings {
 		NavigateBack: key.NewBinding(
 			key.WithKeys("esc"),
 			key.WithHelp("esc", "back"),
+		),
+		TogglePreview: key.NewBinding(
+			key.WithKeys("p"),
+			key.WithHelp("p", "preview"),
 		),
 	}
 }

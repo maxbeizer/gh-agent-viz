@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/maxbeizer/gh-agent-viz/internal/config"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/footer"
@@ -28,19 +29,20 @@ const (
 
 // Model represents the main TUI application state
 type Model struct {
-	ctx        *ProgramContext
-	theme      *Theme
-	keys       Keybindings
-	header     header.Model
-	footer     footer.Model
-	taskList   tasklist.Model
-	taskDetail taskdetail.Model
-	logView    logview.Model
-	viewMode   ViewMode
-	ready      bool
-	repo       string
-	refreshInt time.Duration
-	animFrame  int
+	ctx         *ProgramContext
+	theme       *Theme
+	keys        Keybindings
+	header      header.Model
+	footer      footer.Model
+	taskList    tasklist.Model
+	taskDetail  taskdetail.Model
+	logView     logview.Model
+	viewMode    ViewMode
+	showPreview bool
+	ready       bool
+	repo        string
+	refreshInt  time.Duration
+	animFrame   int
 }
 
 // NewModel creates a new TUI model
@@ -88,18 +90,19 @@ func NewModel(repo string, debug bool) Model {
 	}
 
 	return Model{
-		ctx:        ctx,
-		theme:      theme,
-		keys:       keys,
-		header:     header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter),
-		footer:     footer.New(theme.Footer, footerKeys),
-		taskList:   tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc, dismissedStore),
-		taskDetail: taskdetail.New(theme.Title, theme.Border, StatusIcon),
-		logView:    logview.New(theme.Title, 80, 20),
-		viewMode:   ViewModeList,
-		ready:      false,
-		repo:       repo,
-		refreshInt: time.Duration(refreshSeconds) * time.Second,
+		ctx:         ctx,
+		theme:       theme,
+		keys:        keys,
+		header:      header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter),
+		footer:      footer.New(theme.Footer, footerKeys),
+		taskList:    tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc, dismissedStore),
+		taskDetail:  taskdetail.New(theme.Title, theme.Border, StatusIcon),
+		logView:     logview.New(theme.Title, 80, 20),
+		viewMode:    ViewModeList,
+		showPreview: true,
+		ready:       false,
+		repo:        repo,
+		refreshInt:  time.Duration(refreshSeconds) * time.Second,
 	}
 }
 
@@ -123,7 +126,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ctx.Width = msg.Width
 		m.ctx.Height = msg.Height
 		m.logView.SetSize(msg.Width-4, msg.Height-8)
-		m.taskList.SetSize(msg.Width, msg.Height)
+		m.updateSplitLayout()
 		m.ready = true
 		return m, nil
 
@@ -192,7 +195,17 @@ func (m Model) View() string {
 	var mainView string
 	switch m.viewMode {
 	case ViewModeList:
-		mainView = m.taskList.View()
+		if m.previewVisible() {
+			selected := m.taskList.SelectedTask()
+			if selected != nil {
+				m.taskDetail.SetTask(selected)
+			}
+			leftContent := m.taskList.View()
+			rightContent := m.taskDetail.ViewSplit()
+			mainView = lipgloss.JoinHorizontal(lipgloss.Top, leftContent, rightContent)
+		} else {
+			mainView = m.taskList.View()
+		}
 	case ViewModeDetail:
 		mainView = m.taskDetail.View()
 	case ViewModeLog:
@@ -279,6 +292,10 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.taskList.DismissSelected()
 	case "r":
 		return m, m.fetchTasks
+	case "p":
+		m.showPreview = !m.showPreview
+		m.updateSplitLayout()
+		return m, nil
 	case "a":
 		m.cycleFilter(1)
 		m.taskList.SetLoading(true)
@@ -543,6 +560,26 @@ func isValidFilter(filter string) bool {
 	}
 }
 
+// previewVisible returns true when the split-pane detail preview should render.
+func (m Model) previewVisible() bool {
+	return m.showPreview && m.ctx.Width >= 80 && m.ctx.Height > 20
+}
+
+// updateSplitLayout recalculates component dimensions for the current layout.
+func (m *Model) updateSplitLayout() {
+	if m.previewVisible() {
+		leftWidth := m.ctx.Width * 2 / 5
+		rightWidth := m.ctx.Width - leftWidth
+		contentHeight := m.ctx.Height - 4 // header + footer chrome
+		m.taskList.SetSize(leftWidth, contentHeight)
+		m.taskList.SetSplitMode(true)
+		m.taskDetail.SetSize(rightWidth, contentHeight)
+	} else {
+		m.taskList.SetSize(m.ctx.Width, m.ctx.Height)
+		m.taskList.SetSplitMode(false)
+	}
+}
+
 // updateFooterHints updates footer hints based on current view mode and state
 func (m *Model) updateFooterHints() {
 	switch m.viewMode {
@@ -565,7 +602,7 @@ func (m *Model) updateFooterHints() {
 		if selected != nil {
 			hints = append(hints, m.keys.DismissSession)
 		}
-		hints = append(hints, m.keys.ToggleFilter, m.keys.FocusAttention, m.keys.RefreshData, m.keys.ExitApp)
+		hints = append(hints, m.keys.TogglePreview, m.keys.ToggleFilter, m.keys.FocusAttention, m.keys.RefreshData, m.keys.ExitApp)
 		m.footer.SetHints(hints)
 	case ViewModeDetail:
 		hints := []key.Binding{

@@ -15,6 +15,8 @@ type Model struct {
 	borderStyle lipgloss.Style
 	session     *data.Session
 	statusIcon  func(string) string
+	width       int
+	height      int
 }
 
 // New creates a new task detail model
@@ -79,6 +81,94 @@ func (m Model) View() string {
 // SetTask updates the session being displayed
 func (m *Model) SetTask(session *data.Session) {
 	m.session = session
+}
+
+// SetSize updates the available rendering size for responsive layout.
+func (m *Model) SetSize(width, height int) {
+	if width > 0 {
+		m.width = width
+	}
+	if height > 0 {
+		m.height = height
+	}
+}
+
+// ViewSplit renders the detail pane for split-pane mode with a left border.
+func (m Model) ViewSplit() string {
+	if m.session == nil {
+		content := m.titleStyle.Render("No session selected")
+		style := lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderLeft(true).
+			BorderTop(false).
+			BorderBottom(false).
+			BorderRight(false).
+			BorderForeground(lipgloss.Color("63")).
+			PaddingLeft(1)
+		if m.width > 0 {
+			style = style.Width(m.width - 2)
+		}
+		if m.height > 0 {
+			style = style.Height(m.height)
+		}
+		return style.Render(content)
+	}
+
+	details := []string{
+		m.titleStyle.Render(detailTitle(m.session.Title)),
+		"",
+		fmt.Sprintf("Status:     %s %s", m.statusIcon(m.session.Status), m.session.Status),
+		fmt.Sprintf("Source:     %s", m.session.Source),
+		fmt.Sprintf("Repository: %s", detailValue(m.session.Repository, "n/a")),
+		fmt.Sprintf("Branch:     %s", detailValue(m.session.Branch, "n/a")),
+	}
+
+	if m.session.Source == data.SourceAgentTask {
+		details = append(details,
+			fmt.Sprintf("PR:         #%d", m.session.PRNumber),
+			fmt.Sprintf("PR URL:     %s", m.session.PRURL),
+		)
+	}
+
+	details = append(details,
+		fmt.Sprintf("Created:    %s", detailTimestamp(m.session.CreatedAt)),
+		fmt.Sprintf("Updated:    %s", detailTimestamp(m.session.UpdatedAt)),
+		fmt.Sprintf("Session ID: %s", m.session.ID),
+	)
+
+	if m.session.Telemetry != nil {
+		t := m.session.Telemetry
+		details = append(details, "", m.titleStyle.Render("Usage"))
+		if t.Duration > 0 {
+			details = append(details, fmt.Sprintf("Duration:   %s", formatDuration(t.Duration)))
+		}
+		if t.ConversationTurns > 0 {
+			details = append(details,
+				fmt.Sprintf("Messages:   %d total (%d user, %d assistant)",
+					t.ConversationTurns, t.UserMessages, t.AssistantMessages),
+			)
+		}
+		if t.ConversationTurns == 0 && t.Duration == 0 {
+			details = append(details, "No usage data available")
+		}
+	}
+
+	style := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderLeft(true).
+		BorderTop(false).
+		BorderBottom(false).
+		BorderRight(false).
+		BorderForeground(lipgloss.Color("63")).
+		PaddingLeft(1)
+	if m.width > 0 {
+		style = style.Width(m.width - 2)
+	}
+	if m.height > 0 {
+		style = style.Height(m.height)
+	}
+
+	return style.Render(joinVertical(details))
 }
 
 func joinVertical(lines []string) string {

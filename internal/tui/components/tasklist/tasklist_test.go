@@ -204,8 +204,10 @@ func TestView_ShowsSourceInfo(t *testing.T) {
 	model.SetTasks(tasks)
 
 	view := model.View()
-	if !strings.Contains(view, "Source: agent") {
-		t.Error("expected inline detail to contain source label")
+	// Inline detail panel was removed in favor of split-pane layout.
+	// The list view should render the row with the task title.
+	if !strings.Contains(view, "Task 1") {
+		t.Error("expected list view to contain task title")
 	}
 }
 
@@ -288,14 +290,13 @@ func TestView_SelectedSessionUsesFriendlyFallbacks(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "Repository: not available") {
-		t.Fatalf("expected friendly repository fallback, got: %s", view)
+	// Inline detail panel was removed; verify the row renders with the title.
+	if !strings.Contains(view, "Fallback Session") {
+		t.Fatalf("expected list view to contain session title, got: %s", view)
 	}
-	if !strings.Contains(view, "Branch: not available") {
-		t.Fatalf("expected friendly branch fallback, got: %s", view)
-	}
+	// "not recorded" still appears in the row meta line for zero timestamps
 	if !strings.Contains(view, "not recorded") {
-		t.Fatalf("expected friendly timestamp fallback, got: %s", view)
+		t.Fatalf("expected friendly timestamp fallback in row meta, got: %s", view)
 	}
 }
 
@@ -314,11 +315,13 @@ func TestView_SelectedSessionOmitsOpenPRActionWhenNoPRLinked(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "l logs") {
-		t.Fatalf("expected actions to include logs, got: %s", view)
+	// Inline detail panel was removed; verify the row renders with the title.
+	if !strings.Contains(view, "Agent Session") {
+		t.Fatalf("expected list view to contain session title, got: %s", view)
 	}
+	// The inline "o open PR" action text is no longer rendered in list view.
 	if strings.Contains(view, "o open PR") {
-		t.Fatalf("expected open PR action to be hidden when no PR is linked, got: %s", view)
+		t.Fatalf("expected open PR action to not appear in list view, got: %s", view)
 	}
 }
 

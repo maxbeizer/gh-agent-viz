@@ -93,7 +93,7 @@ func NewModel(repo string, debug bool) Model {
 		ctx:         ctx,
 		theme:       theme,
 		keys:        keys,
-		header:      header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter),
+		header:      header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter, ctx.Config.AsciiHeaderEnabled()),
 		footer:      footer.New(theme.Footer, footerKeys),
 		taskList:    tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc, dismissedStore),
 		taskDetail:  taskdetail.New(theme.Title, theme.Border, StatusIcon),
@@ -125,6 +125,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.ctx.Width = msg.Width
 		m.ctx.Height = msg.Height
+		m.header.SetSize(msg.Width, msg.Height)
 		m.logView.SetSize(msg.Width-4, msg.Height-8)
 		m.updateSplitLayout()
 		m.ready = true

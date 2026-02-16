@@ -11,3 +11,6 @@ refreshInterval: 30
 
 # Default status filter: all, active, completed, failed (default: all)
 defaultFilter: all
+
+# Show ASCII art banner in header (default: true)
+asciiHeader: true

@@ -18,30 +18,56 @@ type FilterCounts struct {
 
 // Model represents the header component state
 type Model struct {
-	titleStyle  lipgloss.Style
-	tabActive   lipgloss.Style
-	tabInactive lipgloss.Style
-	tabCount    lipgloss.Style
-	title       string
-	filter      *string
-	counts      FilterCounts
+	titleStyle     lipgloss.Style
+	tabActive      lipgloss.Style
+	tabInactive    lipgloss.Style
+	tabCount       lipgloss.Style
+	title          string
+	filter         *string
+	counts         FilterCounts
+	useAsciiHeader bool
+	width          int
+	height         int
 }
 
+// Banner is the compact ASCII art header
+const Banner = "┌─────────────────────────┐\n│  A G E N T   V I Z  ⚡  │\n└─────────────────────────┘"
+
+// bannerWidth is the visual width of the banner (excluding ANSI codes)
+const bannerWidth = 27
+
+// minHeightForBanner is the minimum terminal height to show the banner
+const minHeightForBanner = 15
+
 // New creates a new header model
-func New(titleStyle, tabActive, tabInactive, tabCount lipgloss.Style, title string, filter *string) Model {
+func New(titleStyle, tabActive, tabInactive, tabCount lipgloss.Style, title string, filter *string, useAsciiHeader bool) Model {
 	return Model{
-		titleStyle:  titleStyle,
-		tabActive:   tabActive,
-		tabInactive: tabInactive,
-		tabCount:    tabCount,
-		title:       title,
-		filter:      filter,
+		titleStyle:     titleStyle,
+		tabActive:      tabActive,
+		tabInactive:    tabInactive,
+		tabCount:       tabCount,
+		title:          title,
+		filter:         filter,
+		useAsciiHeader: useAsciiHeader,
+		width:          80,
+		height:         24,
 	}
+}
+
+// SetSize updates the terminal dimensions for responsive layout
+func (m *Model) SetSize(width, height int) {
+	m.width = width
+	m.height = height
 }
 
 // SetCounts updates the filter counts displayed in tab badges
 func (m *Model) SetCounts(counts FilterCounts) {
 	m.counts = counts
+}
+
+// showBanner returns true when the ASCII banner should be displayed
+func (m Model) showBanner() bool {
+	return m.useAsciiHeader && m.height >= minHeightForBanner && m.width >= bannerWidth
 }
 
 // View renders the header as a tab bar
@@ -76,6 +102,12 @@ func (m Model) View() string {
 	}
 
 	tabBar := strings.Join(renderedTabs, "")
-	header := lipgloss.JoinHorizontal(lipgloss.Center, title, "  ", tabBar)
-	return header + "\n"
+	tabLine := lipgloss.JoinHorizontal(lipgloss.Center, title, "  ", tabBar)
+
+	if m.showBanner() {
+		styledBanner := m.titleStyle.Render(Banner)
+		return styledBanner + "\n" + tabLine + "\n"
+	}
+
+	return tabLine + "\n"
 }

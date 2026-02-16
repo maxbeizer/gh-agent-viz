@@ -296,6 +296,11 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if session != nil {
 			return m, m.openTaskPR(session)
 		}
+	case "s":
+		session := m.taskList.SelectedTask()
+		if session != nil {
+			return m, m.resumeSession(session)
+		}
 	}
 	return m, nil
 }
@@ -317,6 +322,11 @@ func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.logView.GotoTop()
 	case "G":
 		m.logView.GotoBottom()
+	case "s":
+		session := m.taskList.SelectedTask()
+		if session != nil {
+			return m, m.resumeSession(session)
+		}
 	}
 	return m, nil
 }
@@ -446,8 +456,9 @@ func (m Model) resumeSession(session *data.Session) tea.Cmd {
 		}
 
 		// Only allow resuming active sessions (running, queued, or needs-input)
-		if session.Status != "running" && session.Status != "queued" && session.Status != "needs-input" {
-			return errMsg{fmt.Errorf("cannot resume session: session status is '%s' (only 'running', 'queued', or 'needs-input' sessions can be resumed)", session.Status)}
+		normalizedStatus := strings.ToLower(strings.TrimSpace(session.Status))
+		if normalizedStatus != "running" && normalizedStatus != "queued" && normalizedStatus != "needs-input" {
+			return errMsg{fmt.Errorf("cannot resume: session status is '%s' — only running, queued, or needs-input sessions are resumable", session.Status)}
 		}
 
 		if session.ID == "" {
@@ -516,18 +527,26 @@ func (m *Model) updateFooterHints() {
 		if canOpenPR(selected) {
 			hints = append(hints, m.keys.OpenInBrowser)
 		}
+		if canResumeLocalSession(selected) {
+			hints = append(hints, m.keys.ResumeSession)
+		}
 		hints = append(hints, m.keys.ExitApp)
 		m.footer.SetHints(hints)
 	case ViewModeLog:
-		m.footer.SetHints([]key.Binding{
+		logHints := []key.Binding{
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 			key.NewBinding(key.WithKeys("↑/k"), key.WithHelp("↑/k", "up")),
 			key.NewBinding(key.WithKeys("↓/j"), key.WithHelp("↓/j", "down")),
 			key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "page down")),
 			key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "page up")),
 			key.NewBinding(key.WithKeys("g/G"), key.WithHelp("g/G", "top/bottom")),
-			m.keys.ExitApp,
-		})
+		}
+		selected := m.taskList.SelectedTask()
+		if canResumeLocalSession(selected) {
+			logHints = append(logHints, m.keys.ResumeSession)
+		}
+		logHints = append(logHints, m.keys.ExitApp)
+		m.footer.SetHints(logHints)
 	}
 }
 

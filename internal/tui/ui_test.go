@@ -351,3 +351,86 @@ func TestUpdateFooterHints_AgentSessionWithoutPRHidesOpenPRHint(t *testing.T) {
 		t.Fatalf("expected open PR hint to be hidden when PR is not linked, got: %s", footerView)
 	}
 }
+
+func TestHandleLogKeys_FTogglesFollowMode(t *testing.T) {
+	m := NewModel("", false)
+	m.taskList.SetTasks([]data.Session{
+		{
+			ID:     "agent-1",
+			Status: "running",
+			Title:  "Running Agent",
+			Source: data.SourceAgentTask,
+		},
+	})
+	m.viewMode = ViewModeLog
+	m.logView.SetLive(true)
+	m.logView.SetFollowMode(false)
+
+	updated, _ := m.handleLogKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	updatedModel := updated.(Model)
+	if !updatedModel.logView.FollowMode() {
+		t.Fatal("expected follow mode to be ON after pressing 'f'")
+	}
+
+	updated2, _ := updatedModel.handleLogKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	updatedModel2 := updated2.(Model)
+	if updatedModel2.logView.FollowMode() {
+		t.Fatal("expected follow mode to be OFF after pressing 'f' again")
+	}
+}
+
+func TestHandleLogKeys_ScrollUpPausesFollowMode(t *testing.T) {
+	m := NewModel("", false)
+	m.viewMode = ViewModeLog
+	m.logView.SetLive(true)
+	m.logView.SetFollowMode(true)
+
+	updated, _ := m.handleLogKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	updatedModel := updated.(Model)
+	if updatedModel.logView.FollowMode() {
+		t.Fatal("expected follow mode to be OFF after scrolling up")
+	}
+}
+
+func TestHandleLogKeys_GotoBottomEnablesFollowMode(t *testing.T) {
+	m := NewModel("", false)
+	m.viewMode = ViewModeLog
+	m.logView.SetLive(true)
+	m.logView.SetFollowMode(false)
+
+	updated, _ := m.handleLogKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	updatedModel := updated.(Model)
+	if !updatedModel.logView.FollowMode() {
+		t.Fatal("expected follow mode to be ON after G (goto bottom)")
+	}
+}
+
+func TestHandleLogKeys_EscClearsLiveMode(t *testing.T) {
+	m := NewModel("", false)
+	m.viewMode = ViewModeLog
+	m.logView.SetLive(true)
+	m.logView.SetFollowMode(true)
+
+	updated, _ := m.handleLogKeys(tea.KeyMsg{Type: tea.KeyEscape})
+	updatedModel := updated.(Model)
+	if updatedModel.logView.IsLive() {
+		t.Fatal("expected live mode to be OFF after esc")
+	}
+	if updatedModel.logView.FollowMode() {
+		t.Fatal("expected follow mode to be OFF after esc")
+	}
+}
+
+func TestIsSessionRunning(t *testing.T) {
+	running := &data.Session{Status: "running"}
+	if !isSessionRunning(running) {
+		t.Fatal("expected running session to be detected as running")
+	}
+	completed := &data.Session{Status: "completed"}
+	if isSessionRunning(completed) {
+		t.Fatal("expected completed session to not be running")
+	}
+	if isSessionRunning(nil) {
+		t.Fatal("expected nil session to not be running")
+	}
+}

@@ -166,6 +166,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.taskList.SetAnimFrame(m.animFrame)
 		return m, m.animationTickCmd()
 
+	case logPollTickMsg:
+		if m.viewMode != ViewModeLog || !m.logView.IsLive() {
+			return m, nil
+		}
+		session := m.taskList.SelectedTask()
+		if session == nil {
+			return m, nil
+		}
+		return m, tea.Batch(m.fetchLogPoll(session.ID, session.Repository, session.Source), m.logPollTick())
+
+	case logPollResultMsg:
+		if msg.err == nil {
+			m.logView.AppendOrReplace(msg.log)
+		}
+		return m, nil
+
 	case errMsg:
 		m.ctx.Error = msg.err
 		return m, nil
@@ -273,6 +289,11 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		session := m.taskList.SelectedTask()
 		if session != nil {
 			m.viewMode = ViewModeLog
+			if isSessionRunning(session) {
+				m.logView.SetLive(true)
+				m.logView.SetFollowMode(true)
+				return m, tea.Batch(m.fetchTaskLog(session.ID, session.Repository), m.logPollTick())
+			}
 			return m, m.fetchTaskLog(session.ID, session.Repository)
 		}
 	case "o":
@@ -327,6 +348,11 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		session := m.taskList.SelectedTask()
 		if session != nil {
 			m.viewMode = ViewModeLog
+			if isSessionRunning(session) {
+				m.logView.SetLive(true)
+				m.logView.SetFollowMode(true)
+				return m, tea.Batch(m.fetchTaskLog(session.ID, session.Repository), m.logPollTick())
+			}
 			return m, m.fetchTaskLog(session.ID, session.Repository)
 		}
 	case "o":
@@ -348,18 +374,31 @@ func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.viewMode = ViewModeList
+		m.logView.SetLive(false)
+		m.logView.SetFollowMode(false)
 	case "j", "down":
+		m.logView.SetFollowMode(false)
 		m.logView.LineDown()
 	case "k", "up":
+		m.logView.SetFollowMode(false)
 		m.logView.LineUp()
 	case "d":
+		m.logView.SetFollowMode(false)
 		m.logView.HalfPageDown()
 	case "u":
+		m.logView.SetFollowMode(false)
 		m.logView.HalfPageUp()
 	case "g":
+		m.logView.SetFollowMode(false)
 		m.logView.GotoTop()
 	case "G":
+		m.logView.SetFollowMode(true)
 		m.logView.GotoBottom()
+	case "f":
+		m.logView.SetFollowMode(!m.logView.FollowMode())
+		if m.logView.FollowMode() {
+			m.logView.GotoBottom()
+		}
 	case "s":
 		session := m.taskList.SelectedTask()
 		if session != nil {
@@ -402,6 +441,13 @@ type taskLogLoadedMsg struct {
 type refreshTickMsg struct{}
 
 type animationTickMsg struct{}
+
+type logPollTickMsg struct{}
+
+type logPollResultMsg struct {
+	log string
+	err error
+}
 
 type errMsg struct {
 	err error
@@ -552,6 +598,29 @@ func (m Model) resumeSession(session *data.Session) tea.Cmd {
 	})
 }
 
+func (m Model) logPollTick() tea.Cmd {
+	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+		return logPollTickMsg{}
+	})
+}
+
+func (m Model) fetchLogPoll(id string, repo string, source data.SessionSource) tea.Cmd {
+	return func() tea.Msg {
+		var log string
+		var err error
+		if source == data.SourceLocalCopilot {
+			log, err = data.FetchLocalSessionLog(id)
+		} else {
+			log, err = data.FetchAgentTaskLog(id, repo)
+		}
+		return logPollResultMsg{log: log, err: err}
+	}
+}
+
+func isSessionRunning(session *data.Session) bool {
+	return session != nil && data.StatusIsActive(session.Status)
+}
+
 func (m Model) refreshCmd() tea.Cmd {
 	return tea.Tick(m.refreshInt, func(time.Time) tea.Msg {
 		return refreshTickMsg{}
@@ -652,6 +721,9 @@ func (m *Model) updateFooterHints() {
 			key.NewBinding(key.WithKeys("g/G"), key.WithHelp("g/G", "top/bottom")),
 		}
 		selected := m.taskList.SelectedTask()
+		if m.logView.IsLive() {
+			logHints = append(logHints, m.keys.ToggleFollow)
+		}
 		if canResumeLocalSession(selected) {
 			logHints = append(logHints, m.keys.ResumeSession)
 		}

@@ -11,6 +11,7 @@ import (
 type Model struct {
 	style lipgloss.Style
 	hints []string
+	width int
 }
 
 // New creates a new footer model with key binding hints
@@ -26,9 +27,32 @@ func New(style lipgloss.Style, keys []key.Binding) Model {
 	}
 }
 
-// View renders the footer with key binding hints
+// View renders the footer with key binding hints, truncating to fit width
 func (m Model) View() string {
-	footer := m.style.Render(strings.Join(m.hints, " • "))
+	sep := " • "
+	joined := strings.Join(m.hints, sep)
+
+	// Account for horizontal padding in the style
+	hPad := m.style.GetHorizontalPadding()
+	available := m.width - hPad
+	if available > 0 && lipgloss.Width(joined) > available {
+		ellipsis := " …"
+		joined = ""
+		for i, h := range m.hints {
+			candidate := joined
+			if i > 0 {
+				candidate += sep
+			}
+			candidate += h
+			if lipgloss.Width(candidate+ellipsis) > available {
+				joined += ellipsis
+				break
+			}
+			joined = candidate
+		}
+	}
+
+	footer := m.style.Render(joined)
 	return "\n" + footer
 }
 
@@ -38,4 +62,9 @@ func (m *Model) SetHints(keys []key.Binding) {
 	for _, k := range keys {
 		m.hints = append(m.hints, k.Help().Key+" "+k.Help().Desc)
 	}
+}
+
+// SetWidth updates the available terminal width for truncation
+func (m *Model) SetWidth(width int) {
+	m.width = width
 }

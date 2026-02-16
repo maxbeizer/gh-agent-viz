@@ -82,7 +82,7 @@ func TestView_WithTabCounts(t *testing.T) {
 		t.Errorf("expected ALL count of 10, got: %s", view)
 	}
 	if !strings.Contains(view, "(3)") {
-		t.Errorf("expected ACTION count of 3, got: %s", view)
+		t.Errorf("expected ATTENTION count of 3, got: %s", view)
 	}
 }
 

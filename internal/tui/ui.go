@@ -272,10 +272,6 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "l":
 		session := m.taskList.SelectedTask()
 		if session != nil {
-			if session.Source == data.SourceLocalCopilot {
-				m.ctx.Error = fmt.Errorf("logs are only available for remote agent-task sessions")
-				return m, nil
-			}
 			m.viewMode = ViewModeLog
 			return m, m.fetchTaskLog(session.ID, session.Repository)
 		}
@@ -321,10 +317,6 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "l":
 		session := m.taskList.SelectedTask()
 		if session != nil {
-			if session.Source == data.SourceLocalCopilot {
-				m.ctx.Error = fmt.Errorf("logs are only available for remote agent-task sessions")
-				return m, nil
-			}
 			m.viewMode = ViewModeLog
 			return m, m.fetchTaskLog(session.ID, session.Repository)
 		}
@@ -464,7 +456,17 @@ func (m Model) fetchTaskDetail(id string, repo string) tea.Cmd {
 
 // fetchTaskLog fetches the log for a task
 func (m Model) fetchTaskLog(id string, repo string) tea.Cmd {
+	session := m.taskList.SelectedTask()
 	return func() tea.Msg {
+		// Route to local session log reader for local-copilot sessions
+		if session != nil && session.Source == data.SourceLocalCopilot {
+			log, err := data.FetchLocalSessionLog(id)
+			if err != nil {
+				return errMsg{err}
+			}
+			return taskLogLoadedMsg{log}
+		}
+
 		log, err := data.FetchAgentTaskLog(id, repo)
 		if err != nil {
 			return errMsg{err}
@@ -641,7 +643,14 @@ func (m *Model) updateFooterHints() {
 }
 
 func canShowLogs(session *data.Session) bool {
-	return session != nil && session.Source == data.SourceAgentTask && strings.TrimSpace(session.ID) != ""
+	if session == nil || strings.TrimSpace(session.ID) == "" {
+		return false
+	}
+	if session.Source == data.SourceAgentTask {
+		return true
+	}
+	// Local sessions can show logs if they have an events.jsonl file
+	return session.HasLog
 }
 
 func canOpenPR(session *data.Session) bool {

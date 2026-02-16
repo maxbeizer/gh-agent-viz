@@ -257,6 +257,8 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if session != nil {
 			return m, m.resumeSession(session)
 		}
+	case "x":
+		m.taskList.DismissSelected()
 	case "r":
 		return m, m.fetchTasks
 	case "a":
@@ -534,6 +536,9 @@ func (m *Model) updateFooterHints() {
 		}
 		if canResumeLocalSession(selected) {
 			hints = append(hints, m.keys.ResumeSession)
+		}
+		if selected != nil {
+			hints = append(hints, m.keys.DismissSession)
 		}
 		hints = append(hints, m.keys.ToggleFilter, m.keys.FocusAttention, m.keys.RefreshData, m.keys.ExitApp)
 		m.footer.SetHints(hints)

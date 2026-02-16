@@ -10,6 +10,7 @@ type Keybindings struct {
 	ShowLogs       key.Binding
 	OpenInBrowser  key.Binding
 	ResumeSession  key.Binding
+	DismissSession key.Binding
 	RefreshData    key.Binding
 	FocusAttention key.Binding
 	ExitApp        key.Binding
@@ -43,6 +44,10 @@ func NewKeybindings() Keybindings {
 		ResumeSession: key.NewBinding(
 			key.WithKeys("s"),
 			key.WithHelp("s", "resume"),
+		),
+		DismissSession: key.NewBinding(
+			key.WithKeys("x"),
+			key.WithHelp("x", "dismiss"),
 		),
 		RefreshData: key.NewBinding(
 			key.WithKeys("r"),

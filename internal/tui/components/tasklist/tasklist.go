@@ -19,6 +19,7 @@ type Model struct {
 	tableRowSelected  lipgloss.Style
 	sessions          []data.Session
 	deEmphasizedIdx   map[int]struct{}
+	dismissedIDs      map[string]struct{}
 	rowCursor         int
 	loading           bool
 	statusIcon        func(string) string
@@ -36,6 +37,7 @@ func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, sta
 		tableRowSelected: rowSelectedStyle,
 		sessions:         []data.Session{},
 		deEmphasizedIdx:  map[int]struct{}{},
+		dismissedIDs:     map[string]struct{}{},
 		rowCursor:        0,
 		loading:          false,
 		statusIcon:       statusIconFunc,
@@ -206,6 +208,15 @@ func (m *Model) SetTasks(sessions []data.Session) {
 		m.selectedSessionID = selected.ID
 	}
 
+	// Filter out dismissed sessions
+	filtered := make([]data.Session, 0, len(sessions))
+	for _, session := range sessions {
+		if _, dismissed := m.dismissedIDs[session.ID]; !dismissed {
+			filtered = append(filtered, session)
+		}
+	}
+	sessions = filtered
+
 	type rankedSession struct {
 		session      data.Session
 		deEmphasized bool
@@ -223,24 +234,24 @@ func (m *Model) SetTasks(sessions []data.Session) {
 		})
 	}
 
+	// Sort: most recent first, with de-emphasized items sinking to the bottom
 	sort.SliceStable(ranked, func(i, j int) bool {
-		if ranked[i].sortPriority != ranked[j].sortPriority {
-			return ranked[i].sortPriority < ranked[j].sortPriority
+		// De-emphasized always last
+		if ranked[i].deEmphasized != ranked[j].deEmphasized {
+			return !ranked[i].deEmphasized
 		}
+		// Within same emphasis level: most recent first
 		ti := ranked[i].session.UpdatedAt
 		tj := ranked[j].session.UpdatedAt
-		// Both have timestamps: most recent first
 		if !ti.IsZero() && !tj.IsZero() {
 			return ti.After(tj)
 		}
-		// One has timestamp, one doesn't: timestamped first
 		if !ti.IsZero() {
 			return true
 		}
 		if !tj.IsZero() {
 			return false
 		}
-		// Neither has timestamps: preserve original order (stable sort)
 		return false
 	})
 
@@ -291,6 +302,30 @@ func (m *Model) MoveCursor(delta int) {
 // MoveColumn is a no-op in focused list mode (kept for interface compat)
 func (m *Model) MoveColumn(delta int) {
 	// No columns in focused list mode
+}
+
+// DismissSelected removes the currently selected session from view
+func (m *Model) DismissSelected() {
+	selected := m.SelectedTask()
+	if selected == nil || selected.ID == "" {
+		return
+	}
+	m.dismissedIDs[selected.ID] = struct{}{}
+	// Remove from current sessions
+	newSessions := make([]data.Session, 0, len(m.sessions)-1)
+	for _, s := range m.sessions {
+		if s.ID != selected.ID {
+			newSessions = append(newSessions, s)
+		}
+	}
+	m.sessions = newSessions
+	// Clamp cursor
+	if m.rowCursor >= len(m.sessions) {
+		m.rowCursor = len(m.sessions) - 1
+	}
+	if m.rowCursor < 0 {
+		m.rowCursor = 0
+	}
 }
 
 // SelectedTask returns the currently selected session

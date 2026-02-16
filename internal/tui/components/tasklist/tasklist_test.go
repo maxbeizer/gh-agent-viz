@@ -452,6 +452,17 @@ func TestSessionBadge_IdleShowsDuration(t *testing.T) {
 	}
 }
 
+func TestSessionBadge_StaleShowsEmoji(t *testing.T) {
+	session := data.Session{
+		Status:    "running",
+		UpdatedAt: time.Now().Add(-5 * time.Hour),
+	}
+	badge := sessionBadge(session, false, 0)
+	if badge != "😴 stale" {
+		t.Fatalf("expected stale badge for session idle >4h, got %q", badge)
+	}
+}
+
 func TestCompactDuration(t *testing.T) {
 	tests := []struct {
 		name string

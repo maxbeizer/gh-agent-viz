@@ -16,6 +16,10 @@ const (
 // AttentionStaleThreshold is the quiet-window threshold for active sessions.
 const AttentionStaleThreshold = 20 * time.Minute
 
+// AttentionStaleMax is the upper bound — sessions idle longer than this
+// are considered abandoned and no longer need attention.
+const AttentionStaleMax = 4 * time.Hour
+
 // SessionTelemetry holds derived usage metrics for a session
 type SessionTelemetry struct {
 	Duration          time.Duration // elapsed time from created to last activity
@@ -82,7 +86,8 @@ func SessionNeedsAttention(session Session) bool {
 		return false
 	}
 
-	return time.Since(session.UpdatedAt) >= AttentionStaleThreshold
+	idle := time.Since(session.UpdatedAt)
+	return idle >= AttentionStaleThreshold && idle < AttentionStaleMax
 }
 
 // StatusIsActive determines if a status string represents an active session.

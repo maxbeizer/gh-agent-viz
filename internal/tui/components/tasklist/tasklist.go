@@ -475,6 +475,9 @@ func sessionBadge(session data.Session, deEmphasized bool, duplicateCount int) s
 		}
 		return badge
 	}
+	if isActiveStatus(session.Status) && !session.UpdatedAt.IsZero() && time.Since(session.UpdatedAt) >= data.AttentionStaleMax {
+		return "😴 stale"
+	}
 	if !isActiveStatus(session.Status) || session.UpdatedAt.IsZero() {
 		return ""
 	}

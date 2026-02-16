@@ -275,16 +275,17 @@ func (m *Model) SetTasks(sessions []data.Session) {
 		return false
 	})
 
-	m.sessions = make([]data.Session, len(ranked))
+	m.sessions = make([]data.Session, 0, len(ranked))
 	m.deEmphasizedIdx = map[int]struct{}{}
 	m.duplicateCounts = map[int]int{}
-	for i, candidate := range ranked {
-		m.sessions[i] = candidate.session
+	for _, candidate := range ranked {
 		if candidate.deEmphasized {
-			m.deEmphasizedIdx[i] = struct{}{}
+			continue // Hide quiet duplicates entirely
 		}
+		idx := len(m.sessions)
+		m.sessions = append(m.sessions, candidate.session)
 		if count, ok := inputDupCounts[candidate.origIdx]; ok {
-			m.duplicateCounts[i] = count
+			m.duplicateCounts[idx] = count
 		}
 	}
 

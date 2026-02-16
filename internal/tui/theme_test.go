@@ -73,10 +73,52 @@ func TestNewTheme(t *testing.T) {
 	if theme == nil {
 		t.Fatal("expected non-nil theme")
 	}
+	if theme.ThemeName() != "default" {
+		t.Errorf("expected theme name 'default', got %q", theme.ThemeName())
+	}
+}
 
-	// Verify the theme was successfully created
-	// lipgloss.Style fields contain functions and cannot be compared directly,
-	// so we just verify the function completed successfully and returned a theme
+func TestNewThemeFromConfig_Presets(t *testing.T) {
+	tests := []struct {
+		input    string
+		wantName string
+	}{
+		{"default", "default"},
+		{"catppuccin-mocha", "catppuccin-mocha"},
+		{"dracula", "dracula"},
+		{"tokyo-night", "tokyo-night"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			theme := NewThemeFromConfig(tt.input)
+			if theme == nil {
+				t.Fatal("expected non-nil theme")
+			}
+			if theme.ThemeName() != tt.wantName {
+				t.Errorf("expected theme name %q, got %q", tt.wantName, theme.ThemeName())
+			}
+		})
+	}
+}
+
+func TestNewThemeFromConfig_EmptyFallsBackToDefault(t *testing.T) {
+	theme := NewThemeFromConfig("")
+	if theme == nil {
+		t.Fatal("expected non-nil theme")
+	}
+	if theme.ThemeName() != "default" {
+		t.Errorf("expected fallback theme name 'default', got %q", theme.ThemeName())
+	}
+}
+
+func TestNewThemeFromConfig_UnknownFallsBackToDefault(t *testing.T) {
+	theme := NewThemeFromConfig("nonexistent-theme")
+	if theme == nil {
+		t.Fatal("expected non-nil theme")
+	}
+	if theme.ThemeName() != "default" {
+		t.Errorf("expected fallback theme name 'default', got %q", theme.ThemeName())
+	}
 }
 
 func TestAnimatedStatusIcon_Running(t *testing.T) {

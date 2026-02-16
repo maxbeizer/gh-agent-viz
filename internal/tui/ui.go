@@ -68,7 +68,7 @@ func NewModel(repo string, debug bool) Model {
 		refreshSeconds = 30
 	}
 
-	theme := NewTheme()
+	theme := NewThemeFromConfig(ctx.Config.Theme)
 	keys := NewKeybindings()
 
 	// Prepare key bindings for footer

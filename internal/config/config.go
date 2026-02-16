@@ -14,6 +14,7 @@ type Config struct {
 	DefaultFilter   string   `yaml:"defaultFilter"`
 	Animations      *bool    `yaml:"animations,omitempty"`
 	AsciiHeader     *bool    `yaml:"asciiHeader,omitempty"`
+	Theme           string   `yaml:"theme,omitempty"`
 }
 
 // AnimationsEnabled returns whether animations are enabled (default: true).

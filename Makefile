@@ -51,10 +51,11 @@ run: build
 install-local:
 	gh extension install .
 
-relink-local:
+relink-local: build
 	@if gh extension list | grep -qE '^gh agent-viz[[:space:]]'; then \
 		gh extension remove agent-viz; \
 	fi
+	$(GO) build -o gh-agent-viz ./gh-agent-viz.go
 	gh extension install .
 
 test: check-go-version

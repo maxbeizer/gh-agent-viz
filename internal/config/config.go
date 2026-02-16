@@ -13,6 +13,7 @@ type Config struct {
 	RefreshInterval int      `yaml:"refreshInterval"`
 	DefaultFilter   string   `yaml:"defaultFilter"`
 	Animations      *bool    `yaml:"animations,omitempty"`
+	AsciiHeader     *bool    `yaml:"asciiHeader,omitempty"`
 }
 
 // AnimationsEnabled returns whether animations are enabled (default: true).
@@ -21,6 +22,14 @@ func (c *Config) AnimationsEnabled() bool {
 		return true
 	}
 	return *c.Animations
+}
+
+// AsciiHeaderEnabled returns whether the ASCII art header is enabled (default: true).
+func (c *Config) AsciiHeaderEnabled() bool {
+	if c.AsciiHeader == nil {
+		return true
+	}
+	return *c.AsciiHeader
 }
 
 // DefaultConfig returns the default configuration

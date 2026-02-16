@@ -9,7 +9,7 @@ import (
 
 func newTestModel(title string, filter *string) Model {
 	s := lipgloss.NewStyle()
-	return New(s, s, s, s, title, filter)
+	return New(s, s, s, s, title, filter, false)
 }
 
 func TestNew(t *testing.T) {
@@ -94,5 +94,64 @@ func TestView_EndsWithNewline(t *testing.T) {
 
 	if !strings.HasSuffix(view, "\n") {
 		t.Error("expected view to end with newline")
+	}
+}
+
+func newTestModelWithBanner(title string, filter *string, useAscii bool) Model {
+	s := lipgloss.NewStyle()
+	m := New(s, s, s, s, title, filter, useAscii)
+	m.SetSize(80, 24)
+	return m
+}
+
+func TestView_BannerRendersWhenEnabled(t *testing.T) {
+	model := newTestModelWithBanner("Tasks", nil, true)
+	view := model.View()
+
+	if !strings.Contains(view, "A G E N T   V I Z") {
+		t.Errorf("expected view to contain ASCII banner when enabled, got: %s", view)
+	}
+}
+
+func TestView_PlainTitleWhenBannerDisabled(t *testing.T) {
+	title := "⚡ Agent Sessions"
+	model := newTestModelWithBanner(title, nil, false)
+	view := model.View()
+
+	if strings.Contains(view, "A G E N T   V I Z") {
+		t.Error("expected view NOT to contain ASCII banner when disabled")
+	}
+	if !strings.Contains(view, title) {
+		t.Errorf("expected view to contain plain title '%s'", title)
+	}
+}
+
+func TestView_BannerHiddenOnShortTerminal(t *testing.T) {
+	model := newTestModelWithBanner("Tasks", nil, true)
+	model.SetSize(80, 14) // below minHeightForBanner
+	view := model.View()
+
+	if strings.Contains(view, "A G E N T   V I Z") {
+		t.Error("expected banner to be hidden when terminal height < 15")
+	}
+}
+
+func TestView_BannerHiddenOnNarrowTerminal(t *testing.T) {
+	model := newTestModelWithBanner("Tasks", nil, true)
+	model.SetSize(20, 24) // too narrow for banner
+	view := model.View()
+
+	if strings.Contains(view, "A G E N T   V I Z") {
+		t.Error("expected banner to be hidden when terminal is too narrow")
+	}
+}
+
+func TestView_BannerShownAtExactMinHeight(t *testing.T) {
+	model := newTestModelWithBanner("Tasks", nil, true)
+	model.SetSize(80, 15) // exactly minHeightForBanner
+	view := model.View()
+
+	if !strings.Contains(view, "A G E N T   V I Z") {
+		t.Error("expected banner to be shown at exactly minimum height")
 	}
 }

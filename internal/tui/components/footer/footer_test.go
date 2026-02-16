@@ -132,3 +132,60 @@ func TestView_EmptyHints(t *testing.T) {
 		t.Error("expected view to start with newline even with empty hints")
 	}
 }
+
+func TestView_TruncatesWhenExceedingWidth(t *testing.T) {
+	style := lipgloss.NewStyle()
+	keys := []key.Binding{
+		key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "move")),
+		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
+		key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "logs")),
+		key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "dismiss")),
+		key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "group")),
+		key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
+	}
+
+	model := New(style, keys)
+	model.SetWidth(30)
+	view := model.View()
+
+	if !strings.Contains(view, "…") {
+		t.Error("expected truncated view to contain ellipsis")
+	}
+	if !strings.Contains(view, "move") {
+		t.Error("expected first hint to be preserved")
+	}
+}
+
+func TestView_NoTruncationWhenFits(t *testing.T) {
+	style := lipgloss.NewStyle()
+	keys := []key.Binding{
+		key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
+	}
+
+	model := New(style, keys)
+	model.SetWidth(80)
+	view := model.View()
+
+	if strings.Contains(view, "…") {
+		t.Error("expected no ellipsis when hints fit")
+	}
+	if !strings.Contains(view, "quit") {
+		t.Error("expected hint to be present")
+	}
+}
+
+func TestView_NoTruncationWhenWidthZero(t *testing.T) {
+	style := lipgloss.NewStyle()
+	keys := []key.Binding{
+		key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
+		key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
+	}
+
+	model := New(style, keys)
+	// width defaults to 0; should not truncate
+	view := model.View()
+
+	if strings.Contains(view, "…") {
+		t.Error("expected no truncation when width is zero")
+	}
+}

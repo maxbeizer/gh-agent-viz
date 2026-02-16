@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -468,39 +469,42 @@ func (m Model) openTaskPR(session *data.Session) tea.Cmd {
 	}
 }
 
-func (m Model) resumeSession(session *data.Session) tea.Cmd {
-	return func() tea.Msg {
-		if session == nil {
-			return errMsg{fmt.Errorf("no session selected")}
-		}
-
-		if session.Source != data.SourceLocalCopilot {
-			return errMsg{fmt.Errorf("only local Copilot CLI sessions can be resumed")}
-		}
-
-		// Only allow resuming active sessions (running, queued, or needs-input)
-		normalizedStatus := strings.ToLower(strings.TrimSpace(session.Status))
-		if normalizedStatus != "running" && normalizedStatus != "queued" && normalizedStatus != "needs-input" {
+// resumeSessionErr returns an error tea.Cmd if the session cannot be resumed,
+// or nil if the session is valid for resumption.
+func resumeSessionErr(session *data.Session) tea.Cmd {
+	if session == nil {
+		return func() tea.Msg { return errMsg{fmt.Errorf("no session selected")} }
+	}
+	if session.Source != data.SourceLocalCopilot {
+		return func() tea.Msg { return errMsg{fmt.Errorf("only local Copilot CLI sessions can be resumed")} }
+	}
+	normalizedStatus := strings.ToLower(strings.TrimSpace(session.Status))
+	if normalizedStatus != "running" && normalizedStatus != "queued" && normalizedStatus != "needs-input" {
+		return func() tea.Msg {
 			return errMsg{fmt.Errorf("cannot resume: session status is '%s' — only running, queued, or needs-input sessions are resumable", session.Status)}
 		}
-
-		if session.ID == "" {
-			return errMsg{fmt.Errorf("cannot resume session: session has no ID")}
-		}
-
-		output, err := data.RunGH("copilot", "--", "--resume", session.ID)
-		if err != nil {
-			// Provide a user-friendly error message
-			outputStr := strings.TrimSpace(string(output))
-			if outputStr != "" {
-				// Include output only if it provides useful context
-				return errMsg{fmt.Errorf("failed to resume session: %s", outputStr)}
-			}
-			return errMsg{fmt.Errorf("failed to resume session")}
-		}
-
-		return nil
 	}
+	if session.ID == "" {
+		return func() tea.Msg { return errMsg{fmt.Errorf("cannot resume session: session has no ID")} }
+	}
+	return nil
+}
+
+func (m Model) resumeSession(session *data.Session) tea.Cmd {
+	if errCmd := resumeSessionErr(session); errCmd != nil {
+		return errCmd
+	}
+
+	// Use tea.ExecProcess to hand terminal control to the interactive
+	// Copilot CLI resume command. This suspends the TUI, lets the child
+	// process use stdin/stdout directly, and resumes the TUI on exit.
+	c := exec.Command("gh", "copilot", "--", "--resume", session.ID)
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return errMsg{fmt.Errorf("resume session exited with error: %w", err)}
+		}
+		return nil
+	})
 }
 
 func (m Model) refreshCmd() tea.Cmd {

@@ -79,16 +79,3 @@ func (m Model) View() string {
 	header := lipgloss.JoinHorizontal(lipgloss.Center, title, "  ", tabBar)
 	return header + "\n"
 }
-
-func filterLabel(filter string) string {
-	switch filter {
-	case "attention":
-		return "needs action"
-	case "active":
-		return "running"
-	case "completed":
-		return "done"
-	default:
-		return filter
-	}
-}

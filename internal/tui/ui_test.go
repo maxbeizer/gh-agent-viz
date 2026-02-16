@@ -8,10 +8,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
-func TestResumeSession_ValidRunningSession(t *testing.T) {
-	m := NewModel("", false)
-
-	// Create a running local session
+func TestResumeSessionErr_ValidRunningSession(t *testing.T) {
 	task := &data.Session{
 		ID:     "test-session-123",
 		Status: "running",
@@ -19,17 +16,12 @@ func TestResumeSession_ValidRunningSession(t *testing.T) {
 		Source: data.SourceLocalCopilot,
 	}
 
-	// Test that running sessions are resumable
-	cmd := m.resumeSession(task)
-	if cmd == nil {
-		t.Error("expected cmd to be non-nil for running session")
+	if errCmd := resumeSessionErr(task); errCmd != nil {
+		t.Error("expected no error for running session")
 	}
 }
 
-func TestResumeSession_ValidQueuedSession(t *testing.T) {
-	m := NewModel("", false)
-
-	// Create a queued local session
+func TestResumeSessionErr_ValidQueuedSession(t *testing.T) {
 	task := &data.Session{
 		ID:     "test-session-456",
 		Status: "queued",
@@ -37,16 +29,12 @@ func TestResumeSession_ValidQueuedSession(t *testing.T) {
 		Source: data.SourceLocalCopilot,
 	}
 
-	// Test that queued sessions are resumable
-	cmd := m.resumeSession(task)
-	if cmd == nil {
-		t.Error("expected cmd to be non-nil for queued session")
+	if errCmd := resumeSessionErr(task); errCmd != nil {
+		t.Error("expected no error for queued session")
 	}
 }
 
-func TestResumeSession_ValidNeedsInputSession(t *testing.T) {
-	m := NewModel("", false)
-
+func TestResumeSessionErr_ValidNeedsInputSession(t *testing.T) {
 	task := &data.Session{
 		ID:     "test-session-needs-input",
 		Status: "needs-input",
@@ -54,16 +42,28 @@ func TestResumeSession_ValidNeedsInputSession(t *testing.T) {
 		Source: data.SourceLocalCopilot,
 	}
 
-	cmd := m.resumeSession(task)
-	if cmd == nil {
-		t.Error("expected cmd to be non-nil for needs-input session")
+	if errCmd := resumeSessionErr(task); errCmd != nil {
+		t.Error("expected no error for needs-input session")
 	}
 }
 
-func TestResumeSession_CompletedSession(t *testing.T) {
+func TestResumeSession_ValidSessionReturnsCmd(t *testing.T) {
 	m := NewModel("", false)
 
-	// Create a completed local session
+	task := &data.Session{
+		ID:     "test-session-123",
+		Status: "running",
+		Title:  "Test Running Task",
+		Source: data.SourceLocalCopilot,
+	}
+
+	cmd := m.resumeSession(task)
+	if cmd == nil {
+		t.Error("expected cmd to be non-nil for valid running session")
+	}
+}
+
+func TestResumeSessionErr_CompletedSession(t *testing.T) {
 	task := &data.Session{
 		ID:     "test-session-789",
 		Status: "completed",
@@ -71,31 +71,22 @@ func TestResumeSession_CompletedSession(t *testing.T) {
 		Source: data.SourceLocalCopilot,
 	}
 
-	// Test that completed sessions return an error
-	cmd := m.resumeSession(task)
-	if cmd == nil {
-		t.Fatal("expected cmd to be non-nil")
+	errCmd := resumeSessionErr(task)
+	if errCmd == nil {
+		t.Fatal("expected error cmd for completed session")
 	}
 
-	// Execute the command to get the message
-	msg := cmd()
+	msg := errCmd()
 	errResult, ok := msg.(errMsg)
 	if !ok {
 		t.Fatal("expected errMsg for completed session")
-	}
-
-	if errResult.err == nil {
-		t.Error("expected error for completed session")
 	}
 	if !strings.Contains(errResult.err.Error(), "resumable") {
 		t.Errorf("expected error to mention resumable states, got: %s", errResult.err)
 	}
 }
 
-func TestResumeSession_FailedSession(t *testing.T) {
-	m := NewModel("", false)
-
-	// Create a failed local session
+func TestResumeSessionErr_FailedSession(t *testing.T) {
 	task := &data.Session{
 		ID:     "test-session-999",
 		Status: "failed",
@@ -103,49 +94,38 @@ func TestResumeSession_FailedSession(t *testing.T) {
 		Source: data.SourceLocalCopilot,
 	}
 
-	// Test that failed sessions return an error
-	cmd := m.resumeSession(task)
-	if cmd == nil {
-		t.Fatal("expected cmd to be non-nil")
+	errCmd := resumeSessionErr(task)
+	if errCmd == nil {
+		t.Fatal("expected error cmd for failed session")
 	}
 
-	// Execute the command to get the message
-	msg := cmd()
+	msg := errCmd()
 	errResult, ok := msg.(errMsg)
 	if !ok {
 		t.Fatal("expected errMsg for failed session")
 	}
-
 	if errResult.err == nil {
 		t.Error("expected error for failed session")
 	}
 }
 
-func TestResumeSession_NilTask(t *testing.T) {
-	m := NewModel("", false)
-
-	// Test nil task
-	cmd := m.resumeSession(nil)
-	if cmd == nil {
-		t.Fatal("expected cmd to be non-nil")
+func TestResumeSessionErr_NilTask(t *testing.T) {
+	errCmd := resumeSessionErr(nil)
+	if errCmd == nil {
+		t.Fatal("expected error cmd for nil task")
 	}
 
-	// Execute the command to get the message
-	msg := cmd()
+	msg := errCmd()
 	errResult, ok := msg.(errMsg)
 	if !ok {
 		t.Fatal("expected errMsg for nil task")
 	}
-
 	if errResult.err == nil {
 		t.Error("expected error for nil task")
 	}
 }
 
-func TestResumeSession_EmptySessionID(t *testing.T) {
-	m := NewModel("", false)
-
-	// Create a local session with empty ID
+func TestResumeSessionErr_EmptySessionID(t *testing.T) {
 	task := &data.Session{
 		ID:     "",
 		Status: "running",
@@ -153,28 +133,22 @@ func TestResumeSession_EmptySessionID(t *testing.T) {
 		Source: data.SourceLocalCopilot,
 	}
 
-	// Test that empty ID returns an error
-	cmd := m.resumeSession(task)
-	if cmd == nil {
-		t.Fatal("expected cmd to be non-nil")
+	errCmd := resumeSessionErr(task)
+	if errCmd == nil {
+		t.Fatal("expected error cmd for empty session ID")
 	}
 
-	// Execute the command to get the message
-	msg := cmd()
+	msg := errCmd()
 	errResult, ok := msg.(errMsg)
 	if !ok {
 		t.Fatal("expected errMsg for empty session ID")
 	}
-
 	if errResult.err == nil {
 		t.Error("expected error for empty session ID")
 	}
 }
 
-func TestResumeSession_NormalizesStatusCase(t *testing.T) {
-	m := NewModel("", false)
-
-	// Test that mixed-case status is normalized
+func TestResumeSessionErr_NormalizesStatusCase(t *testing.T) {
 	tests := []string{"Running", "RUNNING", "  running  ", "  QUEUED  ", "Needs-Input"}
 	for _, status := range tests {
 		task := &data.Session{
@@ -182,17 +156,8 @@ func TestResumeSession_NormalizesStatusCase(t *testing.T) {
 			Status: status,
 			Source: data.SourceLocalCopilot,
 		}
-		cmd := m.resumeSession(task)
-		if cmd == nil {
-			t.Errorf("expected cmd to be non-nil for status %q", status)
-		}
-		// The command will fail at exec.Command level, but it should NOT
-		// return a status validation error
-		msg := cmd()
-		if errResult, ok := msg.(errMsg); ok {
-			if strings.Contains(errResult.err.Error(), "resumable") {
-				t.Errorf("status %q should be accepted after normalization, got: %s", status, errResult.err)
-			}
+		if errCmd := resumeSessionErr(task); errCmd != nil {
+			t.Errorf("status %q should be accepted after normalization", status)
 		}
 	}
 }

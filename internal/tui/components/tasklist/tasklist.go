@@ -536,38 +536,6 @@ func attentionReason(session data.Session) string {
 	}
 }
 
-func rowContext(session data.Session) string {
-	switch session.Source {
-	case data.SourceLocalCopilot:
-		if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
-			return "waiting for your response • press 's' to resume"
-		}
-		if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
-			return "failed session • inspect logs or retry"
-		}
-		if data.SessionNeedsAttention(session) {
-			return "active session is quiet • check if it needs direction"
-		}
-		if isActiveStatus(session.Status) {
-			return "local session can be resumed with 's'"
-		}
-		return "local session"
-	case data.SourceAgentTask:
-		if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
-			return "remote task failed • open details/logs"
-		}
-		if data.SessionNeedsAttention(session) {
-			return "remote task is quiet • verify progress"
-		}
-		if session.PRNumber > 0 {
-			return fmt.Sprintf("remote task • PR #%d", session.PRNumber)
-		}
-		return "remote task"
-	default:
-		return "session"
-	}
-}
-
 // SetSize updates the available rendering size for responsive layout.
 func (m *Model) SetSize(width, height int) {
 	if width > 0 {

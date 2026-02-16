@@ -450,3 +450,53 @@ func TestSessionBadge_IdleShowsDuration(t *testing.T) {
 		t.Fatalf("old 'check progress' text should be gone, got %q", badge)
 	}
 }
+
+func TestCompactDuration(t *testing.T) {
+	tests := []struct {
+		name string
+		dur  time.Duration
+		want string
+	}{
+		{"nil telemetry", 0, ""},
+		{"30 seconds", 30 * time.Second, "< 1m"},
+		{"5 minutes", 5 * time.Minute, "5m"},
+		{"90 minutes", 90 * time.Minute, "1h30m"},
+		{"2 hours", 2 * time.Hour, "2h"},
+		{"2h30m", 2*time.Hour + 30*time.Minute, "2h30m"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			session := data.Session{ID: "t"}
+			if tt.dur > 0 {
+				session.Telemetry = &data.SessionTelemetry{Duration: tt.dur}
+			}
+			got := compactDuration(session)
+			if got != tt.want {
+				t.Errorf("compactDuration(%v) = %q, want %q", tt.dur, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestView_MetaLineShowsDuration(t *testing.T) {
+	model := newModel()
+	model.SetSize(140, 30)
+	model.SetTasks([]data.Session{
+		{
+			ID:         "1",
+			Status:     "running",
+			Title:      "Task With Duration",
+			Repository: "owner/repo",
+			UpdatedAt:  time.Now(),
+			Telemetry: &data.SessionTelemetry{
+				Duration: 12 * time.Minute,
+			},
+		},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "⏱ 12m") {
+		t.Fatalf("expected compact duration in metadata line, got: %s", view)
+	}
+}

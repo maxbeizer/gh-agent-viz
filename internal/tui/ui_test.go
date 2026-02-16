@@ -79,13 +79,16 @@ func TestResumeSession_CompletedSession(t *testing.T) {
 
 	// Execute the command to get the message
 	msg := cmd()
-	errMsg, ok := msg.(errMsg)
+	errResult, ok := msg.(errMsg)
 	if !ok {
 		t.Fatal("expected errMsg for completed session")
 	}
 
-	if errMsg.err == nil {
+	if errResult.err == nil {
 		t.Error("expected error for completed session")
+	}
+	if !strings.Contains(errResult.err.Error(), "resumable") {
+		t.Errorf("expected error to mention resumable states, got: %s", errResult.err)
 	}
 }
 
@@ -108,12 +111,12 @@ func TestResumeSession_FailedSession(t *testing.T) {
 
 	// Execute the command to get the message
 	msg := cmd()
-	errMsg, ok := msg.(errMsg)
+	errResult, ok := msg.(errMsg)
 	if !ok {
 		t.Fatal("expected errMsg for failed session")
 	}
 
-	if errMsg.err == nil {
+	if errResult.err == nil {
 		t.Error("expected error for failed session")
 	}
 }
@@ -129,12 +132,12 @@ func TestResumeSession_NilTask(t *testing.T) {
 
 	// Execute the command to get the message
 	msg := cmd()
-	errMsg, ok := msg.(errMsg)
+	errResult, ok := msg.(errMsg)
 	if !ok {
 		t.Fatal("expected errMsg for nil task")
 	}
 
-	if errMsg.err == nil {
+	if errResult.err == nil {
 		t.Error("expected error for nil task")
 	}
 }
@@ -158,13 +161,96 @@ func TestResumeSession_EmptySessionID(t *testing.T) {
 
 	// Execute the command to get the message
 	msg := cmd()
-	errMsg, ok := msg.(errMsg)
+	errResult, ok := msg.(errMsg)
 	if !ok {
 		t.Fatal("expected errMsg for empty session ID")
 	}
 
-	if errMsg.err == nil {
+	if errResult.err == nil {
 		t.Error("expected error for empty session ID")
+	}
+}
+
+func TestResumeSession_NormalizesStatusCase(t *testing.T) {
+	m := NewModel("", false)
+
+	// Test that mixed-case status is normalized
+	tests := []string{"Running", "RUNNING", "  running  ", "  QUEUED  ", "Needs-Input"}
+	for _, status := range tests {
+		task := &data.Session{
+			ID:     "test-session",
+			Status: status,
+			Source: data.SourceLocalCopilot,
+		}
+		cmd := m.resumeSession(task)
+		if cmd == nil {
+			t.Errorf("expected cmd to be non-nil for status %q", status)
+		}
+		// The command will fail at exec.Command level, but it should NOT
+		// return a status validation error
+		msg := cmd()
+		if errResult, ok := msg.(errMsg); ok {
+			if strings.Contains(errResult.err.Error(), "resumable") {
+				t.Errorf("status %q should be accepted after normalization, got: %s", status, errResult.err)
+			}
+		}
+	}
+}
+
+func TestResumeSession_DetailViewResume(t *testing.T) {
+	m := NewModel("", false)
+	m.taskList.SetTasks([]data.Session{
+		{
+			ID:     "local-1",
+			Status: "running",
+			Title:  "Local Session",
+			Source: data.SourceLocalCopilot,
+		},
+	})
+	m.viewMode = ViewModeDetail
+
+	// Press 's' in detail view
+	_, cmd := m.handleDetailKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd == nil {
+		t.Error("expected resume command to work in detail view")
+	}
+}
+
+func TestResumeSession_LogViewResume(t *testing.T) {
+	m := NewModel("", false)
+	m.taskList.SetTasks([]data.Session{
+		{
+			ID:     "local-1",
+			Status: "queued",
+			Title:  "Local Session",
+			Source: data.SourceLocalCopilot,
+		},
+	})
+	m.viewMode = ViewModeLog
+
+	// Press 's' in log view
+	_, cmd := m.handleLogKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd == nil {
+		t.Error("expected resume command to work in log view")
+	}
+}
+
+func TestUpdateFooterHints_DetailViewShowsResumeForResumableSession(t *testing.T) {
+	m := NewModel("", false)
+	m.viewMode = ViewModeDetail
+	m.taskList.SetTasks([]data.Session{
+		{
+			ID:     "local-1",
+			Status: "needs-input",
+			Title:  "Local",
+			Source: data.SourceLocalCopilot,
+		},
+	})
+
+	m.updateFooterHints()
+	footerView := m.footer.View()
+	if !strings.Contains(footerView, "resume session") {
+		t.Fatalf("expected resume hint in detail view for resumable session, got: %s", footerView)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -12,8 +13,9 @@ import (
 type Model struct {
 	titleStyle lipgloss.Style
 	viewport   viewport.Model
-	content    string
-	lineCount  int // Cache line count for performance
+	rawContent string // Original unrendered content
+	content    string // Rendered content currently displayed
+	lineCount  int    // Cache line count for performance
 	ready      bool
 }
 
@@ -54,9 +56,11 @@ func (m Model) View() string {
 
 // SetContent updates the log content
 func (m *Model) SetContent(content string) {
-	m.content = content
-	m.lineCount = len(strings.Split(content, "\n"))
-	m.viewport.SetContent(content)
+	m.rawContent = content
+	rendered := renderMarkdown(content, m.viewport.Width)
+	m.content = rendered
+	m.lineCount = len(strings.Split(rendered, "\n"))
+	m.viewport.SetContent(rendered)
 	m.ready = true
 }
 
@@ -64,9 +68,32 @@ func (m *Model) SetContent(content string) {
 func (m *Model) SetSize(width, height int) {
 	m.viewport.Width = width
 	m.viewport.Height = height
-	if m.content != "" {
-		m.viewport.SetContent(m.content)
+	if m.rawContent != "" {
+		rendered := renderMarkdown(m.rawContent, width)
+		m.content = rendered
+		m.lineCount = len(strings.Split(rendered, "\n"))
+		m.viewport.SetContent(rendered)
 	}
+}
+
+// renderMarkdown renders content through glamour for rich markdown display.
+// Falls back to raw content if rendering fails.
+func renderMarkdown(content string, width int) string {
+	if width <= 0 {
+		width = 80
+	}
+	renderer, err := glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(width),
+	)
+	if err != nil {
+		return content
+	}
+	rendered, err := renderer.Render(content)
+	if err != nil {
+		return content
+	}
+	return strings.TrimRight(rendered, "\n")
 }
 
 // GotoTop scrolls to the top

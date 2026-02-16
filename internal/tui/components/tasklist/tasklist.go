@@ -11,13 +11,17 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
+// groupByModes defines the cycle order for group-by modes.
+var groupByModes = []string{"", "repository", "status", "source"}
+
 // Model represents the task list component state
 type Model struct {
 	titleStyle        lipgloss.Style
 	tableHeaderStyle  lipgloss.Style
 	tableRowStyle     lipgloss.Style
-	tableRowSelected  lipgloss.Style
-	sessions          []data.Session
+	tableRowSelected   lipgloss.Style
+	sectionHeaderStyle lipgloss.Style
+	sessions           []data.Session
 	deEmphasizedIdx   map[int]struct{}
 	duplicateCounts   map[int]int // newest session index → count of older duplicates
 	dismissedIDs      map[string]struct{}
@@ -30,25 +34,27 @@ type Model struct {
 	selectedSessionID string
 	width             int
 	height            int
-	splitMode         bool
+	splitMode          bool
+	groupBy            string // "", "repository", "status", "source"
 }
 
 // New creates a new task list model
 func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, statusIconFunc func(string) string) Model {
-	return NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle, statusIconFunc, nil, nil)
+	return NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle, lipgloss.NewStyle(), statusIconFunc, nil, nil)
 }
 
 // NewWithStore creates a new task list model backed by a persistent dismissed store.
-func NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, statusIconFunc func(string) string, animStatusIconFunc func(string, int) string, store *data.DismissedStore) Model {
+func NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle, sectionHeaderStyle lipgloss.Style, statusIconFunc func(string) string, animStatusIconFunc func(string, int) string, store *data.DismissedStore) Model {
 	dismissed := map[string]struct{}{}
 	if store != nil {
 		dismissed = store.IDs()
 	}
 	return Model{
-		titleStyle:       titleStyle,
-		tableHeaderStyle: headerStyle,
-		tableRowStyle:    rowStyle,
-		tableRowSelected: rowSelectedStyle,
+		titleStyle:         titleStyle,
+		tableHeaderStyle:   headerStyle,
+		tableRowStyle:      rowStyle,
+		tableRowSelected:   rowSelectedStyle,
+		sectionHeaderStyle: sectionHeaderStyle,
 		sessions:         []data.Session{},
 		deEmphasizedIdx:  map[int]struct{}{},
 		dismissedIDs:     dismissed,
@@ -97,6 +103,10 @@ func (m Model) View() string {
 }
 
 func (m Model) renderFocusedList() string {
+	if m.groupBy != "" {
+		return m.renderGroupedList()
+	}
+
 	usableWidth := m.width - 4
 	if usableWidth < 20 {
 		usableWidth = 20
@@ -608,4 +618,112 @@ func visibleRange(total, cursor, size int) (int, int) {
 		start = end - size
 	}
 	return start, end
+}
+
+// CycleGroupBy advances to the next group-by mode.
+func (m *Model) CycleGroupBy() {
+	for i, mode := range groupByModes {
+		if mode == m.groupBy {
+			m.groupBy = groupByModes[(i+1)%len(groupByModes)]
+			return
+		}
+	}
+	m.groupBy = groupByModes[0]
+}
+
+// GroupByLabel returns a human-readable label for the current group mode.
+func (m Model) GroupByLabel() string {
+	switch m.groupBy {
+	case "repository":
+		return "repo"
+	case "status":
+		return "status"
+	case "source":
+		return "source"
+	default:
+		return ""
+	}
+}
+
+func sessionGroupKey(session data.Session, mode string) string {
+	switch mode {
+	case "repository":
+		repo := strings.TrimSpace(session.Repository)
+		if repo == "" {
+			return "(no repository)"
+		}
+		return repo
+	case "status":
+		status := strings.TrimSpace(session.Status)
+		if status == "" {
+			return "(unknown)"
+		}
+		return status
+	case "source":
+		src := strings.TrimSpace(string(session.Source))
+		if src == "" {
+			return "(unknown)"
+		}
+		return src
+	default:
+		return ""
+	}
+}
+
+type sessionGroup struct {
+	label      string
+	sessions   []int
+	mostRecent time.Time
+}
+
+func (m Model) buildGroups() []sessionGroup {
+	groupMap := map[string]*sessionGroup{}
+	var order []string
+	for i, session := range m.sessions {
+		key := sessionGroupKey(session, m.groupBy)
+		g, exists := groupMap[key]
+		if !exists {
+			g = &sessionGroup{label: key}
+			groupMap[key] = g
+			order = append(order, key)
+		}
+		g.sessions = append(g.sessions, i)
+		if session.UpdatedAt.After(g.mostRecent) {
+			g.mostRecent = session.UpdatedAt
+		}
+	}
+	groups := make([]sessionGroup, 0, len(order))
+	for _, key := range order {
+		groups = append(groups, *groupMap[key])
+	}
+	sort.SliceStable(groups, func(i, j int) bool {
+		return groups[i].mostRecent.After(groups[j].mostRecent)
+	})
+	return groups
+}
+
+func (m Model) renderGroupedList() string {
+	usableWidth := m.width - 4
+	if usableWidth < 20 {
+		usableWidth = 20
+	}
+	groups := m.buildGroups()
+	rows := []string{}
+	cursor := m.rowCursor
+	if cursor >= len(m.sessions) {
+		cursor = len(m.sessions) - 1
+	}
+	if cursor < 0 {
+		cursor = 0
+	}
+	for _, g := range groups {
+		headerLine := fmt.Sprintf("── %s: %s (%d) ──", m.groupBy, g.label, len(g.sessions))
+		rows = append(rows, m.sectionHeaderStyle.Render(headerLine))
+		for _, idx := range g.sessions {
+			session := m.sessions[idx]
+			selected := idx == cursor
+			rows = append(rows, m.renderRow(idx, session, selected, usableWidth))
+		}
+	}
+	return strings.Join(rows, "\n")
 }

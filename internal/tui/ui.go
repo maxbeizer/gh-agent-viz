@@ -95,7 +95,7 @@ func NewModel(repo string, debug bool) Model {
 		keys:        keys,
 		header:      header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter, ctx.Config.AsciiHeaderEnabled()),
 		footer:      footer.New(theme.Footer, footerKeys),
-		taskList:    tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc, dismissedStore),
+		taskList:    tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, theme.SectionHeader, StatusIcon, animIconFunc, dismissedStore),
 		taskDetail:  taskdetail.New(theme.Title, theme.Border, StatusIcon),
 		logView:     logview.New(theme.Title, 80, 20),
 		viewMode:    ViewModeList,
@@ -306,6 +306,9 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cycleFilter(-1)
 		m.taskList.SetLoading(true)
 		return m, m.fetchTasks
+	case "g":
+		m.taskList.CycleGroupBy()
+		return m, nil
 	}
 	return m, nil
 }
@@ -607,7 +610,13 @@ func (m *Model) updateFooterHints() {
 		if selected != nil {
 			hints = append(hints, m.keys.DismissSession)
 		}
-		hints = append(hints, m.keys.TogglePreview, m.keys.ToggleFilter, m.keys.FocusAttention, m.keys.RefreshData, m.keys.ExitApp)
+		hints = append(hints, m.keys.TogglePreview, m.keys.ToggleFilter, m.keys.FocusAttention, m.keys.RefreshData)
+		if label := m.taskList.GroupByLabel(); label != "" {
+			hints = append(hints, key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "group: "+label)))
+		} else {
+			hints = append(hints, m.keys.GroupBy)
+		}
+		hints = append(hints, m.keys.ExitApp)
 		m.footer.SetHints(hints)
 	case ViewModeDetail:
 		hints := []key.Binding{

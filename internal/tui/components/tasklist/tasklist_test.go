@@ -549,3 +549,88 @@ func TestNonDuplicateSessionsUnaffected(t *testing.T) {
 		t.Fatalf("non-duplicate sessions should not show duplicate badge, got: %s", view)
 	}
 }
+
+func TestCycleGroupBy(t *testing.T) {
+	model := newModel()
+	if model.GroupByLabel() != "" {
+		t.Fatalf("expected empty, got %q", model.GroupByLabel())
+	}
+	model.CycleGroupBy()
+	if model.GroupByLabel() != "repo" {
+		t.Fatalf("expected repo, got %q", model.GroupByLabel())
+	}
+	model.CycleGroupBy()
+	if model.GroupByLabel() != "status" {
+		t.Fatalf("expected status, got %q", model.GroupByLabel())
+	}
+	model.CycleGroupBy()
+	if model.GroupByLabel() != "source" {
+		t.Fatalf("expected source, got %q", model.GroupByLabel())
+	}
+	model.CycleGroupBy()
+	if model.GroupByLabel() != "" {
+		t.Fatalf("expected empty after wrap, got %q", model.GroupByLabel())
+	}
+}
+
+func TestViewGroupedByRepository(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 40)
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Task A", Repository: "owner/repo-a", UpdatedAt: now},
+		{ID: "2", Status: "completed", Title: "Task B", Repository: "owner/repo-b", UpdatedAt: now.Add(-time.Hour)},
+		{ID: "3", Status: "running", Title: "Task C", Repository: "owner/repo-a", UpdatedAt: now.Add(-2 * time.Hour)},
+	})
+	model.CycleGroupBy()
+	view := model.View()
+	if !strings.Contains(view, "repository: owner/repo-a") {
+		t.Fatalf("expected header for repo-a, got: %s", view)
+	}
+	if !strings.Contains(view, "repository: owner/repo-b") {
+		t.Fatalf("expected header for repo-b, got: %s", view)
+	}
+}
+
+func TestViewGroupedPreservesSortWithinGroups(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 40)
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Older Task", Repository: "owner/repo", UpdatedAt: now.Add(-2 * time.Hour)},
+		{ID: "2", Status: "running", Title: "Newer Task", Repository: "owner/repo", UpdatedAt: now},
+	})
+	model.CycleGroupBy()
+	view := model.View()
+	if strings.Index(view, "Newer Task") > strings.Index(view, "Older Task") {
+		t.Fatalf("expected newer before older within group")
+	}
+}
+
+func TestViewGroupedByStatus(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 40)
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Running Task", UpdatedAt: now},
+		{ID: "2", Status: "completed", Title: "Done Task", UpdatedAt: now.Add(-time.Hour)},
+	})
+	model.CycleGroupBy()
+	model.CycleGroupBy()
+	view := model.View()
+	if !strings.Contains(view, "status: running") {
+		t.Fatalf("expected running header, got: %s", view)
+	}
+}
+
+func TestViewNoGroupShowsNoHeaders(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 40)
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Task A", Repository: "owner/repo", UpdatedAt: time.Now()},
+	})
+	view := model.View()
+	if strings.Contains(view, "repository:") || strings.Contains(view, "status:") {
+		t.Fatalf("expected no headers in None mode, got: %s", view)
+	}
+}

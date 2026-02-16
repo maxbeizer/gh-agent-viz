@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/sparkline"
 )
 
 // Model represents the task list component state
@@ -142,7 +143,16 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 	}
 
 	icon := m.currentStatusIcon(session.Status)
-	titleMax := width - 8
+
+	const sparkWidth = 8
+	showSparkline := width >= 60
+
+	// Account for gutter(2) + icon(~2) + spaces; sparkline adds sparkWidth+1
+	overhead := 8
+	if showSparkline {
+		overhead += sparkWidth + 1
+	}
+	titleMax := width - overhead
 	if titleMax < 3 {
 		titleMax = 3
 	}
@@ -155,7 +165,13 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 		gutter = "▎ "
 	}
 
-	titleLine := fmt.Sprintf("%s%s %s", gutter, icon, title)
+	var titleLine string
+	if showSparkline {
+		spark := sparkline.Generate(session.Status, session.CreatedAt, session.UpdatedAt, sparkWidth)
+		titleLine = fmt.Sprintf("%s%s %s %s", gutter, icon, spark, title)
+	} else {
+		titleLine = fmt.Sprintf("%s%s %s", gutter, icon, title)
+	}
 	if badge != "" {
 		titleLine += " " + badge
 	}

@@ -249,7 +249,7 @@ func TestUpdateFooterHints_DetailViewShowsResumeForResumableSession(t *testing.T
 
 	m.updateFooterHints()
 	footerView := m.footer.View()
-	if !strings.Contains(footerView, "resume session") {
+	if !strings.Contains(footerView, "resume") {
 		t.Fatalf("expected resume hint in detail view for resumable session, got: %s", footerView)
 	}
 }

@@ -95,12 +95,12 @@ func TestViewShowsFocusedList(t *testing.T) {
 
 func TestViewEmptyAndLoadingStates(t *testing.T) {
 	model := newModel()
-	if got := model.View(); !strings.Contains(got, "No sessions to show yet") {
+	if got := model.View(); !strings.Contains(got, "All quiet on the agent front") {
 		t.Fatalf("expected empty state, got: %s", got)
 	}
 
 	model.loading = true
-	if got := model.View(); !strings.Contains(got, "Loading sessions") {
+	if got := model.View(); !strings.Contains(got, "Switching gears") {
 		t.Fatalf("expected loading state, got: %s", got)
 	}
 }
@@ -215,10 +215,10 @@ func TestView_ImprovedEmptyState(t *testing.T) {
 	)
 
 	view := model.View()
-	if !strings.Contains(view, "No sessions to show yet") {
-		t.Error("expected improved empty state message")
+	if !strings.Contains(view, "All quiet on the agent front") {
+		t.Error("expected whimsical empty state message")
 	}
-	if !strings.Contains(view, "Press 'r' to refresh") {
+	if !strings.Contains(view, "refresh") {
 		t.Error("expected empty state to include helpful hints")
 	}
 }

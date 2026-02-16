@@ -19,7 +19,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Repos:           []string{},
 		RefreshInterval: 30,
-		DefaultFilter:   "all",
+		DefaultFilter:   "",
 	}
 }
 

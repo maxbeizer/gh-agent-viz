@@ -13,8 +13,8 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("expected RefreshInterval to be 30, got %d", cfg.RefreshInterval)
 	}
 
-	if cfg.DefaultFilter != "all" {
-		t.Errorf("expected DefaultFilter to be 'all', got '%s'", cfg.DefaultFilter)
+	if cfg.DefaultFilter != "" {
+		t.Errorf("expected DefaultFilter to be empty (defers to TUI default), got '%s'", cfg.DefaultFilter)
 	}
 
 	if len(cfg.Repos) != 0 {
@@ -74,8 +74,8 @@ func TestLoad_MissingFile(t *testing.T) {
 	if cfg.RefreshInterval != 30 {
 		t.Errorf("expected default RefreshInterval of 30, got %d", cfg.RefreshInterval)
 	}
-	if cfg.DefaultFilter != "all" {
-		t.Errorf("expected default DefaultFilter of 'all', got '%s'", cfg.DefaultFilter)
+	if cfg.DefaultFilter != "" {
+		t.Errorf("expected empty DefaultFilter for missing file, got '%s'", cfg.DefaultFilter)
 	}
 	if len(cfg.Repos) != 0 {
 		t.Errorf("expected empty Repos list, got %d items", len(cfg.Repos))
@@ -112,8 +112,8 @@ func TestLoad_PartialConfig(t *testing.T) {
 	if cfg.RefreshInterval != 30 {
 		t.Errorf("expected default RefreshInterval of 30, got %d", cfg.RefreshInterval)
 	}
-	if cfg.DefaultFilter != "all" {
-		t.Errorf("expected default DefaultFilter of 'all', got '%s'", cfg.DefaultFilter)
+	if cfg.DefaultFilter != "" {
+		t.Errorf("expected empty DefaultFilter for partial config, got '%s'", cfg.DefaultFilter)
 	}
 }
 
@@ -128,8 +128,8 @@ func TestLoad_EmptyPath(t *testing.T) {
 	if cfg.RefreshInterval != 30 {
 		t.Errorf("expected default RefreshInterval of 30, got %d", cfg.RefreshInterval)
 	}
-	if cfg.DefaultFilter != "all" {
-		t.Errorf("expected default DefaultFilter of 'all', got '%s'", cfg.DefaultFilter)
+	if cfg.DefaultFilter != "" {
+		t.Errorf("expected empty DefaultFilter for empty path, got '%s'", cfg.DefaultFilter)
 	}
 }
 

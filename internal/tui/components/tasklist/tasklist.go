@@ -19,6 +19,7 @@ type Model struct {
 	tableRowSelected  lipgloss.Style
 	sessions          []data.Session
 	deEmphasizedIdx   map[int]struct{}
+	duplicateCounts   map[int]int // newest session index → count of older duplicates
 	dismissedIDs      map[string]struct{}
 	dismissedStore    *data.DismissedStore
 	rowCursor         int
@@ -148,7 +149,7 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 		titleMax = 3
 	}
 	title := truncate(sessionTitle(session), titleMax)
-	badge := sessionBadge(session, m.isDeEmphasized(sessionIdx))
+	badge := sessionBadge(session, m.isDeEmphasized(sessionIdx), m.duplicateCounts[sessionIdx])
 
 	// Gutter indicator: selected row gets a bar, others get a space
 	gutter := "  "
@@ -199,16 +200,18 @@ func (m *Model) SetTasks(sessions []data.Session) {
 
 	type rankedSession struct {
 		session      data.Session
+		origIdx      int
 		deEmphasized bool
 		sortPriority int
 	}
 
-	deEmphasizedInputIdx := quietDuplicateIndices(sessions)
+	deEmphasizedInputIdx, inputDupCounts := quietDuplicateIndices(sessions)
 	ranked := make([]rankedSession, 0, len(sessions))
 	for i, session := range sessions {
 		_, deEmphasized := deEmphasizedInputIdx[i]
 		ranked = append(ranked, rankedSession{
 			session:      session,
+			origIdx:      i,
 			deEmphasized: deEmphasized,
 			sortPriority: sessionSortPriority(session, deEmphasized),
 		})
@@ -237,10 +240,14 @@ func (m *Model) SetTasks(sessions []data.Session) {
 
 	m.sessions = make([]data.Session, len(ranked))
 	m.deEmphasizedIdx = map[int]struct{}{}
+	m.duplicateCounts = map[int]int{}
 	for i, candidate := range ranked {
 		m.sessions[i] = candidate.session
 		if candidate.deEmphasized {
 			m.deEmphasizedIdx[i] = struct{}{}
+		}
+		if count, ok := inputDupCounts[candidate.origIdx]; ok {
+			m.duplicateCounts[i] = count
 		}
 	}
 
@@ -361,23 +368,42 @@ func isActiveStatus(status string) bool {
 	return data.StatusIsActive(status) || strings.EqualFold(strings.TrimSpace(status), "needs-input")
 }
 
-func sessionBadge(session data.Session, deEmphasized bool) string {
+func sessionBadge(session data.Session, deEmphasized bool, duplicateCount int) string {
 	if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
-		return "🧑 waiting on you"
+		badge := "🧑 waiting on you"
+		if duplicateCount > 0 {
+			badge += fmt.Sprintf(" (+%d older)", duplicateCount)
+		}
+		return badge
 	}
 	if strings.EqualFold(strings.TrimSpace(session.Status), "failed") {
-		return "🚨 failed"
+		badge := "🚨 failed"
+		if duplicateCount > 0 {
+			badge += fmt.Sprintf(" (+%d older)", duplicateCount)
+		}
+		return badge
 	}
 	if deEmphasized {
+		if !session.UpdatedAt.IsZero() {
+			return fmt.Sprintf("↺ quiet duplicate · %s ago", formatTime(session.UpdatedAt))
+		}
 		return "↺ quiet duplicate"
 	}
 	if data.SessionNeedsAttention(session) {
-		return fmt.Sprintf("⏸ idle %s", formatIdleDuration(time.Since(session.UpdatedAt)))
+		badge := fmt.Sprintf("⏸ idle %s", formatIdleDuration(time.Since(session.UpdatedAt)))
+		if duplicateCount > 0 {
+			badge += fmt.Sprintf(" (+%d older)", duplicateCount)
+		}
+		return badge
 	}
 	if !isActiveStatus(session.Status) || session.UpdatedAt.IsZero() {
 		return ""
 	}
-	return "• in progress"
+	badge := "• in progress"
+	if duplicateCount > 0 {
+		badge += fmt.Sprintf(" (+%d older)", duplicateCount)
+	}
+	return badge
 }
 
 func formatIdleDuration(d time.Duration) string {
@@ -413,7 +439,7 @@ func sessionSortPriority(session data.Session, deEmphasized bool) int {
 	}
 }
 
-func quietDuplicateIndices(sessions []data.Session) map[int]struct{} {
+func quietDuplicateIndices(sessions []data.Session) (map[int]struct{}, map[int]int) {
 	grouped := map[string][]int{}
 	for i, session := range sessions {
 		if !isQuietDuplicateSession(session) {
@@ -423,7 +449,8 @@ func quietDuplicateIndices(sessions []data.Session) map[int]struct{} {
 		grouped[key] = append(grouped[key], i)
 	}
 
-	result := map[int]struct{}{}
+	deEmphasized := map[int]struct{}{}
+	counts := map[int]int{}
 	for _, indexes := range grouped {
 		if len(indexes) < 2 {
 			continue
@@ -433,12 +460,13 @@ func quietDuplicateIndices(sessions []data.Session) map[int]struct{} {
 			return sessions[indexes[i]].UpdatedAt.After(sessions[indexes[j]].UpdatedAt)
 		})
 
+		counts[indexes[0]] = len(indexes) - 1
 		for _, idx := range indexes[1:] {
-			result[idx] = struct{}{}
+			deEmphasized[idx] = struct{}{}
 		}
 	}
 
-	return result
+	return deEmphasized, counts
 }
 
 func isQuietDuplicateSession(session data.Session) bool {

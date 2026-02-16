@@ -9,7 +9,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
-	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/sparkline"
 )
 
 // Model represents the task list component state
@@ -173,11 +172,7 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 
 	repo := truncate(rowRepository(session), metaMax)
 	attention := attentionReason(session)
-	spark := ""
-	if width >= 60 {
-		spark = " " + sparkline.Generate(session.Status, session.CreatedAt, session.UpdatedAt, 8)
-	}
-	meta := fmt.Sprintf("    %s • %s • %s%s", repo, attention, formatTime(session.UpdatedAt), spark)
+	meta := fmt.Sprintf("    %s • %s • %s", repo, attention, formatTime(session.UpdatedAt))
 
 	return style.Render(titleLine + "\n" + meta)
 }

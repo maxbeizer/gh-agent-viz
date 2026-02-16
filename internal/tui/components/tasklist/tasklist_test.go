@@ -19,21 +19,22 @@ func newModel() Model {
 	)
 }
 
-func TestSetTasksSortsByPriority(t *testing.T) {
+func TestSetTasksSortsByRecency(t *testing.T) {
 	model := newModel()
+	now := time.Now()
 	model.SetTasks([]data.Session{
-		{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: time.Now()},
-		{ID: "2", Status: "completed", Title: "Done 1", UpdatedAt: time.Now()},
-		{ID: "3", Status: "failed", Title: "Failed 1", UpdatedAt: time.Now()},
-		{ID: "4", Status: "queued", Title: "Running 2", UpdatedAt: time.Now()},
+		{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: now.Add(-2 * time.Hour)},
+		{ID: "2", Status: "completed", Title: "Done 1", UpdatedAt: now.Add(-1 * time.Hour)},
+		{ID: "3", Status: "failed", Title: "Failed 1", UpdatedAt: now},
+		{ID: "4", Status: "queued", Title: "Running 2", UpdatedAt: now.Add(-3 * time.Hour)},
 	})
 
 	if len(model.sessions) != 4 {
 		t.Fatalf("expected 4 sessions, got %d", len(model.sessions))
 	}
-	// Failed should be prioritized first (priority 0)
+	// Most recent first
 	if model.sessions[0].ID != "3" {
-		t.Fatalf("expected failed session first, got %s", model.sessions[0].ID)
+		t.Fatalf("expected most recent session (failed, just now) first, got %s", model.sessions[0].ID)
 	}
 }
 
@@ -137,7 +138,7 @@ func TestSetTasks_PreservesSelection(t *testing.T) {
 	}
 }
 
-func TestSetTasks_PrioritizesNeedsInputFirst(t *testing.T) {
+func TestSetTasks_SortsByRecencyNotPriority(t *testing.T) {
 	model := newModel()
 	now := time.Now()
 	model.SetTasks([]data.Session{
@@ -148,8 +149,9 @@ func TestSetTasks_PrioritizesNeedsInputFirst(t *testing.T) {
 	if len(model.sessions) != 2 {
 		t.Fatalf("expected 2 sessions, got %d", len(model.sessions))
 	}
-	if model.sessions[0].ID != "needs" {
-		t.Fatalf("expected needs-input session first, got order: %s, %s", model.sessions[0].ID, model.sessions[1].ID)
+	// Most recent first, regardless of status
+	if model.sessions[0].ID != "fresh" {
+		t.Fatalf("expected most recent session first, got order: %s, %s", model.sessions[0].ID, model.sessions[1].ID)
 	}
 }
 
@@ -358,5 +360,52 @@ func TestMoveColumn_IsNoOpInFocusedMode(t *testing.T) {
 	selected := model.SelectedTask()
 	if selected == nil || selected.ID != "1" {
 		t.Fatal("MoveColumn should be a no-op in focused mode")
+	}
+}
+
+func TestDismissSelected_RemovesFromView(t *testing.T) {
+	model := newModel()
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Keep", UpdatedAt: now},
+		{ID: "2", Status: "failed", Title: "Dismiss Me", UpdatedAt: now.Add(-time.Hour)},
+	})
+
+	// Select the second session
+	model.MoveCursor(1)
+	selected := model.SelectedTask()
+	if selected == nil || selected.ID != "2" {
+		t.Fatalf("expected session 2 selected, got %v", selected)
+	}
+
+	// Dismiss it
+	model.DismissSelected()
+	if len(model.sessions) != 1 {
+		t.Fatalf("expected 1 session after dismiss, got %d", len(model.sessions))
+	}
+	if model.sessions[0].ID != "1" {
+		t.Fatalf("expected session 1 remaining, got %s", model.sessions[0].ID)
+	}
+}
+
+func TestDismissSelected_PersistsAcrossRefresh(t *testing.T) {
+	model := newModel()
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Keep", UpdatedAt: now},
+		{ID: "2", Status: "failed", Title: "Dismiss Me", UpdatedAt: now.Add(-time.Hour)},
+	})
+
+	model.MoveCursor(1)
+	model.DismissSelected()
+
+	// Simulate refresh with same data
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Keep", UpdatedAt: now},
+		{ID: "2", Status: "failed", Title: "Dismiss Me", UpdatedAt: now.Add(-time.Hour)},
+	})
+
+	if len(model.sessions) != 1 {
+		t.Fatalf("dismissed session should stay hidden after refresh, got %d sessions", len(model.sessions))
 	}
 }

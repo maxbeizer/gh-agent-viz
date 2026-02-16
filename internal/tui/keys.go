@@ -17,6 +17,7 @@ type Keybindings struct {
 	ToggleFilter   key.Binding
 	NavigateBack   key.Binding
 	TogglePreview  key.Binding
+	GroupBy        key.Binding
 }
 
 // NewKeybindings creates the default key bindings for the TUI
@@ -73,6 +74,10 @@ func NewKeybindings() Keybindings {
 		TogglePreview: key.NewBinding(
 			key.WithKeys("p"),
 			key.WithHelp("p", "preview"),
+		),
+		GroupBy: key.NewBinding(
+			key.WithKeys("g"),
+			key.WithHelp("g", "group"),
 		),
 	}
 }

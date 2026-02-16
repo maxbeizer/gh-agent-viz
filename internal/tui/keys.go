@@ -58,7 +58,7 @@ func NewKeybindings() Keybindings {
 		),
 		FocusAttention: key.NewBinding(
 			key.WithKeys("a"),
-			key.WithHelp("a", "action view"),
+			key.WithHelp("a", "attention"),
 		),
 		ExitApp: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),

@@ -84,7 +84,7 @@ func (m Model) View() string {
 		label string
 		count int
 	}{
-		{"attention", "ACTION", m.counts.Attention},
+		{"attention", "ATTENTION", m.counts.Attention},
 		{"active", "RUNNING", m.counts.Active},
 		{"completed", "DONE", m.counts.Completed},
 		{"failed", "FAILED", m.counts.Failed},

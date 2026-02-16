@@ -54,14 +54,19 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// SetLoading sets the loading state, clearing the list for visual feedback
+func (m *Model) SetLoading(loading bool) {
+	m.loading = loading
+}
+
 // View renders the sessions as a focused single-column list
 func (m Model) View() string {
 	if m.loading {
-		return m.titleStyle.Render("Loading sessions...\n\nGathering the latest Copilot session updates.")
+		return m.titleStyle.Render("🔄 Switching gears...\n\nFetching sessions, one moment.")
 	}
 
 	if len(m.sessions) == 0 {
-		return m.titleStyle.Render("No sessions to show yet.\n\nPress 'r' to refresh, or Tab/Shift+Tab to switch filters.")
+		return m.titleStyle.Render("✨ All quiet on the agent front.\n\nNo sessions match this filter — your agents are either napping or haven't checked in yet.\nPress 'r' to refresh, or tab to try another filter.")
 	}
 
 	list := m.renderFocusedList()

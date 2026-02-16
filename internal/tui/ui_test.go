@@ -314,10 +314,10 @@ func TestHandleListKeys_LocalSessionLogShowsHelpfulError(t *testing.T) {
 	}
 }
 
-func TestView_NotReadyShowsWhimsicalStartupText(t *testing.T) {
+func TestView_NotReadyShowsStartupText(t *testing.T) {
 	m := NewModel("", false)
 	view := m.View()
-	if view != "Loading board..." {
+	if view != "Loading sessions..." {
 		t.Fatalf("expected startup text, got %q", view)
 	}
 }
@@ -336,13 +336,13 @@ func TestUpdateFooterHints_LocalSessionShowsOnlyAvailableActions(t *testing.T) {
 
 	m.updateFooterHints()
 	footerView := m.footer.View()
-	if !strings.Contains(footerView, "resume session") {
+	if !strings.Contains(footerView, "resume") {
 		t.Fatalf("expected resume hint for resumable local session, got: %s", footerView)
 	}
-	if strings.Contains(footerView, "show task logs") {
+	if strings.Contains(footerView, "logs") {
 		t.Fatalf("expected logs hint to be hidden for local session, got: %s", footerView)
 	}
-	if strings.Contains(footerView, "open PR URL") {
+	if strings.Contains(footerView, "open PR") {
 		t.Fatalf("expected open PR hint to be hidden for local session, got: %s", footerView)
 	}
 }
@@ -362,10 +362,10 @@ func TestUpdateFooterHints_AgentSessionWithoutPRHidesOpenPRHint(t *testing.T) {
 
 	m.updateFooterHints()
 	footerView := m.footer.View()
-	if !strings.Contains(footerView, "show task logs") {
+	if !strings.Contains(footerView, "logs") {
 		t.Fatalf("expected logs hint for agent session, got: %s", footerView)
 	}
-	if strings.Contains(footerView, "open PR URL") {
+	if strings.Contains(footerView, "open PR") {
 		t.Fatalf("expected open PR hint to be hidden when PR is not linked, got: %s", footerView)
 	}
 }

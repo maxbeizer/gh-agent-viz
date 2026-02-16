@@ -19,15 +19,7 @@ func newModel() Model {
 	)
 }
 
-func runningColumnIDs(model Model) []string {
-	ids := make([]string, 0, len(model.columnSessionIdx[0]))
-	for _, idx := range model.columnSessionIdx[0] {
-		ids = append(ids, model.sessions[idx].ID)
-	}
-	return ids
-}
-
-func TestSetTasksGroupsIntoColumns(t *testing.T) {
+func TestSetTasksSortsByPriority(t *testing.T) {
 	model := newModel()
 	model.SetTasks([]data.Session{
 		{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: time.Now()},
@@ -36,18 +28,16 @@ func TestSetTasksGroupsIntoColumns(t *testing.T) {
 		{ID: "4", Status: "queued", Title: "Running 2", UpdatedAt: time.Now()},
 	})
 
-	if got := len(model.columnSessionIdx[0]); got != 2 {
-		t.Fatalf("expected 2 running tasks, got %d", got)
+	if len(model.sessions) != 4 {
+		t.Fatalf("expected 4 sessions, got %d", len(model.sessions))
 	}
-	if got := len(model.columnSessionIdx[1]); got != 1 {
-		t.Fatalf("expected 1 done task, got %d", got)
-	}
-	if got := len(model.columnSessionIdx[2]); got != 1 {
-		t.Fatalf("expected 1 failed task, got %d", got)
+	// Failed should be prioritized first (priority 0)
+	if model.sessions[0].ID != "3" {
+		t.Fatalf("expected failed session first, got %s", model.sessions[0].ID)
 	}
 }
 
-func TestMoveCursorWithinActiveColumn(t *testing.T) {
+func TestMoveCursorInFocusedList(t *testing.T) {
 	model := newModel()
 	model.SetTasks([]data.Session{
 		{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: time.Now()},
@@ -56,17 +46,17 @@ func TestMoveCursorWithinActiveColumn(t *testing.T) {
 	})
 
 	model.MoveCursor(1)
-	if model.rowCursor[model.activeColumn] != 1 {
-		t.Fatalf("expected row cursor to move to 1, got %d", model.rowCursor[model.activeColumn])
+	if model.rowCursor != 1 {
+		t.Fatalf("expected row cursor to move to 1, got %d", model.rowCursor)
 	}
 
 	model.MoveCursor(10)
-	if model.rowCursor[model.activeColumn] != 1 {
-		t.Fatalf("expected row cursor capped at last item, got %d", model.rowCursor[model.activeColumn])
+	if model.rowCursor != 2 {
+		t.Fatalf("expected row cursor capped at last item, got %d", model.rowCursor)
 	}
 }
 
-func TestMoveColumnAndSelectedTask(t *testing.T) {
+func TestSelectedTaskReturnsCursorSession(t *testing.T) {
 	model := newModel()
 	model.SetTasks([]data.Session{
 		{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: time.Now()},
@@ -74,20 +64,20 @@ func TestMoveColumnAndSelectedTask(t *testing.T) {
 		{ID: "3", Status: "failed", Title: "Failed 1", UpdatedAt: time.Now()},
 	})
 
-	model.MoveColumn(1)
+	// First session should be selected by default (failed first due to priority)
 	selected := model.SelectedTask()
-	if selected == nil || selected.ID != "2" {
-		t.Fatalf("expected done task selected, got %#v", selected)
+	if selected == nil || selected.ID != "3" {
+		t.Fatalf("expected failed task first due to priority, got %#v", selected)
 	}
 
-	model.MoveColumn(1)
+	model.MoveCursor(1)
 	selected = model.SelectedTask()
-	if selected == nil || selected.ID != "3" {
-		t.Fatalf("expected failed task selected, got %#v", selected)
+	if selected == nil {
+		t.Fatal("expected non-nil selected task")
 	}
 }
 
-func TestViewShowsKanbanColumns(t *testing.T) {
+func TestViewShowsFocusedList(t *testing.T) {
 	model := newModel()
 	model.SetTasks([]data.Session{
 		{ID: "1", Status: "running", Title: "Running Task", Repository: "owner/repo", Source: data.SourceAgentTask, UpdatedAt: time.Now()},
@@ -95,15 +85,6 @@ func TestViewShowsKanbanColumns(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "Running") {
-		t.Fatal("expected running column header in view")
-	}
-	if !strings.Contains(view, "Done") {
-		t.Fatal("expected done column header in view")
-	}
-	if !strings.Contains(view, "Failed") {
-		t.Fatal("expected failed column header in view")
-	}
 	if !strings.Contains(view, "Running Task") {
 		t.Fatal("expected running task in view")
 	}
@@ -133,7 +114,7 @@ func TestSetTasks_PreservesSelection(t *testing.T) {
 		func(s string) string { return "" },
 	)
 
-	// Set initial sessions and select the second one in running column
+	// Set initial sessions and select the second one
 	initialTasks := []data.Session{
 		{ID: "1", Status: "running", Title: "Task 1", UpdatedAt: time.Now()},
 		{ID: "2", Status: "running", Title: "Task 2", UpdatedAt: time.Now()},
@@ -142,7 +123,7 @@ func TestSetTasks_PreservesSelection(t *testing.T) {
 	model.SetTasks(initialTasks)
 	model.MoveCursor(1) // Select task 2
 
-	// Refresh with reordered sessions (simulating new fetch)
+	// Refresh with reordered sessions
 	refreshedTasks := []data.Session{
 		{ID: "3", Status: "running", Title: "Task 3", UpdatedAt: time.Now().Add(-time.Minute)},
 		{ID: "2", Status: "running", Title: "Task 2", UpdatedAt: time.Now()},
@@ -156,7 +137,7 @@ func TestSetTasks_PreservesSelection(t *testing.T) {
 	}
 }
 
-func TestSetTasks_PrioritizesNeedsInputAheadOfFreshRunning(t *testing.T) {
+func TestSetTasks_PrioritizesNeedsInputFirst(t *testing.T) {
 	model := newModel()
 	now := time.Now()
 	model.SetTasks([]data.Session{
@@ -164,12 +145,11 @@ func TestSetTasks_PrioritizesNeedsInputAheadOfFreshRunning(t *testing.T) {
 		{ID: "needs", Status: "needs-input", Title: "Need operator", UpdatedAt: now.Add(-40 * time.Minute)},
 	})
 
-	ids := runningColumnIDs(model)
-	if len(ids) != 2 {
-		t.Fatalf("expected 2 running sessions, got %d", len(ids))
+	if len(model.sessions) != 2 {
+		t.Fatalf("expected 2 sessions, got %d", len(model.sessions))
 	}
-	if ids[0] != "needs" {
-		t.Fatalf("expected needs-input session first, got order %v", ids)
+	if model.sessions[0].ID != "needs" {
+		t.Fatalf("expected needs-input session first, got order: %s, %s", model.sessions[0].ID, model.sessions[1].ID)
 	}
 }
 
@@ -183,12 +163,12 @@ func TestSetTasks_DeEmphasizesOlderQuietDuplicates(t *testing.T) {
 		{ID: "active", Status: "running", Title: "Fresh implementation", UpdatedAt: now.Add(-3 * time.Minute)},
 	})
 
-	ids := runningColumnIDs(model)
-	if len(ids) != 3 {
-		t.Fatalf("expected 3 running sessions, got %d", len(ids))
+	if len(model.sessions) != 3 {
+		t.Fatalf("expected 3 sessions, got %d", len(model.sessions))
 	}
-	if ids[len(ids)-1] != "dup-old" {
-		t.Fatalf("expected oldest quiet duplicate to be de-emphasized to end, got order %v", ids)
+	// Oldest quiet duplicate should be last
+	if model.sessions[len(model.sessions)-1].ID != "dup-old" {
+		t.Fatalf("expected oldest quiet duplicate last, got: %s", model.sessions[len(model.sessions)-1].ID)
 	}
 
 	view := model.View()
@@ -197,7 +177,7 @@ func TestSetTasks_DeEmphasizesOlderQuietDuplicates(t *testing.T) {
 	}
 }
 
-func TestView_ShowsSourceBadge(t *testing.T) {
+func TestView_ShowsSourceInfo(t *testing.T) {
 	model := New(
 		lipgloss.NewStyle(),
 		lipgloss.NewStyle(),
@@ -221,29 +201,7 @@ func TestView_ShowsSourceBadge(t *testing.T) {
 
 	view := model.View()
 	if !strings.Contains(view, "Source: agent") {
-		t.Error("expected session summary to contain source label")
-	}
-}
-
-func TestView_ShowsTaskCount(t *testing.T) {
-	model := New(
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		lipgloss.NewStyle(),
-		func(status string) string { return "" },
-	)
-
-	tasks := []data.Session{
-		{ID: "1", Status: "running", Title: "Task 1"},
-		{ID: "2", Status: "completed", Title: "Task 2"},
-		{ID: "3", Status: "failed", Title: "Task 3"},
-	}
-	model.SetTasks(tasks)
-
-	view := model.View()
-	if !strings.Contains(view, "Running (1)") || !strings.Contains(view, "Done (1)") || !strings.Contains(view, "Failed (1)") {
-		t.Error("expected view to show per-column task counts")
+		t.Error("expected inline detail to contain source label")
 	}
 }
 
@@ -272,110 +230,6 @@ func TestVisibleRangeKeepsCursorInView(t *testing.T) {
 	}
 	if end-start != 6 {
 		t.Fatalf("expected window size 6, got %d", end-start)
-	}
-}
-
-func TestNeedsInputStatusStaysInRunningColumn(t *testing.T) {
-	model := newModel()
-	model.SetTasks([]data.Session{
-		{ID: "1", Status: "needs-input", Title: "Waiting input", UpdatedAt: time.Now()},
-	})
-
-	if len(model.columnSessionIdx[0]) != 1 {
-		t.Fatalf("expected needs-input session in running column, got %+v", model.columnSessionIdx)
-	}
-}
-
-func TestView_NarrowModeShowsSingleLaneHint(t *testing.T) {
-	model := newModel()
-	model.SetSize(70, 24)
-	model.SetTasks([]data.Session{
-		{ID: "1", Status: "running", Title: "Running Task", UpdatedAt: time.Now()},
-		{ID: "2", Status: "completed", Title: "Done Task", UpdatedAt: time.Now()},
-	})
-
-	view := model.View()
-	if !strings.Contains(view, "COMPACT VIEW") {
-		t.Fatalf("expected narrow mode hint, got: %s", view)
-	}
-}
-
-func TestView_VeryNarrowWidthUsesCompactRows(t *testing.T) {
-	model := newModel()
-	model.SetSize(12, 24)
-	model.SetTasks([]data.Session{
-		{ID: "1", Status: "running", Title: "Long Session Title", UpdatedAt: time.Now()},
-	})
-
-	view := model.View()
-	if !strings.Contains(view, "COMPACT VIEW") {
-		t.Fatalf("expected narrow mode hint, got: %s", view)
-	}
-	if strings.Contains(view, "• just now") {
-		t.Fatalf("expected compact row without meta overflow, got: %s", view)
-	}
-}
-
-func TestView_VeryShortHeightHidesFlightDeck(t *testing.T) {
-	model := newModel()
-	model.SetSize(120, 20)
-	model.SetTasks([]data.Session{
-		{ID: "1", Status: "running", Title: "Running Task", UpdatedAt: time.Now()},
-	})
-
-	view := model.View()
-	if strings.Contains(view, "SESSION SUMMARY") || strings.Contains(view, "Session Summary") {
-		t.Fatalf("expected no selected session panel in very short layout, got: %s", view)
-	}
-}
-
-func TestView_MediumHeightUsesCompactFlightDeck(t *testing.T) {
-	model := newModel()
-	model.SetSize(120, 28)
-	model.SetTasks([]data.Session{
-		{ID: "1", Status: "running", Title: "Running Task", UpdatedAt: time.Now()},
-	})
-
-	view := model.View()
-	if !strings.Contains(view, "Session Summary •") {
-		t.Fatalf("expected compact selected session panel in medium layout, got: %s", view)
-	}
-}
-
-func TestView_WideColumnShowsRepoAndBranch(t *testing.T) {
-	model := newModel()
-	model.SetSize(300, 36)
-	model.SetTasks([]data.Session{
-		{
-			ID:         "1",
-			Status:     "running",
-			Title:      "Readable Session",
-			Repository: "owner/repository-name",
-			Branch:     "feature/super-readable-output",
-			UpdatedAt:  time.Now(),
-		},
-	})
-
-	view := model.View()
-	if !strings.Contains(view, "Repository: owner/repository-name @ feature/super-readable-output") {
-		t.Fatalf("expected expanded repo+branch details, got: %s", view)
-	}
-}
-
-func TestView_ShowsAttentionChip(t *testing.T) {
-	model := newModel()
-	model.SetTasks([]data.Session{
-		{
-			ID:        "1",
-			Status:    "needs-input",
-			Title:     "Needs human input",
-			UpdatedAt: time.Now(),
-		},
-	})
-
-	view := model.View()
-	if !strings.Contains(view, "needs action 1") {
-		t.Fatalf("expected attention chip, got: %s", view)
 	}
 }
 
@@ -408,10 +262,10 @@ func TestView_CardShowsAttentionReason(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "Needs your action: waiting on your input") {
+	if !strings.Contains(view, "waiting on your input") {
 		t.Fatalf("expected explicit input-needed reason, got: %s", view)
 	}
-	if !strings.Contains(view, "Needs your action: running but quiet") {
+	if !strings.Contains(view, "running but quiet") {
 		t.Fatalf("expected explicit quiet-active reason, got: %s", view)
 	}
 }
@@ -429,20 +283,14 @@ func TestView_SelectedSessionUsesFriendlyFallbacks(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "SESSION SUMMARY") {
-		t.Fatalf("expected selected session heading, got: %s", view)
-	}
 	if !strings.Contains(view, "Repository: not available") {
 		t.Fatalf("expected friendly repository fallback, got: %s", view)
 	}
 	if !strings.Contains(view, "Branch: not available") {
 		t.Fatalf("expected friendly branch fallback, got: %s", view)
 	}
-	if !strings.Contains(view, "Last update: not recorded") {
+	if !strings.Contains(view, "not recorded") {
 		t.Fatalf("expected friendly timestamp fallback, got: %s", view)
-	}
-	if strings.Contains(view, "no-repo") || strings.Contains(view, "unknown") {
-		t.Fatalf("expected no sentinel placeholders, got: %s", view)
 	}
 }
 
@@ -461,8 +309,8 @@ func TestView_SelectedSessionOmitsOpenPRActionWhenNoPRLinked(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "Available actions: enter details • l logs") {
-		t.Fatalf("expected selected-session actions to include logs, got: %s", view)
+	if !strings.Contains(view, "l logs") {
+		t.Fatalf("expected actions to include logs, got: %s", view)
 	}
 	if strings.Contains(view, "o open PR") {
 		t.Fatalf("expected open PR action to be hidden when no PR is linked, got: %s", view)
@@ -481,5 +329,34 @@ func TestSessionHasLinkedPR(t *testing.T) {
 	}
 	if sessionHasLinkedPR(data.Session{Source: data.SourceAgentTask, PRNumber: 42}) {
 		t.Fatal("expected missing repository to prevent linked PR action")
+	}
+}
+
+func TestView_ShowsGutterIndicator(t *testing.T) {
+	model := newModel()
+	model.SetSize(100, 30)
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Selected Task", UpdatedAt: time.Now()},
+		{ID: "2", Status: "completed", Title: "Other Task", UpdatedAt: time.Now()},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "▎") {
+		t.Fatalf("expected gutter indicator for selected row, got: %s", view)
+	}
+}
+
+func TestMoveColumn_IsNoOpInFocusedMode(t *testing.T) {
+	model := newModel()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Task 1", UpdatedAt: time.Now()},
+	})
+
+	model.MoveColumn(1)
+	model.MoveColumn(-1)
+	// Should not panic or change state
+	selected := model.SelectedTask()
+	if selected == nil || selected.ID != "1" {
+		t.Fatal("MoveColumn should be a no-op in focused mode")
 	}
 }

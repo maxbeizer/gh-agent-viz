@@ -4,8 +4,6 @@ import "github.com/charmbracelet/bubbles/key"
 
 // Keybindings holds all key bindings for the application
 type Keybindings struct {
-	MoveLeft       key.Binding
-	MoveRight      key.Binding
 	MoveUp         key.Binding
 	MoveDown       key.Binding
 	SelectTask     key.Binding
@@ -22,45 +20,37 @@ type Keybindings struct {
 // NewKeybindings creates the default key bindings for the TUI
 func NewKeybindings() Keybindings {
 	return Keybindings{
-		MoveLeft: key.NewBinding(
-			key.WithKeys("h", "left"),
-			key.WithHelp("h/←", "move column left"),
-		),
-		MoveRight: key.NewBinding(
-			key.WithKeys("right"),
-			key.WithHelp("→", "move column right"),
-		),
 		MoveUp: key.NewBinding(
 			key.WithKeys("k", "up"),
-			key.WithHelp("k/↑", "navigate up"),
+			key.WithHelp("k/↑", "up"),
 		),
 		MoveDown: key.NewBinding(
 			key.WithKeys("j", "down"),
-			key.WithHelp("j/↓", "navigate down"),
+			key.WithHelp("j/↓", "down"),
 		),
 		SelectTask: key.NewBinding(
 			key.WithKeys("enter"),
-			key.WithHelp("enter", "show task details"),
+			key.WithHelp("enter", "details"),
 		),
 		ShowLogs: key.NewBinding(
 			key.WithKeys("l"),
-			key.WithHelp("l", "show task logs"),
+			key.WithHelp("l", "logs"),
 		),
 		OpenInBrowser: key.NewBinding(
 			key.WithKeys("o"),
-			key.WithHelp("o", "open PR URL"),
+			key.WithHelp("o", "open PR"),
 		),
 		ResumeSession: key.NewBinding(
 			key.WithKeys("s"),
-			key.WithHelp("s", "resume session"),
+			key.WithHelp("s", "resume"),
 		),
 		RefreshData: key.NewBinding(
 			key.WithKeys("r"),
-			key.WithHelp("r", "refresh tasks"),
+			key.WithHelp("r", "refresh"),
 		),
 		FocusAttention: key.NewBinding(
 			key.WithKeys("a"),
-			key.WithHelp("a", "needs-action view"),
+			key.WithHelp("a", "action view"),
 		),
 		ExitApp: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),
@@ -68,11 +58,11 @@ func NewKeybindings() Keybindings {
 		),
 		ToggleFilter: key.NewBinding(
 			key.WithKeys("tab", "shift+tab"),
-			key.WithHelp("tab/shift+tab", "switch status filter"),
+			key.WithHelp("tab", "filter"),
 		),
 		NavigateBack: key.NewBinding(
 			key.WithKeys("esc"),
-			key.WithHelp("esc", "return to list"),
+			key.WithHelp("esc", "back"),
 		),
 	}
 }

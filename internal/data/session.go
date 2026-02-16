@@ -16,6 +16,14 @@ const (
 // AttentionStaleThreshold is the quiet-window threshold for active sessions.
 const AttentionStaleThreshold = 20 * time.Minute
 
+// SessionTelemetry holds derived usage metrics for a session
+type SessionTelemetry struct {
+	Duration          time.Duration // elapsed time from created to last activity
+	ConversationTurns int           // number of conversation exchanges
+	UserMessages      int           // messages from user
+	AssistantMessages int           // messages from assistant
+}
+
 // Session represents a unified model for both agent-task and local Copilot sessions
 type Session struct {
 	ID         string        `json:"id"`
@@ -28,6 +36,7 @@ type Session struct {
 	CreatedAt  time.Time     `json:"createdAt"`
 	UpdatedAt  time.Time     `json:"updatedAt"`
 	Source     SessionSource `json:"source"`
+	Telemetry  *SessionTelemetry `json:"telemetry,omitempty"`
 }
 
 // FromAgentTask converts an AgentTask to a Session

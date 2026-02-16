@@ -204,6 +204,9 @@ func convertLocalSessionToSession(workspace LocalSessionWorkspace) (Session, err
 		}
 	}
 
+	// Derive telemetry from workspace metadata
+	session.Telemetry = deriveSessionTelemetry(workspace, session.CreatedAt, session.UpdatedAt)
+
 	return session, nil
 }
 
@@ -307,6 +310,30 @@ func needsHumanInput(workspace LocalSessionWorkspace) bool {
 func isLocallyActiveStatus(status string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(status))
 	return normalized == "running" || normalized == "queued" || normalized == "needs-input"
+}
+
+// deriveSessionTelemetry computes usage metrics from workspace metadata
+func deriveSessionTelemetry(workspace LocalSessionWorkspace, createdAt, updatedAt time.Time) *SessionTelemetry {
+	telemetry := &SessionTelemetry{}
+
+	// Duration
+	if !createdAt.IsZero() && !updatedAt.IsZero() && updatedAt.After(createdAt) {
+		telemetry.Duration = updatedAt.Sub(createdAt)
+	}
+
+	// Conversation metrics
+	for _, entry := range workspace.ConversationHistory {
+		role, _ := entry["role"].(string)
+		switch strings.ToLower(strings.TrimSpace(role)) {
+		case "user":
+			telemetry.UserMessages++
+		case "assistant":
+			telemetry.AssistantMessages++
+		}
+	}
+	telemetry.ConversationTurns = telemetry.UserMessages + telemetry.AssistantMessages
+
+	return telemetry
 }
 
 // truncateTitle truncates a string to a reasonable title length

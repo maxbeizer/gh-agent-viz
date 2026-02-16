@@ -56,3 +56,73 @@ func TestView_ShowsRecordedTimestamps(t *testing.T) {
 		t.Fatalf("expected formatted updated timestamp, got: %s", view)
 	}
 }
+
+func TestView_ShowsTelemetry(t *testing.T) {
+	model := New(
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		func(string) string { return "•" },
+	)
+	model.SetTask(&data.Session{
+		ID:    "session-3",
+		Title: "Session With Telemetry",
+		Telemetry: &data.SessionTelemetry{
+			Duration:          2*time.Hour + 30*time.Minute,
+			ConversationTurns: 12,
+			UserMessages:      5,
+			AssistantMessages: 7,
+		},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "Usage") {
+		t.Fatalf("expected Usage section header, got: %s", view)
+	}
+	if !strings.Contains(view, "2h 30m") {
+		t.Fatalf("expected formatted duration, got: %s", view)
+	}
+	if !strings.Contains(view, "12 total") {
+		t.Fatalf("expected conversation turn count, got: %s", view)
+	}
+	if !strings.Contains(view, "5 user") {
+		t.Fatalf("expected user message count, got: %s", view)
+	}
+}
+
+func TestView_NoTelemetryShowsNothing(t *testing.T) {
+	model := New(
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		func(string) string { return "•" },
+	)
+	model.SetTask(&data.Session{
+		ID:    "session-4",
+		Title: "No Telemetry",
+	})
+
+	view := model.View()
+	if strings.Contains(view, "Usage") {
+		t.Fatalf("expected no Usage section without telemetry, got: %s", view)
+	}
+}
+
+func TestFormatDuration(t *testing.T) {
+	tests := []struct {
+		d    time.Duration
+		want string
+	}{
+		{30 * time.Second, "30s"},
+		{5 * time.Minute, "5m"},
+		{90 * time.Minute, "1h 30m"},
+		{2 * time.Hour, "2h"},
+		{25 * time.Hour, "1d 1h"},
+		{48 * time.Hour, "2d"},
+	}
+
+	for _, tt := range tests {
+		got := formatDuration(tt.d)
+		if got != tt.want {
+			t.Errorf("formatDuration(%v) = %q, want %q", tt.d, got, tt.want)
+		}
+	}
+}

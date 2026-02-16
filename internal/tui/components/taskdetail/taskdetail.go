@@ -55,6 +55,24 @@ func (m Model) View() string {
 		fmt.Sprintf("Session ID: %s", m.session.ID),
 	)
 
+	// Show telemetry if available
+	if m.session.Telemetry != nil {
+		t := m.session.Telemetry
+		details = append(details, "", m.titleStyle.Render("Usage"))
+		if t.Duration > 0 {
+			details = append(details, fmt.Sprintf("Duration:   %s", formatDuration(t.Duration)))
+		}
+		if t.ConversationTurns > 0 {
+			details = append(details,
+				fmt.Sprintf("Messages:   %d total (%d user, %d assistant)",
+					t.ConversationTurns, t.UserMessages, t.AssistantMessages),
+			)
+		}
+		if t.ConversationTurns == 0 && t.Duration == 0 {
+			details = append(details, "No usage data available for this session")
+		}
+	}
+
 	return m.borderStyle.Render(joinVertical(details))
 }
 
@@ -88,4 +106,27 @@ func detailTimestamp(ts time.Time) string {
 
 func detailTitle(title string) string {
 	return detailValue(title, "Untitled Session")
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	if hours >= 24 {
+		days := hours / 24
+		hours = hours % 24
+		if hours > 0 {
+			return fmt.Sprintf("%dd %dh", days, hours)
+		}
+		return fmt.Sprintf("%dd", days)
+	}
+	if minutes > 0 {
+		return fmt.Sprintf("%dh %dm", hours, minutes)
+	}
+	return fmt.Sprintf("%dh", hours)
 }

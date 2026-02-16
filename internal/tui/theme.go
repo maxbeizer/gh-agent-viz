@@ -4,6 +4,7 @@ import "github.com/charmbracelet/lipgloss"
 
 // Theme contains all Lip Gloss styles for the UI
 type Theme struct {
+	name             string
 	StatusRunning    lipgloss.Style
 	StatusQueued     lipgloss.Style
 	StatusCompleted  lipgloss.Style
@@ -25,13 +26,41 @@ type Theme struct {
 	SectionHeader lipgloss.Style
 }
 
-// NewTheme creates a default theme
+// ThemeName returns the name of the active theme.
+func (t *Theme) ThemeName() string {
+	return t.name
+}
+
+// NewTheme creates the default theme using ANSI color numbers.
 func NewTheme() *Theme {
+	return newDefaultTheme()
+}
+
+// NewThemeFromConfig returns the theme matching themeName, or the adaptive
+// default when the name is empty or unrecognised.
+func NewThemeFromConfig(themeName string) *Theme {
+	switch themeName {
+	case "catppuccin-mocha":
+		return newCatppuccinMochaTheme()
+	case "dracula":
+		return newDraculaTheme()
+	case "tokyo-night":
+		return newTokyoNightTheme()
+	case "default":
+		return newDefaultTheme()
+	default:
+		return newAdaptiveDefaultTheme()
+	}
+}
+
+// newDefaultTheme builds the original hardcoded ANSI theme.
+func newDefaultTheme() *Theme {
 	return &Theme{
-		StatusRunning:   lipgloss.NewStyle().Foreground(lipgloss.Color("42")),  // Green
-		StatusQueued:    lipgloss.NewStyle().Foreground(lipgloss.Color("226")), // Yellow
-		StatusCompleted: lipgloss.NewStyle().Foreground(lipgloss.Color("46")),  // Bright green
-		StatusFailed:    lipgloss.NewStyle().Foreground(lipgloss.Color("196")), // Red
+		name:            "default",
+		StatusRunning:   lipgloss.NewStyle().Foreground(lipgloss.Color("42")),
+		StatusQueued:    lipgloss.NewStyle().Foreground(lipgloss.Color("226")),
+		StatusCompleted: lipgloss.NewStyle().Foreground(lipgloss.Color("46")),
+		StatusFailed:    lipgloss.NewStyle().Foreground(lipgloss.Color("196")),
 		TableHeader: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("99")).
@@ -53,32 +82,246 @@ func NewTheme() *Theme {
 		Footer: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
 			Padding(0, 1),
-		// Active tab: bold with magenta accent background
 		TabActive: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("15")).
 			Background(lipgloss.Color("99")).
 			Padding(0, 2),
-		// Inactive tab: subdued
 		TabInactive: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("245")).
 			Padding(0, 2),
-		// Count badge inside tabs
 		TabCount: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")),
-		// Focus area border
 		FocusBorder: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("63")),
-		// Left gutter indicator for selected row
 		RowGutter: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("238")),
 		RowGutterSel: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("99")).
 			Bold(true),
-		// Section headers within the focus area
 		SectionHeader: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("63")).
+			Bold(true).
+			Padding(0, 1),
+	}
+}
+
+// newAdaptiveDefaultTheme uses lipgloss.AdaptiveColor so the palette
+// automatically adjusts to light and dark terminals.
+func newAdaptiveDefaultTheme() *Theme {
+	return &Theme{
+		name:            "default",
+		StatusRunning:   lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "42"}),
+		StatusQueued:    lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "178", Dark: "226"}),
+		StatusCompleted: lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "34", Dark: "46"}),
+		StatusFailed:    lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "160", Dark: "196"}),
+		TableHeader: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.AdaptiveColor{Light: "55", Dark: "99"}).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderBottom(true),
+		TableRow: lipgloss.NewStyle().
+			Padding(0, 1),
+		TableRowSelected: lipgloss.NewStyle().
+			Padding(0, 1).
+			Background(lipgloss.AdaptiveColor{Light: "254", Dark: "237"}).
+			Foreground(lipgloss.AdaptiveColor{Light: "0", Dark: "15"}),
+		Border: lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.AdaptiveColor{Light: "249", Dark: "238"}),
+		Title: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.AdaptiveColor{Light: "55", Dark: "99"}).
+			Padding(0, 1),
+		Footer: lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "241"}).
+			Padding(0, 1),
+		TabActive: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.AdaptiveColor{Light: "15", Dark: "15"}).
+			Background(lipgloss.AdaptiveColor{Light: "55", Dark: "99"}).
+			Padding(0, 2),
+		TabInactive: lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "242", Dark: "245"}).
+			Padding(0, 2),
+		TabCount: lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "241"}),
+		FocusBorder: lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.AdaptiveColor{Light: "27", Dark: "63"}),
+		RowGutter: lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "249", Dark: "238"}),
+		RowGutterSel: lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "55", Dark: "99"}).
+			Bold(true),
+		SectionHeader: lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "27", Dark: "63"}).
+			Bold(true).
+			Padding(0, 1),
+	}
+}
+
+// newCatppuccinMochaTheme returns a theme using the Catppuccin Mocha palette.
+func newCatppuccinMochaTheme() *Theme {
+	return &Theme{
+		name:            "catppuccin-mocha",
+		StatusRunning:   lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")),
+		StatusQueued:    lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")),
+		StatusCompleted: lipgloss.NewStyle().Foreground(lipgloss.Color("#94e2d5")),
+		StatusFailed:    lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")),
+		TableHeader: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#cba6f7")).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderBottom(true),
+		TableRow: lipgloss.NewStyle().
+			Padding(0, 1).
+			Foreground(lipgloss.Color("#cdd6f4")),
+		TableRowSelected: lipgloss.NewStyle().
+			Padding(0, 1).
+			Background(lipgloss.Color("#313244")).
+			Foreground(lipgloss.Color("#cdd6f4")),
+		Border: lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#313244")),
+		Title: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#cba6f7")).
+			Padding(0, 1),
+		Footer: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#a6adc8")).
+			Padding(0, 1),
+		TabActive: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#1e1e2e")).
+			Background(lipgloss.Color("#cba6f7")).
+			Padding(0, 2),
+		TabInactive: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#a6adc8")).
+			Padding(0, 2),
+		TabCount: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#a6adc8")),
+		FocusBorder: lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#89b4fa")),
+		RowGutter: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#313244")),
+		RowGutterSel: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#cba6f7")).
+			Bold(true),
+		SectionHeader: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#89b4fa")).
+			Bold(true).
+			Padding(0, 1),
+	}
+}
+
+// newDraculaTheme returns a theme using the Dracula palette.
+func newDraculaTheme() *Theme {
+	return &Theme{
+		name:            "dracula",
+		StatusRunning:   lipgloss.NewStyle().Foreground(lipgloss.Color("#50fa7b")),
+		StatusQueued:    lipgloss.NewStyle().Foreground(lipgloss.Color("#f1fa8c")),
+		StatusCompleted: lipgloss.NewStyle().Foreground(lipgloss.Color("#8be9fd")),
+		StatusFailed:    lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5555")),
+		TableHeader: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#bd93f9")).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderBottom(true),
+		TableRow: lipgloss.NewStyle().
+			Padding(0, 1).
+			Foreground(lipgloss.Color("#f8f8f2")),
+		TableRowSelected: lipgloss.NewStyle().
+			Padding(0, 1).
+			Background(lipgloss.Color("#44475a")).
+			Foreground(lipgloss.Color("#f8f8f2")),
+		Border: lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#44475a")),
+		Title: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#bd93f9")).
+			Padding(0, 1),
+		Footer: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6272a4")).
+			Padding(0, 1),
+		TabActive: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#282a36")).
+			Background(lipgloss.Color("#bd93f9")).
+			Padding(0, 2),
+		TabInactive: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6272a4")).
+			Padding(0, 2),
+		TabCount: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6272a4")),
+		FocusBorder: lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#8be9fd")),
+		RowGutter: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#44475a")),
+		RowGutterSel: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#bd93f9")).
+			Bold(true),
+		SectionHeader: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#8be9fd")).
+			Bold(true).
+			Padding(0, 1),
+	}
+}
+
+// newTokyoNightTheme returns a theme using the Tokyo Night palette.
+func newTokyoNightTheme() *Theme {
+	return &Theme{
+		name:            "tokyo-night",
+		StatusRunning:   lipgloss.NewStyle().Foreground(lipgloss.Color("#9ece6a")),
+		StatusQueued:    lipgloss.NewStyle().Foreground(lipgloss.Color("#e0af68")),
+		StatusCompleted: lipgloss.NewStyle().Foreground(lipgloss.Color("#7dcfff")),
+		StatusFailed:    lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e")),
+		TableHeader: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#bb9af7")).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderBottom(true),
+		TableRow: lipgloss.NewStyle().
+			Padding(0, 1).
+			Foreground(lipgloss.Color("#c0caf5")),
+		TableRowSelected: lipgloss.NewStyle().
+			Padding(0, 1).
+			Background(lipgloss.Color("#33467c")).
+			Foreground(lipgloss.Color("#c0caf5")),
+		Border: lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#33467c")),
+		Title: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#bb9af7")).
+			Padding(0, 1),
+		Footer: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#565f89")).
+			Padding(0, 1),
+		TabActive: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#1a1b26")).
+			Background(lipgloss.Color("#bb9af7")).
+			Padding(0, 2),
+		TabInactive: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#565f89")).
+			Padding(0, 2),
+		TabCount: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#565f89")),
+		FocusBorder: lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#7aa2f7")),
+		RowGutter: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#33467c")),
+		RowGutterSel: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#bb9af7")).
+			Bold(true),
+		SectionHeader: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#7aa2f7")).
 			Bold(true).
 			Padding(0, 1),
 	}

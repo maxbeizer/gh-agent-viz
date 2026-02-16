@@ -14,3 +14,7 @@ defaultFilter: all
 
 # Show ASCII art banner in header (default: true)
 asciiHeader: true
+
+# Color theme: default, catppuccin-mocha, dracula, tokyo-night
+# When omitted, auto-detects light/dark terminal background.
+# theme: catppuccin-mocha

@@ -99,7 +99,7 @@ func NewModel(repo string, debug bool) Model {
 		taskDetail:  taskdetail.New(theme.Title, theme.Border, StatusIcon),
 		logView:     logview.New(theme.Title, 80, 20),
 		viewMode:    ViewModeList,
-		showPreview: true,
+		showPreview: false,
 		ready:       false,
 		repo:        repo,
 		refreshInt:  time.Duration(refreshSeconds) * time.Second,
@@ -377,6 +377,7 @@ func (m *Model) cycleFilter(delta int) {
 				next += len(filters)
 			}
 			m.ctx.StatusFilter = filters[next]
+			m.showPreview = false
 			break
 		}
 	}

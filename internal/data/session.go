@@ -37,6 +37,7 @@ type Session struct {
 	UpdatedAt  time.Time     `json:"updatedAt"`
 	Source     SessionSource `json:"source"`
 	Telemetry  *SessionTelemetry `json:"telemetry,omitempty"`
+	HasLog     bool              `json:"-"` // true when a viewable log exists (e.g. events.jsonl)
 }
 
 // FromAgentTask converts an AgentTask to a Session

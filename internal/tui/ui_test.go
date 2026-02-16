@@ -259,7 +259,7 @@ func TestHandleListKeys_ACyclesForward(t *testing.T) {
 	}
 }
 
-func TestHandleListKeys_LocalSessionLogShowsHelpfulError(t *testing.T) {
+func TestHandleListKeys_LocalSessionLogSwitchesToLogView(t *testing.T) {
 	m := NewModel("", false)
 	m.taskList.SetTasks([]data.Session{
 		{
@@ -272,16 +272,13 @@ func TestHandleListKeys_LocalSessionLogShowsHelpfulError(t *testing.T) {
 	})
 
 	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
-	if cmd != nil {
-		t.Fatal("expected no log fetch command for local session")
+	if cmd == nil {
+		t.Fatal("expected log fetch command for local session")
 	}
 
 	updatedModel := updated.(Model)
-	if updatedModel.viewMode != ViewModeList {
-		t.Fatalf("expected list view to remain active, got %v", updatedModel.viewMode)
-	}
-	if updatedModel.ctx.Error == nil {
-		t.Fatal("expected helpful error for local session logs")
+	if updatedModel.viewMode != ViewModeLog {
+		t.Fatalf("expected log view, got %v", updatedModel.viewMode)
 	}
 }
 

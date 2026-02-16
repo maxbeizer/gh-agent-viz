@@ -1,6 +1,8 @@
 package data
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -61,6 +63,12 @@ func FetchLocalSessions() ([]Session, error) {
 		if err != nil {
 			// Tolerant parsing - log error but continue
 			continue
+		}
+
+		// Check for events.jsonl to mark log availability
+		eventsFile := filepath.Join(sessionDir, entry.Name(), "events.jsonl")
+		if info, err := os.Stat(eventsFile); err == nil && info.Size() > 0 {
+			session.HasLog = true
 		}
 
 		sessions = append(sessions, session)
@@ -344,6 +352,116 @@ func truncateTitle(s string) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// FetchLocalSessionLog reads events.jsonl for a local session and formats it
+// as a human-readable conversation log.
+func FetchLocalSessionLog(sessionID string) (string, error) {
+	if sessionID == "" {
+		return "", fmt.Errorf("session ID is required")
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	eventsFile := filepath.Join(homeDir, ".copilot", "session-state", sessionID, "events.jsonl")
+	f, err := os.Open(eventsFile)
+	if err != nil {
+		return "", fmt.Errorf("no event log found for this session")
+	}
+	defer f.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(f)
+	// Allow large lines (some tool results can be big)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		var event struct {
+			Type      string          `json:"type"`
+			Timestamp string          `json:"timestamp"`
+			Data      json.RawMessage `json:"data"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
+			continue
+		}
+
+		line := formatEventLine(event.Type, event.Timestamp, event.Data)
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+
+	if len(lines) == 0 {
+		return "No conversation events recorded for this session.", nil
+	}
+
+	header := "# Session Event Log\n\n"
+	return header + strings.Join(lines, "\n"), nil
+}
+
+// formatEventLine renders a single event as a readable log line.
+func formatEventLine(eventType, timestamp string, rawData json.RawMessage) string {
+	ts := formatEventTimestamp(timestamp)
+
+	switch eventType {
+	case "session.start":
+		return fmt.Sprintf("**%s** — 🚀 Session started\n", ts)
+
+	case "user.message":
+		var data struct {
+			Content string `json:"content"`
+		}
+		if json.Unmarshal(rawData, &data) == nil && data.Content != "" {
+			content := truncateLogContent(data.Content, 500)
+			return fmt.Sprintf("**%s** — 👤 **User**\n\n%s\n", ts, content)
+		}
+
+	case "assistant.message":
+		var data struct {
+			Content string `json:"content"`
+		}
+		if json.Unmarshal(rawData, &data) == nil && data.Content != "" {
+			content := truncateLogContent(data.Content, 500)
+			return fmt.Sprintf("**%s** — 🤖 **Assistant**\n\n%s\n", ts, content)
+		}
+
+	case "tool.execution_start":
+		var data struct {
+			ToolName string `json:"toolName"`
+		}
+		if json.Unmarshal(rawData, &data) == nil && data.ToolName != "" {
+			return fmt.Sprintf("`%s` 🔧 %s", ts, data.ToolName)
+		}
+
+	case "abort":
+		return fmt.Sprintf("**%s** — ⛔ Aborted\n", ts)
+
+	case "assistant.turn_start":
+		return fmt.Sprintf("---\n**%s** — _Turn started_", ts)
+	}
+
+	return ""
+}
+
+func formatEventTimestamp(ts string) string {
+	t, err := time.Parse(time.RFC3339Nano, ts)
+	if err != nil {
+		t, err = time.Parse(time.RFC3339, ts)
+		if err != nil {
+			return ts
+		}
+	}
+	return t.Format("15:04:05")
+}
+
+func truncateLogContent(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "\n\n_(truncated)_"
 }
 
 // FetchAllSessions fetches both agent-task and local Copilot sessions

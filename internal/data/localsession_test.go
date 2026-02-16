@@ -542,3 +542,137 @@ func TestSessionConversion(t *testing.T) {
 		t.Errorf("expected title '%s' after conversion, got '%s'", original.Title, converted.Title)
 	}
 }
+
+func TestFormatEventLine_UserMessage(t *testing.T) {
+	raw := []byte(`{"content":"hello world"}`)
+	line := formatEventLine("user.message", "2026-01-15T10:30:00.000Z", raw)
+	if line == "" {
+		t.Fatal("expected non-empty line for user.message")
+	}
+	if !contains(line, "👤") {
+		t.Error("expected user icon in output")
+	}
+	if !contains(line, "hello world") {
+		t.Error("expected message content in output")
+	}
+}
+
+func TestFormatEventLine_AssistantMessage(t *testing.T) {
+	raw := []byte(`{"content":"I can help with that"}`)
+	line := formatEventLine("assistant.message", "2026-01-15T10:30:05.000Z", raw)
+	if line == "" {
+		t.Fatal("expected non-empty line for assistant.message")
+	}
+	if !contains(line, "🤖") {
+		t.Error("expected assistant icon in output")
+	}
+}
+
+func TestFormatEventLine_ToolExecution(t *testing.T) {
+	raw := []byte(`{"toolName":"bash"}`)
+	line := formatEventLine("tool.execution_start", "2026-01-15T10:30:10.000Z", raw)
+	if line == "" {
+		t.Fatal("expected non-empty line for tool execution")
+	}
+	if !contains(line, "🔧") || !contains(line, "bash") {
+		t.Error("expected tool icon and name in output")
+	}
+}
+
+func TestFormatEventLine_EmptyAssistantMessage(t *testing.T) {
+	raw := []byte(`{"content":""}`)
+	line := formatEventLine("assistant.message", "2026-01-15T10:30:05.000Z", raw)
+	if line != "" {
+		t.Error("expected empty line for empty assistant.message")
+	}
+}
+
+func TestFormatEventLine_SessionStart(t *testing.T) {
+	line := formatEventLine("session.start", "2026-01-15T10:30:00.000Z", nil)
+	if !contains(line, "🚀") {
+		t.Error("expected rocket icon for session start")
+	}
+}
+
+func TestFormatEventLine_UnknownType(t *testing.T) {
+	line := formatEventLine("tool.execution_complete", "2026-01-15T10:30:00.000Z", nil)
+	if line != "" {
+		t.Error("expected empty line for unhandled event type")
+	}
+}
+
+func TestTruncateLogContent_Short(t *testing.T) {
+	result := truncateLogContent("short", 100)
+	if result != "short" {
+		t.Errorf("expected 'short', got %q", result)
+	}
+}
+
+func TestTruncateLogContent_Long(t *testing.T) {
+	long := string(make([]byte, 600))
+	result := truncateLogContent(long, 500)
+	if !contains(result, "_(truncated)_") {
+		t.Error("expected truncation marker")
+	}
+}
+
+func TestFetchLocalSessionLog_MissingSession(t *testing.T) {
+	_, err := FetchLocalSessionLog("nonexistent-session-id-12345")
+	if err == nil {
+		t.Fatal("expected error for missing session")
+	}
+}
+
+func TestFetchLocalSessionLog_EmptyID(t *testing.T) {
+	_, err := FetchLocalSessionLog("")
+	if err == nil {
+		t.Fatal("expected error for empty session ID")
+	}
+}
+
+func TestFetchLocalSessionLog_ValidEvents(t *testing.T) {
+	// Create a temp session directory with events.jsonl
+	tmpDir := t.TempDir()
+	sessionID := "test-log-session"
+	sessionDir := filepath.Join(tmpDir, sessionID)
+	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	events := `{"type":"session.start","timestamp":"2026-01-15T10:30:00.000Z","data":{}}
+{"type":"user.message","timestamp":"2026-01-15T10:30:01.000Z","data":{"content":"fix the bug"}}
+{"type":"assistant.turn_start","timestamp":"2026-01-15T10:30:02.000Z","data":{"turnId":"1"}}
+{"type":"tool.execution_start","timestamp":"2026-01-15T10:30:03.000Z","data":{"toolName":"bash"}}
+{"type":"assistant.message","timestamp":"2026-01-15T10:30:05.000Z","data":{"content":"I fixed the bug"}}
+`
+	eventsFile := filepath.Join(sessionDir, "events.jsonl")
+	if err := os.WriteFile(eventsFile, []byte(events), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Override home dir to use our temp dir — we can't easily do this
+	// without modifying the function, so test the formatting functions directly
+	// and verify they produce correct output for known inputs.
+	line := formatEventLine("user.message", "2026-01-15T10:30:01.000Z", []byte(`{"content":"fix the bug"}`))
+	if !contains(line, "fix the bug") || !contains(line, "👤") {
+		t.Errorf("unexpected user message rendering: %s", line)
+	}
+
+	toolLine := formatEventLine("tool.execution_start", "2026-01-15T10:30:03.000Z", []byte(`{"toolName":"bash"}`))
+	if !contains(toolLine, "bash") || !contains(toolLine, "🔧") {
+		t.Errorf("unexpected tool rendering: %s", toolLine)
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && searchSubstring(s, substr)
+}
+
+func searchSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}

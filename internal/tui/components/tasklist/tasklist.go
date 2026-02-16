@@ -227,7 +227,21 @@ func (m *Model) SetTasks(sessions []data.Session) {
 		if ranked[i].sortPriority != ranked[j].sortPriority {
 			return ranked[i].sortPriority < ranked[j].sortPriority
 		}
-		return ranked[i].session.UpdatedAt.After(ranked[j].session.UpdatedAt)
+		ti := ranked[i].session.UpdatedAt
+		tj := ranked[j].session.UpdatedAt
+		// Both have timestamps: most recent first
+		if !ti.IsZero() && !tj.IsZero() {
+			return ti.After(tj)
+		}
+		// One has timestamp, one doesn't: timestamped first
+		if !ti.IsZero() {
+			return true
+		}
+		if !tj.IsZero() {
+			return false
+		}
+		// Neither has timestamps: preserve original order (stable sort)
+		return false
 	})
 
 	m.sessions = make([]data.Session, len(ranked))

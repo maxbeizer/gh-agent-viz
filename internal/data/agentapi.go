@@ -94,7 +94,7 @@ func FetchAgentTasks(repo string) ([]AgentTask, error) {
 
 		id := strings.TrimPrefix(strings.TrimSpace(fields[1]), "#")
 		prNumber, _ := strconv.Atoi(id)
-		updatedAt, _ := time.Parse(time.RFC3339, strings.TrimSpace(fields[4]))
+		updatedAt := parseAgentTaskTime(strings.TrimSpace(fields[4]))
 
 		tasks = append(tasks, AgentTask{
 			ID:         id,
@@ -246,4 +246,64 @@ func logDebugEntry(args []string, output []byte, cmdErr error) {
 		status,
 		strings.TrimSpace(string(output)),
 	)
+}
+
+// parseAgentTaskTime tries multiple time formats for agent-task CLI output
+func parseAgentTaskTime(value string) time.Time {
+	if value == "" {
+		return time.Time{}
+	}
+	formats := []string{
+		time.RFC3339,
+		time.RFC3339Nano,
+		"2006-01-02T15:04:05Z",
+		"2006-01-02 15:04:05 -0700 MST",
+		"2006-01-02 15:04:05",
+		"Jan 2, 2006",
+		"about 1 hour ago",
+	}
+	for _, layout := range formats {
+		if t, err := time.Parse(layout, value); err == nil {
+			return t
+		}
+	}
+	// Handle relative times like "about 2 hours ago", "3 days ago"
+	value = strings.ToLower(strings.TrimSpace(value))
+	if strings.Contains(value, "ago") {
+		return parseRelativeTime(value)
+	}
+	return time.Time{}
+}
+
+func parseRelativeTime(value string) time.Time {
+	now := time.Now()
+	value = strings.TrimSuffix(strings.TrimSpace(value), " ago")
+	value = strings.TrimPrefix(value, "about ")
+
+	parts := strings.Fields(value)
+	if len(parts) < 2 {
+		return time.Time{}
+	}
+
+	n := 1
+	if _, err := fmt.Sscanf(parts[0], "%d", &n); err != nil {
+		n = 1
+	}
+
+	unit := strings.TrimSuffix(parts[1], "s")
+	switch unit {
+	case "second":
+		return now.Add(-time.Duration(n) * time.Second)
+	case "minute":
+		return now.Add(-time.Duration(n) * time.Minute)
+	case "hour":
+		return now.Add(-time.Duration(n) * time.Hour)
+	case "day":
+		return now.Add(-time.Duration(n) * 24 * time.Hour)
+	case "week":
+		return now.Add(-time.Duration(n) * 7 * 24 * time.Hour)
+	case "month":
+		return now.Add(-time.Duration(n) * 30 * 24 * time.Hour)
+	}
+	return time.Time{}
 }

@@ -1,6 +1,7 @@
 package tasklist
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -250,7 +251,7 @@ func TestTruncate_HandlesUnicodeSafely(t *testing.T) {
 	}
 }
 
-func TestView_CardShowsAttentionReason(t *testing.T) {
+func TestView_CardShowsAttentionBadges(t *testing.T) {
 	model := newModel()
 	model.SetSize(140, 36)
 	model.SetTasks([]data.Session{
@@ -269,11 +270,11 @@ func TestView_CardShowsAttentionReason(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "waiting on your input") {
-		t.Fatalf("expected explicit input-needed reason, got: %s", view)
+	if !strings.Contains(view, "🧑 waiting on you") {
+		t.Fatalf("expected needs-input badge, got: %s", view)
 	}
-	if !strings.Contains(view, "running but quiet") {
-		t.Fatalf("expected explicit quiet-active reason, got: %s", view)
+	if !strings.Contains(view, "💤 ~30m") {
+		t.Fatalf("expected idle badge, got: %s", view)
 	}
 }
 
@@ -443,7 +444,7 @@ func TestSessionBadge_IdleShowsDuration(t *testing.T) {
 		UpdatedAt: time.Now().Add(-30 * time.Minute),
 	}
 	badge := sessionBadge(session, false, 0)
-	if !strings.HasPrefix(badge, "⏸ idle ~") {
+	if !strings.HasPrefix(badge, "💤 ~") {
 		t.Fatalf("expected idle badge with duration, got %q", badge)
 	}
 	if strings.Contains(badge, "check progress") {
@@ -584,10 +585,10 @@ func TestViewGroupedByRepository(t *testing.T) {
 	})
 	model.CycleGroupBy()
 	view := model.View()
-	if !strings.Contains(view, "repository: owner/repo-a") {
+	if !strings.Contains(view, "owner/repo-a") {
 		t.Fatalf("expected header for repo-a, got: %s", view)
 	}
-	if !strings.Contains(view, "repository: owner/repo-b") {
+	if !strings.Contains(view, "owner/repo-b") {
 		t.Fatalf("expected header for repo-b, got: %s", view)
 	}
 }
@@ -618,7 +619,7 @@ func TestViewGroupedByStatus(t *testing.T) {
 	model.CycleGroupBy()
 	model.CycleGroupBy()
 	view := model.View()
-	if !strings.Contains(view, "status: running") {
+	if !strings.Contains(view, "running") {
 		t.Fatalf("expected running header, got: %s", view)
 	}
 }
@@ -630,7 +631,116 @@ func TestViewNoGroupShowsNoHeaders(t *testing.T) {
 		{ID: "1", Status: "running", Title: "Task A", Repository: "owner/repo", UpdatedAt: time.Now()},
 	})
 	view := model.View()
-	if strings.Contains(view, "repository:") || strings.Contains(view, "status:") {
+	if strings.Contains(view, "──") {
 		t.Fatalf("expected no headers in None mode, got: %s", view)
+	}
+}
+
+func TestSessionTitle_UUIDReplaced(t *testing.T) {
+	got := sessionTitle(data.Session{Title: "Session 7967abbc-163d-4975-9803-8d340b6eb590"})
+	if got != "Untitled session" {
+		t.Fatalf("expected UUID title replaced, got %q", got)
+	}
+}
+
+func TestSessionTitle_NormalPreserved(t *testing.T) {
+	got := sessionTitle(data.Session{Title: "Switch To Main And Pull"})
+	if got != "Switch To Main And Pull" {
+		t.Fatalf("expected normal title preserved, got %q", got)
+	}
+}
+
+func TestSessionTitle_EmptyBecomesUntitled(t *testing.T) {
+	got := sessionTitle(data.Session{Title: ""})
+	if got != "Untitled session" {
+		t.Fatalf("expected empty title to become untitled, got %q", got)
+	}
+}
+
+func TestAutoGroupAtThreshold(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 60)
+	now := time.Now()
+	sessions := make([]data.Session, 0, 10)
+	for i := 0; i < 10; i++ {
+		sessions = append(sessions, data.Session{
+			ID:         fmt.Sprintf("%d", i),
+			Status:     "running",
+			Title:      fmt.Sprintf("Task %d", i),
+			Repository: fmt.Sprintf("owner/repo-%d", i%3),
+			UpdatedAt:  now.Add(-time.Duration(i) * time.Minute),
+		})
+	}
+	model.SetTasks(sessions)
+
+	view := model.View()
+	if !strings.Contains(view, "▸") && !strings.Contains(view, "▾") {
+		t.Fatalf("expected auto-grouped headers with 10 sessions, got: %s", view)
+	}
+}
+
+func TestAutoGroupDisabledByManualToggle(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 60)
+	now := time.Now()
+	sessions := make([]data.Session, 0, 10)
+	for i := 0; i < 10; i++ {
+		sessions = append(sessions, data.Session{
+			ID:         fmt.Sprintf("%d", i),
+			Status:     "running",
+			Title:      fmt.Sprintf("Task %d", i),
+			Repository: fmt.Sprintf("owner/repo-%d", i%3),
+			UpdatedAt:  now.Add(-time.Duration(i) * time.Minute),
+		})
+	}
+	model.SetTasks(sessions)
+
+	// Manually cycle to "" (none) — auto-group should not override
+	model.CycleGroupBy() // → repository
+	model.CycleGroupBy() // → status
+	model.CycleGroupBy() // → source
+	model.CycleGroupBy() // → "" (none)
+
+	view := model.View()
+	if strings.Contains(view, "▸") || strings.Contains(view, "▾") {
+		t.Fatalf("manual toggle to none should disable auto-group, got: %s", view)
+	}
+}
+
+func TestToggleGroupExpand(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 40)
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Task A", Repository: "owner/repo-a", UpdatedAt: now},
+		{ID: "2", Status: "running", Title: "Task B", Repository: "owner/repo-b", UpdatedAt: now.Add(-time.Hour)},
+		{ID: "3", Status: "running", Title: "Task C", Repository: "owner/repo-b", UpdatedAt: now.Add(-2 * time.Hour)},
+	})
+	model.CycleGroupBy() // → repository
+
+	// All groups start collapsed; cursor highlights first group header
+	view := model.View()
+	if !strings.Contains(view, "▎▸ owner/repo-a") {
+		t.Fatalf("expected cursor on collapsed repo-a header, got: %s", view)
+	}
+	if strings.Contains(view, "Task A") {
+		t.Fatalf("expected Task A hidden when collapsed, got: %s", view)
+	}
+
+	// Press space to expand cursor's group
+	model.ToggleGroupExpand()
+	view = model.View()
+	if !strings.Contains(view, "▾ owner/repo-a") {
+		t.Fatalf("expected repo-a expanded after toggle, got: %s", view)
+	}
+	if !strings.Contains(view, "Task A") {
+		t.Fatalf("expected Task A visible after expand, got: %s", view)
+	}
+
+	// Press space again to collapse
+	model.ToggleGroupExpand()
+	view = model.View()
+	if strings.Contains(view, "▾ owner/repo-a") {
+		t.Fatalf("expected repo-a collapsed after second toggle, got: %s", view)
 	}
 }

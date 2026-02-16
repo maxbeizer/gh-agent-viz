@@ -14,6 +14,9 @@ import (
 // groupByModes defines the cycle order for group-by modes.
 var groupByModes = []string{"", "repository", "status", "source"}
 
+// autoGroupThreshold is the session count at which auto-grouping by repo kicks in.
+const autoGroupThreshold = 8
+
 // Model represents the task list component state
 type Model struct {
 	titleStyle        lipgloss.Style
@@ -36,6 +39,8 @@ type Model struct {
 	height            int
 	splitMode          bool
 	groupBy            string // "", "repository", "status", "source"
+	userSetGroupBy     bool   // true once user manually toggles via 'g'
+	expandedGroup      int    // index of expanded group (-1 = none)
 }
 
 // New creates a new task list model
@@ -65,6 +70,7 @@ func NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle, sectionHe
 		animStatusIcon:   animStatusIconFunc,
 		width:            80,
 		height:           24,
+		expandedGroup:    -1,
 	}
 }
 
@@ -103,8 +109,14 @@ func (m Model) View() string {
 }
 
 func (m Model) renderFocusedList() string {
-	if m.groupBy != "" {
-		return m.renderGroupedList()
+	// Auto-group by repo when many sessions and user hasn't manually set grouping
+	effectiveGroupBy := m.groupBy
+	if effectiveGroupBy == "" && !m.userSetGroupBy && len(m.sessions) >= autoGroupThreshold {
+		effectiveGroupBy = "repository"
+	}
+
+	if effectiveGroupBy != "" {
+		return m.renderGroupedListWith(effectiveGroupBy)
 	}
 
 	usableWidth := m.width - 4
@@ -154,11 +166,6 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 
 	icon := m.currentStatusIcon(session.Status)
 
-	titleMax := width - 8
-	if titleMax < 3 {
-		titleMax = 3
-	}
-	title := truncate(sessionTitle(session), titleMax)
 	badge := sessionBadge(session, m.isDeEmphasized(sessionIdx), m.duplicateCounts[sessionIdx])
 
 	// Gutter indicator: selected row gets a bar, others get a space
@@ -167,29 +174,49 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 		gutter = "▎ "
 	}
 
-	titleLine := fmt.Sprintf("%s%s %s", gutter, icon, title)
-	if badge != "" {
-		titleLine += " " + badge
-	}
-
-	metaMax := width - 8
-	if metaMax < 3 {
-		metaMax = 3
-	}
-
 	if width < 40 {
+		titleMax := width - 8
+		if titleMax < 3 {
+			titleMax = 3
+		}
+		title := truncate(sessionTitle(session), titleMax)
+		titleLine := fmt.Sprintf("%s%s %s", gutter, icon, title)
 		return style.Render(titleLine)
 	}
 
-	repo := truncate(rowRepository(session), metaMax)
-	attention := attentionReason(session)
-	meta := fmt.Sprintf("    %s • %s • %s", repo, attention, formatTime(session.UpdatedAt))
-
-	if dur := compactDuration(session); dur != "" {
-		meta += " • ⏱ " + dur
+	// Title line: left-aligned title, right-aligned badge
+	badgeLen := len(badge)
+	titleMax := width - 8 - badgeLen
+	if badgeLen > 0 {
+		titleMax -= 2 // space before badge
+	}
+	if titleMax < 10 {
+		titleMax = 10
+	}
+	title := truncate(sessionTitle(session), titleMax)
+	leftPart := fmt.Sprintf("%s%s %s", gutter, icon, title)
+	if badge != "" {
+		pad := width - len(leftPart) - badgeLen
+		if pad < 1 {
+			pad = 1
+		}
+		leftPart += strings.Repeat(" ", pad) + badge
 	}
 
-	return style.Render(titleLine + "\n" + meta)
+	// Meta line: repo + time, right-aligned telemetry
+	// Skip attentionReason when badge already communicates the state
+	repo := truncate(rowRepository(session), width/2)
+	meta := fmt.Sprintf("    %s  %s", repo, formatTime(session.UpdatedAt))
+	if dur := compactDuration(session); dur != "" {
+		durStr := "⏱ " + dur
+		pad := width - len(meta) - len(durStr)
+		if pad < 1 {
+			pad = 1
+		}
+		meta += strings.Repeat(" ", pad) + durStr
+	}
+
+	return style.Render(leftPart + "\n" + meta)
 }
 
 // SetTasks updates sessions with sorting and de-emphasis
@@ -287,13 +314,55 @@ func (m *Model) MoveCursor(delta int) {
 		return
 	}
 
-	m.rowCursor += delta
-	if m.rowCursor < 0 {
-		m.rowCursor = 0
+	gb := m.effectiveGroupBy()
+	if gb == "" {
+		// Ungrouped: simple cursor movement
+		m.rowCursor += delta
+		if m.rowCursor < 0 {
+			m.rowCursor = 0
+		}
+		if m.rowCursor >= len(m.sessions) {
+			m.rowCursor = len(m.sessions) - 1
+		}
+		return
 	}
-	if m.rowCursor >= len(m.sessions) {
-		m.rowCursor = len(m.sessions) - 1
+
+	// Grouped: navigate between visible items (expanded group sessions + collapsed group headers)
+	groups := m.buildGroupsWith(gb)
+	// Build flat list of navigable positions (session indices)
+	var navigable []int
+	for gi, g := range groups {
+		if m.expandedGroup == gi {
+			navigable = append(navigable, g.sessions...)
+		} else {
+			// Collapsed group: use first session index as representative
+			if len(g.sessions) > 0 {
+				navigable = append(navigable, g.sessions[0])
+			}
+		}
 	}
+
+	if len(navigable) == 0 {
+		return
+	}
+
+	// Find current position in navigable list
+	currentPos := 0
+	for i, idx := range navigable {
+		if idx == m.rowCursor {
+			currentPos = i
+			break
+		}
+	}
+
+	newPos := currentPos + delta
+	if newPos < 0 {
+		newPos = 0
+	}
+	if newPos >= len(navigable) {
+		newPos = len(navigable) - 1
+	}
+	m.rowCursor = navigable[newPos]
 }
 
 // MoveColumn is a no-op in focused list mode (kept for interface compat)
@@ -400,7 +469,7 @@ func sessionBadge(session data.Session, deEmphasized bool, duplicateCount int) s
 		return "↺ quiet duplicate"
 	}
 	if data.SessionNeedsAttention(session) {
-		badge := fmt.Sprintf("⏸ idle %s", formatIdleDuration(time.Since(session.UpdatedAt)))
+		badge := fmt.Sprintf("💤 %s", formatIdleDuration(time.Since(session.UpdatedAt)))
 		if duplicateCount > 0 {
 			badge += fmt.Sprintf(" (+%d older)", duplicateCount)
 		}
@@ -498,10 +567,25 @@ func quietDuplicateKey(session data.Session) string {
 }
 
 func sessionTitle(session data.Session) string {
-	if strings.TrimSpace(session.Title) == "" {
-		return "Untitled Session"
+	title := strings.TrimSpace(session.Title)
+	if title == "" {
+		return "Untitled session"
 	}
-	return session.Title
+	// Replace "Session <UUID>" with a human-friendly fallback
+	if isUUIDSessionTitle(title) {
+		return "Untitled session"
+	}
+	return title
+}
+
+// isUUIDSessionTitle detects titles like "Session 7967abbc-163d-4975-9803-8d340b6eb590"
+func isUUIDSessionTitle(title string) bool {
+	if !strings.HasPrefix(title, "Session ") {
+		return false
+	}
+	uuid := strings.TrimPrefix(title, "Session ")
+	// UUID v4 is 36 chars: 8-4-4-4-12
+	return len(uuid) == 36 && strings.Count(uuid, "-") == 4
 }
 
 func rowRepository(session data.Session) string {
@@ -545,22 +629,6 @@ func sessionHasLinkedPR(session data.Session) bool {
 		return true
 	}
 	return session.PRNumber > 0 && strings.TrimSpace(session.Repository) != ""
-}
-
-func attentionReason(session data.Session) string {
-	status := strings.ToLower(strings.TrimSpace(session.Status))
-	switch {
-	case status == "needs-input":
-		return "waiting on your input"
-	case status == "failed":
-		return "run failed"
-	case data.SessionNeedsAttention(session):
-		return "running but quiet"
-	case isActiveStatus(session.Status):
-		return "in progress"
-	default:
-		return "no action needed"
-	}
 }
 
 // SetSize updates the available rendering size for responsive layout.
@@ -622,6 +690,7 @@ func visibleRange(total, cursor, size int) (int, int) {
 
 // CycleGroupBy advances to the next group-by mode.
 func (m *Model) CycleGroupBy() {
+	m.userSetGroupBy = true
 	for i, mode := range groupByModes {
 		if mode == m.groupBy {
 			m.groupBy = groupByModes[(i+1)%len(groupByModes)]
@@ -643,6 +712,56 @@ func (m Model) GroupByLabel() string {
 	default:
 		return ""
 	}
+}
+
+// ToggleGroupExpand expands or collapses the group containing the current cursor.
+func (m *Model) ToggleGroupExpand() {
+	groupIdx := m.groupIndexForCursor()
+	if groupIdx < 0 {
+		return
+	}
+	if m.expandedGroup == groupIdx {
+		m.expandedGroup = -1
+	} else {
+		m.expandedGroup = groupIdx
+	}
+}
+
+// IsGrouped returns true when grouping is active (manual or auto).
+func (m Model) IsGrouped() bool {
+	if m.groupBy != "" {
+		return true
+	}
+	return !m.userSetGroupBy && len(m.sessions) >= autoGroupThreshold
+}
+
+// effectiveGroupBy returns the active groupBy mode (manual or auto).
+func (m Model) effectiveGroupBy() string {
+	if m.groupBy != "" {
+		return m.groupBy
+	}
+	if !m.userSetGroupBy && len(m.sessions) >= autoGroupThreshold {
+		return "repository"
+	}
+	return ""
+}
+
+// groupIndexForCursor returns the group index containing the current cursor session.
+func (m Model) groupIndexForCursor() int {
+	gb := m.effectiveGroupBy()
+	if gb == "" {
+		return -1
+	}
+	groups := m.buildGroupsWith(gb)
+	cursor := m.rowCursor
+	for gi, g := range groups {
+		for _, idx := range g.sessions {
+			if idx == cursor {
+				return gi
+			}
+		}
+	}
+	return -1
 }
 
 func sessionGroupKey(session data.Session, mode string) string {
@@ -676,11 +795,11 @@ type sessionGroup struct {
 	mostRecent time.Time
 }
 
-func (m Model) buildGroups() []sessionGroup {
+func (m Model) buildGroupsWith(groupBy string) []sessionGroup {
 	groupMap := map[string]*sessionGroup{}
 	var order []string
 	for i, session := range m.sessions {
-		key := sessionGroupKey(session, m.groupBy)
+		key := sessionGroupKey(session, groupBy)
 		g, exists := groupMap[key]
 		if !exists {
 			g = &sessionGroup{label: key}
@@ -702,12 +821,12 @@ func (m Model) buildGroups() []sessionGroup {
 	return groups
 }
 
-func (m Model) renderGroupedList() string {
+func (m Model) renderGroupedListWith(groupBy string) string {
 	usableWidth := m.width - 4
 	if usableWidth < 20 {
 		usableWidth = 20
 	}
-	groups := m.buildGroups()
+	groups := m.buildGroupsWith(groupBy)
 	rows := []string{}
 	cursor := m.rowCursor
 	if cursor >= len(m.sessions) {
@@ -716,13 +835,65 @@ func (m Model) renderGroupedList() string {
 	if cursor < 0 {
 		cursor = 0
 	}
-	for _, g := range groups {
-		headerLine := fmt.Sprintf("── %s: %s (%d) ──", m.groupBy, g.label, len(g.sessions))
+
+	pageSize := m.pageSize()
+
+	for gi, g := range groups {
+		isExpanded := m.expandedGroup == gi
+
+		if !isExpanded {
+			// Collapsed: show header with count, highlight if cursor is here
+			cursorInGroup := false
+			for _, idx := range g.sessions {
+				if idx == cursor {
+					cursorInGroup = true
+					break
+				}
+			}
+			indicator := "▸"
+			if cursorInGroup {
+				indicator = "▎▸"
+			}
+			headerLine := fmt.Sprintf("  %s %s (%d)", indicator, g.label, len(g.sessions))
+			rows = append(rows, m.sectionHeaderStyle.Render(headerLine))
+			continue
+		}
+
+		// Expanded group
+		headerLine := fmt.Sprintf("  ▾ %s (%d)", g.label, len(g.sessions))
 		rows = append(rows, m.sectionHeaderStyle.Render(headerLine))
-		for _, idx := range g.sessions {
-			session := m.sessions[idx]
-			selected := idx == cursor
-			rows = append(rows, m.renderRow(idx, session, selected, usableWidth))
+
+		// Paginate within group
+		if len(g.sessions) <= pageSize {
+			for _, idx := range g.sessions {
+				session := m.sessions[idx]
+				selected := idx == cursor
+				rows = append(rows, m.renderRow(idx, session, selected, usableWidth))
+			}
+		} else {
+			// Find cursor position within group
+			cursorPos := 0
+			for si, idx := range g.sessions {
+				if idx == cursor {
+					cursorPos = si
+					break
+				}
+			}
+			start, end := visibleRange(len(g.sessions), cursorPos, pageSize)
+			if start > 0 {
+				rows = append(rows, m.tableRowStyle.Render(
+					fmt.Sprintf("    ↑ %d more", start)))
+			}
+			for si := start; si < end; si++ {
+				idx := g.sessions[si]
+				session := m.sessions[idx]
+				selected := idx == cursor
+				rows = append(rows, m.renderRow(idx, session, selected, usableWidth))
+			}
+			if end < len(g.sessions) {
+				rows = append(rows, m.tableRowStyle.Render(
+					fmt.Sprintf("    ↓ %d more", len(g.sessions)-end)))
+			}
 		}
 	}
 	return strings.Join(rows, "\n")

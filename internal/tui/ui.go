@@ -127,6 +127,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Completed: msg.counts.Completed,
 			Failed:    msg.counts.Failed,
 		})
+		m.taskList.SetLoading(false)
 		m.taskList.SetTasks(msg.tasks)
 		return m, nil
 
@@ -264,12 +265,15 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.ctx.StatusFilter = "attention"
 		}
+		m.taskList.SetLoading(true)
 		return m, m.fetchTasks
 	case "tab":
 		m.cycleFilter(1)
+		m.taskList.SetLoading(true)
 		return m, m.fetchTasks
 	case "shift+tab", "backtab":
 		m.cycleFilter(-1)
+		m.taskList.SetLoading(true)
 		return m, m.fetchTasks
 	}
 	return m, nil

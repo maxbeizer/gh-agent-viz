@@ -309,6 +309,11 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "g":
 		m.taskList.CycleGroupBy()
 		return m, nil
+	case " ":
+		if m.taskList.IsGrouped() {
+			m.taskList.ToggleGroupExpand()
+			return m, nil
+		}
 	}
 	return m, nil
 }
@@ -615,6 +620,9 @@ func (m *Model) updateFooterHints() {
 			hints = append(hints, key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "group: "+label)))
 		} else {
 			hints = append(hints, m.keys.GroupBy)
+		}
+		if m.taskList.IsGrouped() {
+			hints = append(hints, m.keys.ExpandGroup)
 		}
 		hints = append(hints, m.keys.ExitApp)
 		m.footer.SetHints(hints)

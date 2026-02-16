@@ -40,6 +40,7 @@ type Model struct {
 	ready      bool
 	repo       string
 	refreshInt time.Duration
+	animFrame  int
 }
 
 // NewModel creates a new TUI model
@@ -81,13 +82,18 @@ func NewModel(repo string, debug bool) Model {
 
 	dismissedStore := data.NewDismissedStore()
 
+	var animIconFunc func(string, int) string
+	if ctx.Config.AnimationsEnabled() {
+		animIconFunc = AnimatedStatusIcon
+	}
+
 	return Model{
 		ctx:        ctx,
 		theme:      theme,
 		keys:       keys,
 		header:     header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter),
 		footer:     footer.New(theme.Footer, footerKeys),
-		taskList:   tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, StatusIcon, dismissedStore),
+		taskList:   tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc, dismissedStore),
 		taskDetail: taskdetail.New(theme.Title, theme.Border, StatusIcon),
 		logView:    logview.New(theme.Title, 80, 20),
 		viewMode:   ViewModeList,
@@ -99,11 +105,15 @@ func NewModel(repo string, debug bool) Model {
 
 // Init initializes the Bubble Tea program
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
+	cmds := []tea.Cmd{
 		m.fetchTasks,
 		m.refreshCmd(),
 		tea.EnterAltScreen,
-	)
+	}
+	if m.ctx.Config.AnimationsEnabled() {
+		cmds = append(cmds, m.animationTickCmd())
+	}
+	return tea.Batch(cmds...)
 }
 
 // Update handles incoming messages
@@ -146,6 +156,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case refreshTickMsg:
 		return m, tea.Batch(m.fetchTasks, m.refreshCmd())
+
+	case animationTickMsg:
+		m.animFrame++
+		m.taskList.SetAnimFrame(m.animFrame)
+		return m, m.animationTickCmd()
 
 	case errMsg:
 		m.ctx.Error = msg.err
@@ -366,6 +381,8 @@ type taskLogLoadedMsg struct {
 
 type refreshTickMsg struct{}
 
+type animationTickMsg struct{}
+
 type errMsg struct {
 	err error
 }
@@ -508,6 +525,12 @@ func (m Model) resumeSession(session *data.Session) tea.Cmd {
 func (m Model) refreshCmd() tea.Cmd {
 	return tea.Tick(m.refreshInt, func(time.Time) tea.Msg {
 		return refreshTickMsg{}
+	})
+}
+
+func (m Model) animationTickCmd() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg {
+		return animationTickMsg{}
 	})
 }
 

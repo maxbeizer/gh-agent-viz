@@ -24,6 +24,8 @@ type Model struct {
 	rowCursor         int
 	loading           bool
 	statusIcon        func(string) string
+	animStatusIcon    func(string, int) string
+	animFrame         int
 	selectedSessionID string
 	width             int
 	height            int
@@ -31,11 +33,11 @@ type Model struct {
 
 // New creates a new task list model
 func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, statusIconFunc func(string) string) Model {
-	return NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle, statusIconFunc, nil)
+	return NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle, statusIconFunc, nil, nil)
 }
 
 // NewWithStore creates a new task list model backed by a persistent dismissed store.
-func NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, statusIconFunc func(string) string, store *data.DismissedStore) Model {
+func NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, statusIconFunc func(string) string, animStatusIconFunc func(string, int) string, store *data.DismissedStore) Model {
 	dismissed := map[string]struct{}{}
 	if store != nil {
 		dismissed = store.IDs()
@@ -52,6 +54,7 @@ func NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.S
 		rowCursor:        0,
 		loading:          true,
 		statusIcon:       statusIconFunc,
+		animStatusIcon:   animStatusIconFunc,
 		width:            80,
 		height:           24,
 	}
@@ -153,7 +156,7 @@ func (m Model) renderInlineDetail() string {
 	}
 
 	lines := []string{
-		fmt.Sprintf("  %s %s", m.statusIcon(selected.Status), truncate(sessionTitle(*selected), maxW)),
+		fmt.Sprintf("  %s %s", m.currentStatusIcon(selected.Status), truncate(sessionTitle(*selected), maxW)),
 		fmt.Sprintf("  Status: %s  •  Needs action: %s", selected.Status, attentionReason(*selected)),
 		fmt.Sprintf("  Repository: %s  •  Branch: %s", panelRepository(*selected), panelBranch(*selected)),
 		fmt.Sprintf("  Source: %s  •  Last update: %s", sourceLabel(selected.Source), formatTime(selected.UpdatedAt)),
@@ -178,7 +181,7 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 		style = style.Faint(true)
 	}
 
-	icon := m.statusIcon(session.Status)
+	icon := m.currentStatusIcon(session.Status)
 	titleMax := width - 8
 	if titleMax < 3 {
 		titleMax = 3
@@ -559,6 +562,19 @@ func (m *Model) SetSize(width, height int) {
 	if height > 0 {
 		m.height = height
 	}
+}
+
+// SetAnimFrame updates the animation frame counter for animated status icons.
+func (m *Model) SetAnimFrame(frame int) {
+	m.animFrame = frame
+}
+
+// currentStatusIcon returns the animated icon if available, otherwise the static icon.
+func (m Model) currentStatusIcon(status string) string {
+	if m.animStatusIcon != nil {
+		return m.animStatusIcon(status, m.animFrame)
+	}
+	return m.statusIcon(status)
 }
 
 func (m Model) pageSize() int {

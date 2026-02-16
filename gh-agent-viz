@@ -4,4 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
+go_version="$(go env GOVERSION 2>/dev/null | sed 's/^go//')"
+go_major="${go_version%%.*}"
+go_minor="${go_version#*.}"
+go_minor="${go_minor%%.*}"
+go_patch="${go_version#*.*.}"
+if [[ "${go_patch}" == "${go_version}" ]]; then
+  go_patch=0
+fi
+go_patch="${go_patch%%.*}"
+
+if [[ -z "${go_major}" || -z "${go_minor}" || -z "${go_patch}" || "${go_major}" -lt 1 || ( "${go_major}" -eq 1 && ( "${go_minor}" -lt 24 || ( "${go_minor}" -eq 24 && "${go_patch}" -lt 2 ) ) ) ]]; then
+  echo "gh-agent-viz requires Go 1.24.2+. Detected Go ${go_version:-unknown}."
+  echo "Upgrade Go and run again."
+  exit 1
+fi
+
 exec go run ./gh-agent-viz.go "$@"

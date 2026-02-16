@@ -144,15 +144,7 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 
 	icon := m.currentStatusIcon(session.Status)
 
-	const sparkWidth = 8
-	showSparkline := width >= 60
-
-	// Account for gutter(2) + icon(~2) + spaces; sparkline adds sparkWidth+1
-	overhead := 8
-	if showSparkline {
-		overhead += sparkWidth + 1
-	}
-	titleMax := width - overhead
+	titleMax := width - 8
 	if titleMax < 3 {
 		titleMax = 3
 	}
@@ -165,13 +157,7 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 		gutter = "▎ "
 	}
 
-	var titleLine string
-	if showSparkline {
-		spark := sparkline.Generate(session.Status, session.CreatedAt, session.UpdatedAt, sparkWidth)
-		titleLine = fmt.Sprintf("%s%s %s %s", gutter, icon, spark, title)
-	} else {
-		titleLine = fmt.Sprintf("%s%s %s", gutter, icon, title)
-	}
+	titleLine := fmt.Sprintf("%s%s %s", gutter, icon, title)
 	if badge != "" {
 		titleLine += " " + badge
 	}
@@ -187,7 +173,11 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 
 	repo := truncate(rowRepository(session), metaMax)
 	attention := attentionReason(session)
-	meta := fmt.Sprintf("    %s • %s • %s", repo, attention, formatTime(session.UpdatedAt))
+	spark := ""
+	if width >= 60 {
+		spark = " " + sparkline.Generate(session.Status, session.CreatedAt, session.UpdatedAt, 8)
+	}
+	meta := fmt.Sprintf("    %s • %s • %s%s", repo, attention, formatTime(session.UpdatedAt), spark)
 
 	return style.Render(titleLine + "\n" + meta)
 }

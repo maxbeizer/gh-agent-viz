@@ -245,7 +245,21 @@ func TestCycleFilterForwardAndBackward(t *testing.T) {
 	}
 }
 
-func TestHandleListKeys_ACyclesForward(t *testing.T) {
+func TestHandleListKeys_AJumpsToAttention(t *testing.T) {
+	m := NewModel("", false)
+	m.ctx.StatusFilter = "active" // start on a different tab
+
+	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	if cmd == nil {
+		t.Fatal("expected fetch command when pressing 'a'")
+	}
+	updatedModel := updated.(Model)
+	if updatedModel.ctx.StatusFilter != "attention" {
+		t.Fatalf("expected attention after 'a', got %q", updatedModel.ctx.StatusFilter)
+	}
+}
+
+func TestHandleListKeys_AJumpsToAttentionFromAttention(t *testing.T) {
 	m := NewModel("", false)
 	m.ctx.StatusFilter = "attention"
 
@@ -254,8 +268,8 @@ func TestHandleListKeys_ACyclesForward(t *testing.T) {
 		t.Fatal("expected fetch command when pressing 'a'")
 	}
 	updatedModel := updated.(Model)
-	if updatedModel.ctx.StatusFilter != "active" {
-		t.Fatalf("expected active after 'a' from attention, got %q", updatedModel.ctx.StatusFilter)
+	if updatedModel.ctx.StatusFilter != "attention" {
+		t.Fatalf("expected attention after 'a' from attention, got %q", updatedModel.ctx.StatusFilter)
 	}
 }
 

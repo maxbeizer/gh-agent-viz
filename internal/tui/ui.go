@@ -294,7 +294,8 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.updateSplitLayout()
 		return m, nil
 	case "a":
-		m.cycleFilter(1)
+		m.ctx.StatusFilter = "attention"
+		m.showPreview = false
 		m.taskList.SetLoading(true)
 		return m, m.fetchTasks
 	case "tab":

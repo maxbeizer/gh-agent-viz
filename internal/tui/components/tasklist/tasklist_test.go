@@ -415,3 +415,38 @@ func TestDismissSelected_PersistsAcrossRefresh(t *testing.T) {
 		t.Fatalf("dismissed session should stay hidden after refresh, got %d sessions", len(model.sessions))
 	}
 }
+
+func TestFormatIdleDuration(t *testing.T) {
+	tests := []struct {
+		d    time.Duration
+		want string
+	}{
+		{20 * time.Minute, "~20m"},
+		{45 * time.Minute, "~45m"},
+		{59 * time.Minute, "~59m"},
+		{60 * time.Minute, "~1h"},
+		{90 * time.Minute, "~1h30m"},
+		{2 * time.Hour, "~2h"},
+		{2*time.Hour + 15*time.Minute, "~2h15m"},
+	}
+	for _, tc := range tests {
+		got := formatIdleDuration(tc.d)
+		if got != tc.want {
+			t.Errorf("formatIdleDuration(%v) = %q, want %q", tc.d, got, tc.want)
+		}
+	}
+}
+
+func TestSessionBadge_IdleShowsDuration(t *testing.T) {
+	session := data.Session{
+		Status:    "running",
+		UpdatedAt: time.Now().Add(-30 * time.Minute),
+	}
+	badge := sessionBadge(session, false)
+	if !strings.HasPrefix(badge, "⏸ idle ~") {
+		t.Fatalf("expected idle badge with duration, got %q", badge)
+	}
+	if strings.Contains(badge, "check progress") {
+		t.Fatalf("old 'check progress' text should be gone, got %q", badge)
+	}
+}

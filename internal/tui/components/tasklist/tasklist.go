@@ -368,12 +368,24 @@ func sessionBadge(session data.Session, deEmphasized bool) string {
 		return "↺ quiet duplicate"
 	}
 	if data.SessionNeedsAttention(session) {
-		return "⚠ check progress"
+		return fmt.Sprintf("⏸ idle %s", formatIdleDuration(time.Since(session.UpdatedAt)))
 	}
 	if !isActiveStatus(session.Status) || session.UpdatedAt.IsZero() {
 		return ""
 	}
 	return "• in progress"
+}
+
+func formatIdleDuration(d time.Duration) string {
+	if d < time.Hour {
+		return fmt.Sprintf("~%dm", int(d.Minutes()))
+	}
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	if m == 0 {
+		return fmt.Sprintf("~%dh", h)
+	}
+	return fmt.Sprintf("~%dh%dm", h, m)
 }
 
 func (m Model) isDeEmphasized(sessionIdx int) bool {

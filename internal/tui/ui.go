@@ -263,11 +263,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		return m, m.fetchTasks
 	case "a":
-		if m.ctx.StatusFilter == "attention" {
-			m.ctx.StatusFilter = "all"
-		} else {
-			m.ctx.StatusFilter = "attention"
-		}
+		m.cycleFilter(1)
 		m.taskList.SetLoading(true)
 		return m, m.fetchTasks
 	case "tab":
@@ -339,7 +335,7 @@ func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // cycleFilter cycles through status filters by delta (+1 forward, -1 backward)
 func (m *Model) cycleFilter(delta int) {
-	filters := []string{"all", "attention", "active", "completed", "failed"}
+	filters := []string{"attention", "active", "completed", "failed", "all"}
 	for i, f := range filters {
 		if f == m.ctx.StatusFilter {
 			next := (i + delta) % len(filters)

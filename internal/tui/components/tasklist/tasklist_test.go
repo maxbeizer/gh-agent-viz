@@ -158,7 +158,7 @@ func TestSetTasks_SortsByRecencyNotPriority(t *testing.T) {
 	}
 }
 
-func TestSetTasks_DeEmphasizesOlderQuietDuplicates(t *testing.T) {
+func TestSetTasks_HidesOlderQuietDuplicates(t *testing.T) {
 	model := newModel()
 	model.SetSize(160, 32)
 	now := time.Now()
@@ -168,17 +168,19 @@ func TestSetTasks_DeEmphasizesOlderQuietDuplicates(t *testing.T) {
 		{ID: "active", Status: "running", Title: "Fresh implementation", UpdatedAt: now.Add(-3 * time.Minute)},
 	})
 
-	if len(model.sessions) != 3 {
-		t.Fatalf("expected 3 sessions, got %d", len(model.sessions))
+	// Older quiet duplicate should be hidden entirely
+	if len(model.sessions) != 2 {
+		t.Fatalf("expected 2 sessions (older duplicate hidden), got %d", len(model.sessions))
 	}
-	// Oldest quiet duplicate should be last
-	if model.sessions[len(model.sessions)-1].ID != "dup-old" {
-		t.Fatalf("expected oldest quiet duplicate last, got: %s", model.sessions[len(model.sessions)-1].ID)
+	for _, s := range model.sessions {
+		if s.ID == "dup-old" {
+			t.Fatal("older quiet duplicate should not appear in sessions list")
+		}
 	}
 
 	view := model.View()
-	if !strings.Contains(view, "↺ quiet duplicate") {
-		t.Fatalf("expected quiet duplicate badge in view, got: %s", view)
+	if strings.Contains(view, "↺ quiet duplicate") {
+		t.Fatalf("quiet duplicate badge should not appear, got: %s", view)
 	}
 }
 
@@ -529,7 +531,7 @@ func TestNewestDuplicateShowsCountIndicator(t *testing.T) {
 	}
 }
 
-func TestOlderDuplicateShowsTimeSince(t *testing.T) {
+func TestOlderDuplicateHiddenFromSessions(t *testing.T) {
 	model := newModel()
 	model.SetSize(160, 32)
 	now := time.Now()
@@ -538,9 +540,16 @@ func TestOlderDuplicateShowsTimeSince(t *testing.T) {
 		{ID: "dup-new", Status: "running", Title: "Sync roadmap", Repository: "owner/repo", Branch: "main", Source: data.SourceAgentTask, UpdatedAt: now.Add(-40 * time.Minute)},
 	})
 
+	if len(model.sessions) != 1 {
+		t.Fatalf("expected 1 session (older duplicate hidden), got %d", len(model.sessions))
+	}
+	if model.sessions[0].ID != "dup-new" {
+		t.Fatalf("expected newest duplicate to remain, got %s", model.sessions[0].ID)
+	}
+
 	view := model.View()
-	if !strings.Contains(view, "↺ quiet duplicate ·") {
-		t.Fatalf("expected older duplicate to show time-since suffix, got: %s", view)
+	if strings.Contains(view, "↺ quiet duplicate") {
+		t.Fatalf("quiet duplicate badge should not appear, got: %s", view)
 	}
 }
 

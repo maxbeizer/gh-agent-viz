@@ -1,6 +1,8 @@
 module github.com/maxbeizer/gh-agent-viz
 
-go 1.24.13
+go 1.24.2
+
+toolchain go1.24.13
 
 require (
 	github.com/charmbracelet/bubbles v1.0.0

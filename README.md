@@ -28,6 +28,8 @@ gh extension install maxbeizer/gh-agent-viz
 
 ### Build from Source
 
+Requires Go 1.24.2 or newer.
+
 ```bash
 git clone https://github.com/maxbeizer/gh-agent-viz.git
 cd gh-agent-viz
@@ -41,6 +43,14 @@ gh extension install .
 ```
 
 This local install path uses the repository's executable wrapper and runs with your installed Go toolchain.
+
+To reload while developing, just run `gh agent-viz` again after code changes. Local installs cannot be upgraded with `gh extension upgrade`.
+
+If you need to (re)link the local checkout, run:
+
+```bash
+make relink-local
+```
 
 ## Usage
 
@@ -203,7 +213,7 @@ gh-agent-viz/
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Go 1.24.2 or later
 - GitHub CLI authenticated
 
 ### One-command workflow (recommended)

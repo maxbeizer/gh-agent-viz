@@ -5,3 +5,4 @@ vendor/
 *.test
 *.out
 go.work
+gh-agent-viz

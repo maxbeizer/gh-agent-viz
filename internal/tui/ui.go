@@ -79,13 +79,15 @@ func NewModel(repo string, debug bool) Model {
 		keys.ExitApp,
 	}
 
+	dismissedStore := data.NewDismissedStore()
+
 	return Model{
 		ctx:        ctx,
 		theme:      theme,
 		keys:       keys,
 		header:     header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter),
 		footer:     footer.New(theme.Footer, footerKeys),
-		taskList:   tasklist.New(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, StatusIcon),
+		taskList:   tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, StatusIcon, dismissedStore),
 		taskDetail: taskdetail.New(theme.Title, theme.Border, StatusIcon),
 		logView:    logview.New(theme.Title, 80, 20),
 		viewMode:   ViewModeList,

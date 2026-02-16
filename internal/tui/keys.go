@@ -19,6 +19,7 @@ type Keybindings struct {
 	TogglePreview  key.Binding
 	GroupBy        key.Binding
 	ExpandGroup    key.Binding
+	ToggleFollow   key.Binding
 }
 
 // NewKeybindings creates the default key bindings for the TUI
@@ -83,6 +84,10 @@ func NewKeybindings() Keybindings {
 		ExpandGroup: key.NewBinding(
 			key.WithKeys(" "),
 			key.WithHelp("space", "expand/collapse"),
+		),
+		ToggleFollow: key.NewBinding(
+			key.WithKeys("f"),
+			key.WithHelp("f", "follow"),
 		),
 	}
 }

@@ -99,3 +99,94 @@ func TestView_NotReady(t *testing.T) {
 		t.Errorf("expected 'Loading logs...', got: %s", view)
 	}
 }
+
+func TestSetFollowMode_Toggle(t *testing.T) {
+	m := New(lipgloss.NewStyle(), 80, 24)
+	if m.FollowMode() {
+		t.Fatal("expected follow mode to be off by default")
+	}
+	m.SetFollowMode(true)
+	if !m.FollowMode() {
+		t.Fatal("expected follow mode to be on")
+	}
+	m.SetFollowMode(false)
+	if m.FollowMode() {
+		t.Fatal("expected follow mode to be off")
+	}
+}
+
+func TestSetLive(t *testing.T) {
+	m := New(lipgloss.NewStyle(), 80, 24)
+	if m.IsLive() {
+		t.Fatal("expected live to be off by default")
+	}
+	m.SetLive(true)
+	if !m.IsLive() {
+		t.Fatal("expected live to be on")
+	}
+	m.SetLive(false)
+	if m.IsLive() {
+		t.Fatal("expected live to be off")
+	}
+}
+
+func TestAppendOrReplace_UpdatesWhenLonger(t *testing.T) {
+	m := New(lipgloss.NewStyle(), 80, 24)
+	m.SetContent("short")
+	if m.rawContent != "short" {
+		t.Fatalf("expected rawContent 'short', got %q", m.rawContent)
+	}
+	m.AppendOrReplace("short and longer")
+	if m.rawContent != "short and longer" {
+		t.Fatalf("expected rawContent to be updated, got %q", m.rawContent)
+	}
+}
+
+func TestAppendOrReplace_NoUpdateWhenSameLength(t *testing.T) {
+	m := New(lipgloss.NewStyle(), 80, 24)
+	m.SetContent("hello")
+	m.AppendOrReplace("hello")
+	if m.rawContent != "hello" {
+		t.Fatalf("expected rawContent to remain 'hello', got %q", m.rawContent)
+	}
+}
+
+func TestAppendOrReplace_NoUpdateWhenShorter(t *testing.T) {
+	m := New(lipgloss.NewStyle(), 80, 24)
+	m.SetContent("longer content")
+	m.AppendOrReplace("short")
+	if m.rawContent != "longer content" {
+		t.Fatalf("expected rawContent to remain unchanged, got %q", m.rawContent)
+	}
+}
+
+func TestView_LiveFollowing(t *testing.T) {
+	m := New(lipgloss.NewStyle(), 80, 24)
+	m.SetContent("some log content")
+	m.SetLive(true)
+	m.SetFollowMode(true)
+	view := m.View()
+	if !strings.Contains(view, "LIVE 🔴") {
+		t.Errorf("expected LIVE indicator, got: %s", view)
+	}
+}
+
+func TestView_LivePaused(t *testing.T) {
+	m := New(lipgloss.NewStyle(), 80, 24)
+	m.SetContent("some log content")
+	m.SetLive(true)
+	m.SetFollowMode(false)
+	view := m.View()
+	if !strings.Contains(view, "PAUSED") {
+		t.Errorf("expected PAUSED indicator, got: %s", view)
+	}
+}
+
+func TestView_NotLive_NoIndicator(t *testing.T) {
+	m := New(lipgloss.NewStyle(), 80, 24)
+	m.SetContent("some log content")
+	view := m.View()
+	if strings.Contains(view, "LIVE") || strings.Contains(view, "PAUSED") {
+		t.Errorf("expected no indicator for non-live session, got: %s", view)
+	}
+}

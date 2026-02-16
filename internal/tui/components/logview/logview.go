@@ -11,12 +11,14 @@ import (
 
 // Model represents the log view component state
 type Model struct {
-	titleStyle lipgloss.Style
-	viewport   viewport.Model
-	rawContent string // Original unrendered content
-	content    string // Rendered content currently displayed
-	lineCount  int    // Cache line count for performance
-	ready      bool
+	titleStyle  lipgloss.Style
+	viewport    viewport.Model
+	rawContent  string // Original unrendered content
+	content     string // Rendered content currently displayed
+	lineCount   int    // Cache line count for performance
+	ready       bool
+	followMode  bool // whether auto-scroll is active
+	liveSession bool // whether the session is running (enables LIVE indicator)
 }
 
 // New creates a new log view model
@@ -49,6 +51,16 @@ func (m Model) View() string {
 
 	if m.content == "" {
 		return m.titleStyle.Render("No logs available")
+	}
+
+	if m.liveSession {
+		indicator := " PAUSED ⏸ "
+		style := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("11")) // yellow
+		if m.followMode {
+			indicator = " LIVE 🔴 "
+			style = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("9")) // red
+		}
+		return style.Render(indicator) + "\n" + m.viewport.View()
 	}
 
 	return m.viewport.View()
@@ -137,5 +149,38 @@ func (m *Model) LineDown() {
 func (m *Model) LineUp() {
 	if m.viewport.YOffset > 0 {
 		m.viewport.ScrollUp(1)
+	}
+}
+
+// SetFollowMode toggles follow mode
+func (m *Model) SetFollowMode(on bool) {
+	m.followMode = on
+}
+
+// FollowMode returns whether follow mode is active
+func (m Model) FollowMode() bool {
+	return m.followMode
+}
+
+// SetLive marks whether the session being viewed is running
+func (m *Model) SetLive(live bool) {
+	m.liveSession = live
+}
+
+// IsLive returns whether the session is live
+func (m Model) IsLive() bool {
+	return m.liveSession
+}
+
+// AppendOrReplace updates log content if the new content is longer than the
+// current content (poll-and-replace strategy). When followMode is true it
+// auto-scrolls to the bottom.
+func (m *Model) AppendOrReplace(content string) {
+	if len(content) <= len(m.rawContent) {
+		return
+	}
+	m.SetContent(content)
+	if m.followMode {
+		m.viewport.GotoBottom()
 	}
 }

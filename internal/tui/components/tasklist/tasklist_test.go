@@ -442,7 +442,7 @@ func TestSessionBadge_IdleShowsDuration(t *testing.T) {
 		Status:    "running",
 		UpdatedAt: time.Now().Add(-30 * time.Minute),
 	}
-	badge := sessionBadge(session, false)
+	badge := sessionBadge(session, false, 0)
 	if !strings.HasPrefix(badge, "⏸ idle ~") {
 		t.Fatalf("expected idle badge with duration, got %q", badge)
 	}
@@ -498,5 +498,54 @@ func TestView_MetaLineShowsDuration(t *testing.T) {
 	view := model.View()
 	if !strings.Contains(view, "⏱ 12m") {
 		t.Fatalf("expected compact duration in metadata line, got: %s", view)
+	}
+}
+
+func TestNewestDuplicateShowsCountIndicator(t *testing.T) {
+	model := newModel()
+	model.SetSize(160, 32)
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "dup-1", Status: "running", Title: "Sync roadmap", Repository: "owner/repo", Branch: "main", Source: data.SourceAgentTask, UpdatedAt: now.Add(-70 * time.Minute)},
+		{ID: "dup-2", Status: "running", Title: "Sync roadmap", Repository: "owner/repo", Branch: "main", Source: data.SourceAgentTask, UpdatedAt: now.Add(-50 * time.Minute)},
+		{ID: "dup-3", Status: "running", Title: "Sync roadmap", Repository: "owner/repo", Branch: "main", Source: data.SourceAgentTask, UpdatedAt: now.Add(-40 * time.Minute)},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "(+2 older)") {
+		t.Fatalf("expected newest duplicate to show (+2 older) count, got: %s", view)
+	}
+}
+
+func TestOlderDuplicateShowsTimeSince(t *testing.T) {
+	model := newModel()
+	model.SetSize(160, 32)
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "dup-old", Status: "running", Title: "Sync roadmap", Repository: "owner/repo", Branch: "main", Source: data.SourceAgentTask, UpdatedAt: now.Add(-70 * time.Minute)},
+		{ID: "dup-new", Status: "running", Title: "Sync roadmap", Repository: "owner/repo", Branch: "main", Source: data.SourceAgentTask, UpdatedAt: now.Add(-40 * time.Minute)},
+	})
+
+	view := model.View()
+	if !strings.Contains(view, "↺ quiet duplicate ·") {
+		t.Fatalf("expected older duplicate to show time-since suffix, got: %s", view)
+	}
+}
+
+func TestNonDuplicateSessionsUnaffected(t *testing.T) {
+	model := newModel()
+	model.SetSize(160, 32)
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "a", Status: "running", Title: "Unique task A", Repository: "owner/repo-a", UpdatedAt: now.Add(-5 * time.Minute)},
+		{ID: "b", Status: "completed", Title: "Unique task B", Repository: "owner/repo-b", UpdatedAt: now.Add(-10 * time.Minute)},
+	})
+
+	view := model.View()
+	if strings.Contains(view, "older)") {
+		t.Fatalf("non-duplicate sessions should not show duplicate count, got: %s", view)
+	}
+	if strings.Contains(view, "↺ quiet duplicate") {
+		t.Fatalf("non-duplicate sessions should not show duplicate badge, got: %s", view)
 	}
 }

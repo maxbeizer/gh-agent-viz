@@ -12,6 +12,15 @@ type Config struct {
 	Repos           []string `yaml:"repos"`
 	RefreshInterval int      `yaml:"refreshInterval"`
 	DefaultFilter   string   `yaml:"defaultFilter"`
+	Animations      *bool    `yaml:"animations,omitempty"`
+}
+
+// AnimationsEnabled returns whether animations are enabled (default: true).
+func (c *Config) AnimationsEnabled() bool {
+	if c.Animations == nil {
+		return true
+	}
+	return *c.Animations
 }
 
 // DefaultConfig returns the default configuration

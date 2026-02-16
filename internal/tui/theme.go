@@ -101,3 +101,23 @@ func StatusIcon(status string) string {
 		return "⚪"
 	}
 }
+
+// Braille spinner frames for running sessions
+var runningFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+// Pulsing dot frames for queued sessions
+var queuedFrames = []string{"⠿", "⠷", "⠯", "⠟", "⠻", "⠽"}
+
+// AnimatedStatusIcon returns an animated icon for running/queued statuses,
+// or the static icon for all other statuses. The frame parameter selects
+// which animation frame to display.
+func AnimatedStatusIcon(status string, frame int) string {
+	switch status {
+	case "running":
+		return runningFrames[frame%len(runningFrames)]
+	case "queued":
+		return queuedFrames[frame%len(queuedFrames)]
+	default:
+		return StatusIcon(status)
+	}
+}

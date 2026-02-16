@@ -164,3 +164,46 @@ func TestSave(t *testing.T) {
 		t.Errorf("expected DefaultFilter of 'completed' after save/load, got '%s'", loadedCfg.DefaultFilter)
 	}
 }
+
+func TestAnimationsEnabled_DefaultTrue(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.AnimationsEnabled() {
+		t.Error("expected animations enabled by default")
+	}
+}
+
+func TestAnimationsEnabled_ExplicitTrue(t *testing.T) {
+	b := true
+	cfg := &Config{Animations: &b}
+	if !cfg.AnimationsEnabled() {
+		t.Error("expected animations enabled when explicitly true")
+	}
+}
+
+func TestAnimationsEnabled_ExplicitFalse(t *testing.T) {
+	b := false
+	cfg := &Config{Animations: &b}
+	if cfg.AnimationsEnabled() {
+		t.Error("expected animations disabled when explicitly false")
+	}
+}
+
+func TestLoad_AnimationsFalse(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "anim-config.yml")
+
+	configContent := "animations: false\n"
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	if cfg.AnimationsEnabled() {
+		t.Error("expected animations disabled from config file")
+	}
+}

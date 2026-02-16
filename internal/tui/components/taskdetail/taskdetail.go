@@ -60,13 +60,13 @@ func (m Model) View() string {
 	// Show telemetry if available
 	if m.session.Telemetry != nil {
 		t := m.session.Telemetry
-		details = append(details, "", m.titleStyle.Render("Usage"))
+		details = append(details, "", m.titleStyle.Render("Session Stats"))
 		if t.Duration > 0 {
-			details = append(details, fmt.Sprintf("Duration:   %s", formatDuration(t.Duration)))
+			details = append(details, fmt.Sprintf("⏱ Duration: %s", formatDuration(t.Duration)))
 		}
 		if t.ConversationTurns > 0 {
 			details = append(details,
-				fmt.Sprintf("Messages:   %d total (%d user, %d assistant)",
+				fmt.Sprintf("💬 Turns: %d (%d user · %d assistant)",
 					t.ConversationTurns, t.UserMessages, t.AssistantMessages),
 			)
 		}
@@ -138,13 +138,13 @@ func (m Model) ViewSplit() string {
 
 	if m.session.Telemetry != nil {
 		t := m.session.Telemetry
-		details = append(details, "", m.titleStyle.Render("Usage"))
+		details = append(details, "", m.titleStyle.Render("Session Stats"))
 		if t.Duration > 0 {
-			details = append(details, fmt.Sprintf("Duration:   %s", formatDuration(t.Duration)))
+			details = append(details, fmt.Sprintf("⏱ Duration: %s", formatDuration(t.Duration)))
 		}
 		if t.ConversationTurns > 0 {
 			details = append(details,
-				fmt.Sprintf("Messages:   %d total (%d user, %d assistant)",
+				fmt.Sprintf("💬 Turns: %d (%d user · %d assistant)",
 					t.ConversationTurns, t.UserMessages, t.AssistantMessages),
 			)
 		}

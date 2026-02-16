@@ -174,6 +174,10 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 	attention := attentionReason(session)
 	meta := fmt.Sprintf("    %s • %s • %s", repo, attention, formatTime(session.UpdatedAt))
 
+	if dur := compactDuration(session); dur != "" {
+		meta += " • ⏱ " + dur
+	}
+
 	return style.Render(titleLine + "\n" + meta)
 }
 
@@ -474,6 +478,26 @@ func rowRepository(session data.Session) string {
 	return fmt.Sprintf("%s @ %s", repository, branch)
 }
 
+// compactDuration returns a short duration string for the metadata line.
+// Returns empty string when telemetry is nil or duration is zero.
+func compactDuration(session data.Session) string {
+	if session.Telemetry == nil || session.Telemetry.Duration <= 0 {
+		return ""
+	}
+	d := session.Telemetry.Duration
+	if d < time.Minute {
+		return "< 1m"
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	if minutes > 0 {
+		return fmt.Sprintf("%dh%dm", hours, minutes)
+	}
+	return fmt.Sprintf("%dh", hours)
+}
 
 func sessionHasLinkedPR(session data.Session) bool {
 	if session.Source != data.SourceAgentTask {

@@ -75,17 +75,20 @@ func TestView_ShowsTelemetry(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "Usage") {
-		t.Fatalf("expected Usage section header, got: %s", view)
+	if !strings.Contains(view, "Session Stats") {
+		t.Fatalf("expected Session Stats section header, got: %s", view)
+	}
+	if !strings.Contains(view, "⏱ Duration:") {
+		t.Fatalf("expected duration with emoji prefix, got: %s", view)
 	}
 	if !strings.Contains(view, "2h 30m") {
 		t.Fatalf("expected formatted duration, got: %s", view)
 	}
-	if !strings.Contains(view, "12 total") {
-		t.Fatalf("expected conversation turn count, got: %s", view)
+	if !strings.Contains(view, "💬 Turns: 12") {
+		t.Fatalf("expected conversation turn count with emoji, got: %s", view)
 	}
-	if !strings.Contains(view, "5 user") {
-		t.Fatalf("expected user message count, got: %s", view)
+	if !strings.Contains(view, "5 user · 7 assistant") {
+		t.Fatalf("expected user/assistant breakdown with middle dot, got: %s", view)
 	}
 }
 
@@ -101,8 +104,8 @@ func TestView_NoTelemetryShowsNothing(t *testing.T) {
 	})
 
 	view := model.View()
-	if strings.Contains(view, "Usage") {
-		t.Fatalf("expected no Usage section without telemetry, got: %s", view)
+	if strings.Contains(view, "Session Stats") {
+		t.Fatalf("expected no Session Stats section without telemetry, got: %s", view)
 	}
 }
 

@@ -19,18 +19,13 @@ type Model struct {
 	tableRowSelected  lipgloss.Style
 	sessions          []data.Session
 	deEmphasizedIdx   map[int]struct{}
-	columnSessionIdx  [3][]int
-	activeColumn      int
-	rowCursor         [3]int
+	rowCursor         int
 	loading           bool
 	statusIcon        func(string) string
 	selectedSessionID string
 	width             int
 	height            int
 }
-
-const defaultColumnWidth = 42
-const minColumnWidth = 30
 
 // New creates a new task list model
 func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, statusIconFunc func(string) string) Model {
@@ -41,10 +36,10 @@ func New(titleStyle, headerStyle, rowStyle, rowSelectedStyle lipgloss.Style, sta
 		tableRowSelected: rowSelectedStyle,
 		sessions:         []data.Session{},
 		deEmphasizedIdx:  map[int]struct{}{},
-		activeColumn:     0,
+		rowCursor:        0,
 		loading:          false,
 		statusIcon:       statusIconFunc,
-		width:            defaultColumnWidth * 3,
+		width:            80,
 		height:           24,
 	}
 }
@@ -59,7 +54,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// View renders the sessions as a kanban board
+// View renders the sessions as a focused single-column list
 func (m Model) View() string {
 	if m.loading {
 		return m.titleStyle.Render("Loading sessions...\n\nGathering the latest Copilot session updates.")
@@ -69,69 +64,55 @@ func (m Model) View() string {
 		return m.titleStyle.Render("No sessions to show yet.\n\nPress 'r' to refresh, or Tab/Shift+Tab to switch filters.")
 	}
 
-	overview := m.renderOverview()
-	board := m.renderBoard()
-	flightDeck := m.renderFlightDeck()
-	compactFlightDeck := m.renderCompactFlightDeck()
+	list := m.renderFocusedList()
+	detail := m.renderInlineDetail()
 
-	switch {
-	case m.height <= 24:
-		return lipgloss.JoinVertical(lipgloss.Left, overview, board)
-	case m.height <= 30:
-		return lipgloss.JoinVertical(lipgloss.Left, overview, board, compactFlightDeck)
-	default:
-		return lipgloss.JoinVertical(lipgloss.Left, overview, "", board, "", flightDeck)
+	if m.height <= 20 {
+		return list
 	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, list, "", detail)
 }
 
-func (m Model) renderBoard() string {
-	if m.width < minColumnWidth*3+4 {
-		narrowWidth := m.width - 2
-		if narrowWidth < 3 {
-			narrowWidth = 3
-		}
-		hint := m.tableRowStyle.Render(fmt.Sprintf("COMPACT VIEW • showing %s lane only (use ←/→)", columnTitle(m.activeColumn)))
-		column := m.renderColumn(m.activeColumn, narrowWidth)
-		return lipgloss.JoinVertical(lipgloss.Left, hint, column)
+func (m Model) renderFocusedList() string {
+	usableWidth := m.width - 4
+	if usableWidth < 20 {
+		usableWidth = 20
 	}
 
-	columns := make([]string, 0, 3)
-	columnWidth := m.columnWidth()
-	for col := 0; col < 3; col++ {
-		columns = append(columns, m.renderColumn(col, columnWidth))
+	rows := []string{}
+
+	cursor := m.rowCursor
+	if cursor >= len(m.sessions) {
+		cursor = len(m.sessions) - 1
+	}
+	if cursor < 0 {
+		cursor = 0
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, columns...)
+	pageSize := m.pageSize()
+	start, end := visibleRange(len(m.sessions), cursor, pageSize)
+
+	if start > 0 {
+		rows = append(rows, m.tableRowStyle.Render(
+			fmt.Sprintf("  ↑ %d more above", start)))
+	}
+
+	for i := start; i < end; i++ {
+		session := m.sessions[i]
+		selected := i == cursor
+		rows = append(rows, m.renderRow(i, session, selected, usableWidth))
+	}
+
+	if end < len(m.sessions) {
+		rows = append(rows, m.tableRowStyle.Render(
+			fmt.Sprintf("  ↓ %d more below", len(m.sessions)-end)))
+	}
+
+	return strings.Join(rows, "\n")
 }
 
-func (m Model) renderOverview() string {
-	activeCount := len(m.columnSessionIdx[0])
-	doneCount := len(m.columnSessionIdx[1])
-	failedCount := len(m.columnSessionIdx[2])
-	attentionCount := 0
-
-	for _, session := range m.sessions {
-		if data.SessionNeedsAttention(session) {
-			attentionCount++
-		}
-	}
-
-	chips := []string{
-		fmt.Sprintf("total %d", len(m.sessions)),
-		fmt.Sprintf("running %d", activeCount),
-		fmt.Sprintf("done %d", doneCount),
-		fmt.Sprintf("failed %d", failedCount),
-		fmt.Sprintf("needs action %d", attentionCount),
-	}
-
-	return lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63")).
-		Padding(0, 1).
-		Render("SESSIONS AT A GLANCE  " + strings.Join(chips, "  •  "))
-}
-
-func (m Model) renderFlightDeck() string {
+func (m Model) renderInlineDetail() string {
 	selected := m.SelectedTask()
 	if selected == nil {
 		return ""
@@ -148,76 +129,27 @@ func (m Model) renderFlightDeck() string {
 		actions = append(actions, "s resume")
 	}
 
+	maxW := m.width - 6
+	if maxW < 20 {
+		maxW = 20
+	}
+
 	lines := []string{
-		"SESSION SUMMARY",
-		fmt.Sprintf("%s %s", m.statusIcon(selected.Status), sessionTitle(*selected)),
-		fmt.Sprintf("Status: %s", selected.Status),
-		fmt.Sprintf("Needs your action: %s", attentionReason(*selected)),
-		fmt.Sprintf("Repository: %s", panelRepository(*selected)),
-		fmt.Sprintf("Branch: %s", panelBranch(*selected)),
-		fmt.Sprintf("Source: %s", sourceLabel(selected.Source)),
-		fmt.Sprintf("Last update: %s", formatTime(selected.UpdatedAt)),
-		fmt.Sprintf("Available actions: %s", strings.Join(actions, " • ")),
+		fmt.Sprintf("  %s %s", m.statusIcon(selected.Status), truncate(sessionTitle(*selected), maxW)),
+		fmt.Sprintf("  Status: %s  •  Needs action: %s", selected.Status, attentionReason(*selected)),
+		fmt.Sprintf("  Repository: %s  •  Branch: %s", panelRepository(*selected), panelBranch(*selected)),
+		fmt.Sprintf("  Source: %s  •  Last update: %s", sourceLabel(selected.Source), formatTime(selected.UpdatedAt)),
+		fmt.Sprintf("  Actions: %s", strings.Join(actions, " • ")),
 	}
 	if selected.Source == data.SourceAgentTask && selected.PRNumber > 0 {
-		lines = append(lines, fmt.Sprintf("Pull Request: #%d", selected.PRNumber))
+		lines = append(lines, fmt.Sprintf("  Pull Request: #%d", selected.PRNumber))
 	}
 
 	return lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("241")).
+		BorderForeground(lipgloss.Color("63")).
 		Padding(0, 1).
 		Render(strings.Join(lines, "\n"))
-}
-
-func (m Model) renderCompactFlightDeck() string {
-	selected := m.SelectedTask()
-	if selected == nil {
-		return ""
-	}
-	line := fmt.Sprintf("Session Summary • %s %s • Needs action: %s • Last update: %s", m.statusIcon(selected.Status), truncate(sessionTitle(*selected), 32), attentionReason(*selected), formatTime(selected.UpdatedAt))
-	return lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("241")).
-		Padding(0, 1).
-		Render(line)
-}
-
-func (m Model) renderColumn(column int, width int) string {
-	headerStyle := m.tableHeaderStyle
-	if column == m.activeColumn {
-		headerStyle = m.tableRowSelected.Bold(true)
-	}
-
-	indices := m.columnSessionIdx[column]
-	rows := []string{headerStyle.Render(fmt.Sprintf("%s (%d)", columnTitle(column), len(indices)))}
-	if len(indices) == 0 {
-		rows = append(rows, m.tableRowStyle.Render("  —"))
-		return lipgloss.NewStyle().Width(width).PaddingRight(1).Render(strings.Join(rows, "\n"))
-	}
-
-	cursor := m.rowCursor[column]
-	if cursor >= len(indices) {
-		cursor = len(indices) - 1
-	}
-	if cursor < 0 {
-		cursor = 0
-	}
-
-	start, end := visibleRange(len(indices), cursor, m.pageSize())
-	if start > 0 {
-		rows = append(rows, m.tableRowStyle.Render(fmt.Sprintf("  ↑ %d above", start)))
-	}
-	for i, idx := range indices[start:end] {
-		session := m.sessions[idx]
-		selected := column == m.activeColumn && (start+i) == cursor
-		rows = append(rows, m.renderRow(idx, session, selected, width))
-	}
-	if end < len(indices) {
-		rows = append(rows, m.tableRowStyle.Render(fmt.Sprintf("  ↓ %d more", len(indices)-end)))
-	}
-
-	return lipgloss.NewStyle().Width(width).PaddingRight(1).Render(strings.Join(rows, "\n"))
 }
 
 func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, width int) string {
@@ -229,47 +161,41 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 	}
 
 	icon := m.statusIcon(session.Status)
-	titleMax := width - 4
+	titleMax := width - 8
 	if titleMax < 3 {
 		titleMax = 3
 	}
 	title := truncate(sessionTitle(session), titleMax)
 	badge := sessionBadge(session, m.isDeEmphasized(sessionIdx))
-	attention := fmt.Sprintf("Needs your action: %s", attentionReason(session))
 
-	titleLine := fmt.Sprintf("%s %s", icon, title)
+	// Gutter indicator: selected row gets a bar, others get a space
+	gutter := "  "
+	if selected {
+		gutter = "▎ "
+	}
+
+	titleLine := fmt.Sprintf("%s%s %s", gutter, icon, title)
 	if badge != "" {
 		titleLine += " " + badge
 	}
 
-	if width < 20 {
-		row := fmt.Sprintf("%s\n  %s", titleLine, truncate(attention, titleMax))
-		if selected {
-			row += fmt.Sprintf("\n  ↳ %s", truncate(rowContext(session), titleMax))
-		}
-		return style.Render(row)
-	}
-
-	metaMax := width - 4
+	metaMax := width - 8
 	if metaMax < 3 {
 		metaMax = 3
 	}
-	rowLines := []string{
-		titleLine,
-		fmt.Sprintf("  %s", truncate(fmt.Sprintf("Repository: %s", rowRepository(session)), metaMax)),
-		fmt.Sprintf("  %s", truncate(fmt.Sprintf("%s • Last update: %s", attention, formatTime(session.UpdatedAt)), metaMax)),
+
+	if width < 40 {
+		return style.Render(titleLine)
 	}
-	if selected {
-		contextMax := width - 6
-		if contextMax < 3 {
-			contextMax = 3
-		}
-		rowLines = append(rowLines, fmt.Sprintf("  ↳ %s", truncate(rowContext(session), contextMax)))
-	}
-	return style.Render(strings.Join(rowLines, "\n"))
+
+	repo := truncate(rowRepository(session), metaMax)
+	attention := attentionReason(session)
+	meta := fmt.Sprintf("    %s • %s • %s", repo, attention, formatTime(session.UpdatedAt))
+
+	return style.Render(titleLine + "\n" + meta)
 }
 
-// SetTasks updates sessions and recategorizes columns
+// SetTasks updates sessions with sorting and de-emphasis
 func (m *Model) SetTasks(sessions []data.Session) {
 	if selected := m.SelectedTask(); selected != nil {
 		m.selectedSessionID = selected.ID
@@ -308,97 +234,61 @@ func (m *Model) SetTasks(sessions []data.Session) {
 		}
 	}
 
-	m.columnSessionIdx = [3][]int{}
-	for i, session := range m.sessions {
-		column := statusColumn(session.Status)
-		m.columnSessionIdx[column] = append(m.columnSessionIdx[column], i)
+	// Clamp cursor
+	if m.rowCursor >= len(m.sessions) {
+		m.rowCursor = len(m.sessions) - 1
+	}
+	if m.rowCursor < 0 {
+		m.rowCursor = 0
 	}
 
-	for col := 0; col < 3; col++ {
-		if len(m.columnSessionIdx[col]) == 0 {
-			m.rowCursor[col] = 0
-			continue
-		}
-		if m.rowCursor[col] >= len(m.columnSessionIdx[col]) {
-			m.rowCursor[col] = len(m.columnSessionIdx[col]) - 1
-		}
-		if m.rowCursor[col] < 0 {
-			m.rowCursor[col] = 0
-		}
-	}
-
+	// Restore selection by ID
 	if m.selectedSessionID != "" {
-		for idx, session := range m.sessions {
-			if session.ID != m.selectedSessionID {
-				continue
-			}
-			for col := 0; col < 3; col++ {
-				for row, sessionIdx := range m.columnSessionIdx[col] {
-					if sessionIdx == idx {
-						m.activeColumn = col
-						m.rowCursor[col] = row
-						return
-					}
-				}
-			}
-		}
-	}
-
-	if len(m.columnSessionIdx[m.activeColumn]) == 0 {
-		for col := 0; col < 3; col++ {
-			if len(m.columnSessionIdx[col]) > 0 {
-				m.activeColumn = col
-				break
+		for i, session := range m.sessions {
+			if session.ID == m.selectedSessionID {
+				m.rowCursor = i
+				return
 			}
 		}
 	}
 }
 
-// MoveCursor moves the active row cursor
+// MoveCursor moves the cursor up/down in the focused list
 func (m *Model) MoveCursor(delta int) {
-	columnSessions := m.columnSessionIdx[m.activeColumn]
-	if len(columnSessions) == 0 {
-		m.rowCursor[m.activeColumn] = 0
+	if len(m.sessions) == 0 {
+		m.rowCursor = 0
 		return
 	}
 
-	m.rowCursor[m.activeColumn] += delta
-	if m.rowCursor[m.activeColumn] < 0 {
-		m.rowCursor[m.activeColumn] = 0
+	m.rowCursor += delta
+	if m.rowCursor < 0 {
+		m.rowCursor = 0
 	}
-	if m.rowCursor[m.activeColumn] >= len(columnSessions) {
-		m.rowCursor[m.activeColumn] = len(columnSessions) - 1
+	if m.rowCursor >= len(m.sessions) {
+		m.rowCursor = len(m.sessions) - 1
 	}
 }
 
-// MoveColumn moves the active column left/right
+// MoveColumn is a no-op in focused list mode (kept for interface compat)
 func (m *Model) MoveColumn(delta int) {
-	m.activeColumn += delta
-	if m.activeColumn < 0 {
-		m.activeColumn = 0
-	}
-	if m.activeColumn > 2 {
-		m.activeColumn = 2
-	}
+	// No columns in focused list mode
 }
 
-// SelectedTask returns the selected session
+// SelectedTask returns the currently selected session
 func (m Model) SelectedTask() *data.Session {
-	columnSessions := m.columnSessionIdx[m.activeColumn]
-	if len(columnSessions) == 0 {
+	if len(m.sessions) == 0 {
 		return nil
 	}
 
-	cursor := m.rowCursor[m.activeColumn]
-	if cursor >= len(columnSessions) {
-		cursor = len(columnSessions) - 1
+	cursor := m.rowCursor
+	if cursor >= len(m.sessions) {
+		cursor = len(m.sessions) - 1
 	}
 	if cursor < 0 {
 		cursor = 0
 	}
 
-	sessionIdx := columnSessions[cursor]
-	return &m.sessions[sessionIdx]
+	return &m.sessions[cursor]
 }
 
 func truncate(s string, maxLen int) string {
@@ -428,31 +318,6 @@ func formatTime(t time.Time) string {
 		return fmt.Sprintf("%dh ago", int(diff.Hours()))
 	}
 	return t.Format("Jan 2")
-}
-
-func statusColumn(status string) int {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "failed", "cancelled", "canceled":
-		return 2
-	case "needs-input":
-		return 0
-	default:
-		if data.StatusIsActive(status) {
-			return 0
-		}
-		return 1
-	}
-}
-
-func columnTitle(column int) string {
-	switch column {
-	case 0:
-		return "🛫 Running"
-	case 1:
-		return "🛬 Done"
-	default:
-		return "🚨 Failed"
-	}
 }
 
 func sourceLabel(source data.SessionSource) string {
@@ -659,31 +524,19 @@ func (m *Model) SetSize(width, height int) {
 	}
 }
 
-func (m Model) columnWidth() int {
-	usable := m.width - 4
-	if usable <= 0 {
-		return defaultColumnWidth
-	}
-	width := usable / 3
-	if width < minColumnWidth {
-		return minColumnWidth
-	}
-	return width
-}
-
 func (m Model) pageSize() int {
-	available := m.height - 14
-	if m.height <= 24 {
-		available = m.height - 8
-	} else if m.height <= 30 {
-		available = m.height - 9
+	// Reserve space for detail panel + padding
+	available := m.height - 12
+	if m.height <= 20 {
+		available = m.height - 4
 	}
+	// Each row is 2 lines
 	size := available / 2
-	if size < 2 {
-		return 2
+	if size < 3 {
+		return 3
 	}
-	if size > 12 {
-		return 12
+	if size > 20 {
+		return 20
 	}
 	return size
 }

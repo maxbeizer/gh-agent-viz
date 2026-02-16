@@ -69,14 +69,9 @@ func NewModel(repo string, debug bool) Model {
 
 	// Prepare key bindings for footer
 	footerKeys := []key.Binding{
-		keys.MoveLeft,
-		keys.MoveRight,
 		keys.MoveUp,
 		keys.MoveDown,
 		keys.SelectTask,
-		keys.ShowLogs,
-		keys.OpenInBrowser,
-		keys.ResumeSession,
 		keys.ToggleFilter,
 		keys.FocusAttention,
 		keys.RefreshData,
@@ -87,7 +82,7 @@ func NewModel(repo string, debug bool) Model {
 		ctx:        ctx,
 		theme:      theme,
 		keys:       keys,
-		header:     header.New(theme.Title, "GitHub Agent Sessions", &ctx.StatusFilter),
+		header:     header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter),
 		footer:     footer.New(theme.Footer, footerKeys),
 		taskList:   tasklist.New(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, StatusIcon),
 		taskDetail: taskdetail.New(theme.Title, theme.Border, StatusIcon),
@@ -124,6 +119,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tasksLoadedMsg:
 		m.ctx.Error = nil
+		m.ctx.Counts = msg.counts
+		m.header.SetCounts(header.FilterCounts{
+			All:       msg.counts.All,
+			Attention: msg.counts.Attention,
+			Active:    msg.counts.Active,
+			Completed: msg.counts.Completed,
+			Failed:    msg.counts.Failed,
+		})
 		m.taskList.SetTasks(msg.tasks)
 		return m, nil
 
@@ -158,7 +161,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the TUI
 func (m Model) View() string {
 	if !m.ready {
-		return "Loading board..."
+		return "Loading sessions..."
 	}
 
 	// Update footer hints based on current context
@@ -217,10 +220,6 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleListKeys handles keys in list view mode
 func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "h", "left":
-		m.taskList.MoveColumn(-1)
-	case "right":
-		m.taskList.MoveColumn(1)
 	case "j", "down":
 		m.taskList.MoveCursor(1)
 	case "k", "up":
@@ -338,7 +337,8 @@ func (m *Model) cycleFilter(delta int) {
 
 // Message types
 type tasksLoadedMsg struct {
-	tasks []data.Session
+	tasks  []data.Session
+	counts FilterCounts
 }
 
 type taskDetailLoadedMsg struct {
@@ -362,6 +362,23 @@ func (m Model) fetchTasks() tea.Msg {
 		return errMsg{err}
 	}
 
+	// Compute counts across ALL sessions before filtering
+	counts := FilterCounts{All: len(sessions)}
+	for _, session := range sessions {
+		if data.SessionNeedsAttention(session) {
+			counts.Attention++
+		}
+		if data.StatusIsActive(session.Status) || strings.EqualFold(session.Status, "needs-input") {
+			counts.Active++
+		}
+		if strings.EqualFold(session.Status, "completed") {
+			counts.Completed++
+		}
+		if strings.EqualFold(session.Status, "failed") {
+			counts.Failed++
+		}
+	}
+
 	// Filter sessions based on status filter
 	if m.ctx.StatusFilter != "all" {
 		filtered := []data.Session{}
@@ -377,7 +394,7 @@ func (m Model) fetchTasks() tea.Msg {
 		sessions = filtered
 	}
 
-	return tasksLoadedMsg{sessions}
+	return tasksLoadedMsg{sessions, counts}
 }
 
 // fetchTaskDetail fetches detailed information for a session

@@ -127,19 +127,20 @@ func (m Model) View() string {
 		Foreground(lipgloss.AdaptiveColor{Light: "249", Dark: "240"}).
 		Render(strings.Repeat("━", m.width))
 
-	taglineRendered := ""
-	if m.tagline != "" && m.height >= 18 {
-		taglineRendered = "\n" + lipgloss.NewStyle().
-			Faint(true).
-			Italic(true).
-			Padding(0, 2).
-			Render(m.tagline)
-	}
-
 	if m.showBanner() {
 		styledBanner := m.titleStyle.Render(Banner)
-		return styledBanner + "\n" + tabLine + taglineRendered + "\n" + separator + "\n"
+		if m.tagline != "" {
+			tagStyle := lipgloss.NewStyle().Faint(true).Italic(true)
+			styledBanner += "  " + tagStyle.Render(m.tagline)
+		}
+		return styledBanner + "\n" + tabLine + "\n" + separator + "\n"
 	}
 
-	return tabLine + taglineRendered + "\n" + separator + "\n"
+	// No banner: show tagline beside the title
+	if m.tagline != "" && m.height >= 18 {
+		tagStyle := lipgloss.NewStyle().Faint(true).Italic(true)
+		tabLine = lipgloss.JoinHorizontal(lipgloss.Center, title, "  ", tagStyle.Render(m.tagline), "  ", tabBar)
+	}
+
+	return tabLine + "\n" + separator + "\n"
 }

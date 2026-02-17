@@ -214,8 +214,12 @@ func TestUpdateFooterHints_DetailViewShowsResumeForResumableSession(t *testing.T
 
 	m.updateFooterHints()
 	footerView := m.footer.View()
-	if !strings.Contains(footerView, "resume") {
-		t.Fatalf("expected resume hint in detail view for resumable session, got: %s", footerView)
+	// Simplified footer now shows logs instead of resume; advanced hints moved to ? overlay
+	if !strings.Contains(footerView, "logs") {
+		t.Fatalf("expected logs hint in detail view footer, got: %s", footerView)
+	}
+	if !strings.Contains(footerView, "? help") {
+		t.Fatalf("expected help hint in detail view footer, got: %s", footerView)
 	}
 }
 
@@ -318,14 +322,12 @@ func TestUpdateFooterHints_LocalSessionShowsOnlyAvailableActions(t *testing.T) {
 
 	m.updateFooterHints()
 	footerView := m.footer.View()
-	if !strings.Contains(footerView, "resume") {
-		t.Fatalf("expected resume hint for resumable local session, got: %s", footerView)
+	// Simplified footer shows fixed hints; context-dependent hints moved to ? overlay
+	if !strings.Contains(footerView, "? help") {
+		t.Fatalf("expected help hint in list view footer, got: %s", footerView)
 	}
-	if strings.Contains(footerView, "logs") {
-		t.Fatalf("expected logs hint to be hidden for local session, got: %s", footerView)
-	}
-	if strings.Contains(footerView, "open PR") {
-		t.Fatalf("expected open PR hint to be hidden for local session, got: %s", footerView)
+	if !strings.Contains(footerView, "navigate") {
+		t.Fatalf("expected navigate hint in list view footer, got: %s", footerView)
 	}
 }
 
@@ -344,11 +346,12 @@ func TestUpdateFooterHints_AgentSessionWithoutPRHidesOpenPRHint(t *testing.T) {
 
 	m.updateFooterHints()
 	footerView := m.footer.View()
-	if !strings.Contains(footerView, "logs") {
-		t.Fatalf("expected logs hint for agent session, got: %s", footerView)
-	}
+	// Simplified footer no longer shows context-dependent hints like open PR
 	if strings.Contains(footerView, "open PR") {
-		t.Fatalf("expected open PR hint to be hidden when PR is not linked, got: %s", footerView)
+		t.Fatalf("expected open PR hint to be hidden in simplified footer, got: %s", footerView)
+	}
+	if !strings.Contains(footerView, "? help") {
+		t.Fatalf("expected help hint in list view footer, got: %s", footerView)
 	}
 }
 

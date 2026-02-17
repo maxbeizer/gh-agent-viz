@@ -168,7 +168,7 @@ func (m Model) renderFocusedList() string {
 func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, width int) string {
 	style := m.tableRowStyle
 	if selected {
-		style = m.statusSelectedStyle(session.Status)
+		style = m.tableRowSelected
 	}
 
 	icon := m.currentStatusIcon(session.Status)
@@ -911,23 +911,6 @@ func (m Model) statusColor(status string) lipgloss.Color {
 		return lipgloss.Color("203")
 	default:
 		return lipgloss.Color("245")
-	}
-}
-
-// statusSelectedStyle returns a row style tinted by status color.
-func (m Model) statusSelectedStyle(status string) lipgloss.Style {
-	base := m.tableRowSelected
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "running":
-		return base.Background(lipgloss.Color("22"))
-	case "needs-input":
-		return base.Background(lipgloss.Color("94"))
-	case "failed":
-		return base.Background(lipgloss.Color("52"))
-	case "completed":
-		return base.Background(lipgloss.Color("23"))
-	default:
-		return base
 	}
 }
 

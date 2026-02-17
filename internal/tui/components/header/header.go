@@ -2,10 +2,27 @@ package header
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
+
+// taglines displayed randomly on startup
+var taglines = []string{
+	"your agents, at a glance",
+	"be in control of your agents",
+	"mission control for AI",
+	"keeping an eye on things",
+	"agents assemble",
+	"who's working on what?",
+	"the command center",
+	"all systems nominal",
+	"orchestrate everything",
+	"let them cook",
+	"while you were away...",
+	"dispatch, monitor, ship",
+}
 
 // FilterCounts holds per-filter session counts for the tab bar
 type FilterCounts struct {
@@ -23,6 +40,7 @@ type Model struct {
 	tabInactive    lipgloss.Style
 	tabCount       lipgloss.Style
 	title          string
+	tagline        string
 	filter         *string
 	counts         FilterCounts
 	useAsciiHeader bool
@@ -47,6 +65,7 @@ func New(titleStyle, tabActive, tabInactive, tabCount lipgloss.Style, title stri
 		tabInactive:    tabInactive,
 		tabCount:       tabCount,
 		title:          title,
+		tagline:        taglines[rand.Intn(len(taglines))],
 		filter:         filter,
 		useAsciiHeader: useAsciiHeader,
 		width:          80,
@@ -108,10 +127,19 @@ func (m Model) View() string {
 		Foreground(lipgloss.AdaptiveColor{Light: "249", Dark: "240"}).
 		Render(strings.Repeat("━", m.width))
 
-	if m.showBanner() {
-		styledBanner := m.titleStyle.Render(Banner)
-		return styledBanner + "\n" + tabLine + "\n" + separator + "\n"
+	taglineRendered := ""
+	if m.tagline != "" && m.height >= 18 {
+		taglineRendered = "\n" + lipgloss.NewStyle().
+			Faint(true).
+			Italic(true).
+			Padding(0, 2).
+			Render(m.tagline)
 	}
 
-	return tabLine + "\n" + separator + "\n"
+	if m.showBanner() {
+		styledBanner := m.titleStyle.Render(Banner)
+		return styledBanner + "\n" + tabLine + taglineRendered + "\n" + separator + "\n"
+	}
+
+	return tabLine + taglineRendered + "\n" + separator + "\n"
 }

@@ -25,7 +25,6 @@ type Model struct {
 	tableRowSelected   lipgloss.Style
 	sectionHeaderStyle lipgloss.Style
 	sessions           []data.Session
-	deEmphasizedIdx   map[int]struct{}
 	duplicateCounts   map[int]int // newest session index → count of older duplicates
 	dismissedIDs      map[string]struct{}
 	dismissedStore    *data.DismissedStore
@@ -61,7 +60,6 @@ func NewWithStore(titleStyle, headerStyle, rowStyle, rowSelectedStyle, sectionHe
 		tableRowSelected:   rowSelectedStyle,
 		sectionHeaderStyle: sectionHeaderStyle,
 		sessions:         []data.Session{},
-		deEmphasizedIdx:  map[int]struct{}{},
 		dismissedIDs:     dismissed,
 		dismissedStore:   store,
 		rowCursor:        0,
@@ -160,13 +158,11 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 	style := m.tableRowStyle
 	if selected {
 		style = m.tableRowSelected
-	} else if m.isDeEmphasized(sessionIdx) {
-		style = style.Faint(true)
 	}
 
 	icon := m.currentStatusIcon(session.Status)
 
-	badge := sessionBadge(session, m.isDeEmphasized(sessionIdx), m.duplicateCounts[sessionIdx])
+	badge := sessionBadge(session, m.duplicateCounts[sessionIdx])
 
 	// Gutter indicator: selected row gets a bar, others get a space
 	gutter := "  "
@@ -239,7 +235,6 @@ func (m *Model) SetTasks(sessions []data.Session) {
 		session      data.Session
 		origIdx      int
 		deEmphasized bool
-		sortPriority int
 	}
 
 	deEmphasizedInputIdx, inputDupCounts := quietDuplicateIndices(sessions)
@@ -250,17 +245,11 @@ func (m *Model) SetTasks(sessions []data.Session) {
 			session:      session,
 			origIdx:      i,
 			deEmphasized: deEmphasized,
-			sortPriority: sessionSortPriority(session, deEmphasized),
 		})
 	}
 
-	// Sort: most recent first, with de-emphasized items sinking to the bottom
+	// Sort: most recent first
 	sort.SliceStable(ranked, func(i, j int) bool {
-		// De-emphasized always last
-		if ranked[i].deEmphasized != ranked[j].deEmphasized {
-			return !ranked[i].deEmphasized
-		}
-		// Within same emphasis level: most recent first
 		ti := ranked[i].session.UpdatedAt
 		tj := ranked[j].session.UpdatedAt
 		if !ti.IsZero() && !tj.IsZero() {
@@ -269,14 +258,10 @@ func (m *Model) SetTasks(sessions []data.Session) {
 		if !ti.IsZero() {
 			return true
 		}
-		if !tj.IsZero() {
-			return false
-		}
 		return false
 	})
 
 	m.sessions = make([]data.Session, 0, len(ranked))
-	m.deEmphasizedIdx = map[int]struct{}{}
 	m.duplicateCounts = map[int]int{}
 	for _, candidate := range ranked {
 		if candidate.deEmphasized {
@@ -448,7 +433,7 @@ func isActiveStatus(status string) bool {
 	return data.StatusIsActive(status) || strings.EqualFold(strings.TrimSpace(status), "needs-input")
 }
 
-func sessionBadge(session data.Session, deEmphasized bool, duplicateCount int) string {
+func sessionBadge(session data.Session, duplicateCount int) string {
 	if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
 		badge := "🧑 waiting on you"
 		if duplicateCount > 0 {
@@ -462,12 +447,6 @@ func sessionBadge(session data.Session, deEmphasized bool, duplicateCount int) s
 			badge += fmt.Sprintf(" (+%d older)", duplicateCount)
 		}
 		return badge
-	}
-	if deEmphasized {
-		if !session.UpdatedAt.IsZero() {
-			return fmt.Sprintf("↺ quiet duplicate · %s ago", formatTime(session.UpdatedAt))
-		}
-		return "↺ quiet duplicate"
 	}
 	if data.SessionNeedsAttention(session) {
 		badge := fmt.Sprintf("💤 %s", formatIdleDuration(time.Since(session.UpdatedAt)))
@@ -499,27 +478,6 @@ func formatIdleDuration(d time.Duration) string {
 		return fmt.Sprintf("~%dh", h)
 	}
 	return fmt.Sprintf("~%dh%dm", h, m)
-}
-
-func (m Model) isDeEmphasized(sessionIdx int) bool {
-	_, ok := m.deEmphasizedIdx[sessionIdx]
-	return ok
-}
-
-func sessionSortPriority(session data.Session, deEmphasized bool) int {
-	status := strings.ToLower(strings.TrimSpace(session.Status))
-	switch {
-	case status == "needs-input" || status == "failed":
-		return 0
-	case deEmphasized:
-		return 4
-	case data.SessionNeedsAttention(session):
-		return 1
-	case isActiveStatus(session.Status):
-		return 2
-	default:
-		return 3
-	}
 }
 
 func quietDuplicateIndices(sessions []data.Session) (map[int]struct{}, map[int]int) {

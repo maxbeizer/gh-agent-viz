@@ -69,7 +69,11 @@ func (m Model) View() string {
 	// Views section
 	views := sectionStyle.Render("Views") + "\n" +
 		formatKey("K", "kanban board") + "\n" +
+		formatKey("M", "mission control") + "\n" +
 		formatKey("l", "logs") + "\n" +
+		formatKey("c", "conversation") + "\n" +
+		formatKey("t", "tool timeline") + "\n" +
+		formatKey("d", "diff (PR)") + "\n" +
 		formatKey("p", "preview pane")
 
 	// Groups section

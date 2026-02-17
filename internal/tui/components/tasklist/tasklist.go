@@ -712,6 +712,26 @@ func (m Model) IsGrouped() bool {
 	return !m.userSetGroupBy && len(m.sessions) >= autoGroupThreshold
 }
 
+// IsCursorOnCollapsedGroup returns true when the cursor is on a collapsed group header.
+func (m Model) IsCursorOnCollapsedGroup() bool {
+	gb := m.effectiveGroupBy()
+	if gb == "" {
+		return false
+	}
+	groups := m.buildGroupsWith(gb)
+	for gi, g := range groups {
+		if gi == m.expandedGroup {
+			continue // expanded group — cursor is on a session row
+		}
+		for _, idx := range g.sessions {
+			if idx == m.rowCursor {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // effectiveGroupBy returns the active groupBy mode (manual or auto).
 func (m Model) effectiveGroupBy() string {
 	if m.groupBy != "" {

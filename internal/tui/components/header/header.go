@@ -103,11 +103,11 @@ func (m Model) View() string {
 		label string
 		count int
 	}{
-		{"attention", "ATTENTION", m.counts.Attention},
 		{"active", "RUNNING", m.counts.Active},
 		{"completed", "DONE", m.counts.Completed},
 		{"failed", "FAILED", m.counts.Failed},
 		{"all", "ALL", m.counts.All},
+		{"attention", "ATTENTION", m.counts.Attention},
 	}
 
 	renderedTabs := make([]string, 0, len(tabs))

@@ -722,7 +722,7 @@ func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // cycleFilter cycles through status filters by delta (+1 forward, -1 backward)
 func (m *Model) cycleFilter(delta int) {
-	filters := []string{"attention", "active", "completed", "failed", "all"}
+	filters := []string{"active", "completed", "failed", "all", "attention"}
 	for i, f := range filters {
 		if f == m.ctx.StatusFilter {
 			next := (i + delta) % len(filters)
@@ -1058,11 +1058,11 @@ func isValidFilter(filter string) bool {
 
 // smartDefaultFilter picks the best starting tab based on actual session counts.
 func smartDefaultFilter(counts FilterCounts) string {
-	if counts.Attention > 0 {
-		return "attention"
-	}
 	if counts.Active > 0 {
 		return "active"
+	}
+	if counts.Attention > 0 {
+		return "attention"
 	}
 	return "all"
 }

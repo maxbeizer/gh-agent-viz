@@ -146,6 +146,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		m.taskList.SetLoading(false)
 		m.taskList.SetTasks(msg.tasks)
+		m.taskDetail.SetAllSessions(msg.tasks)
 		return m, nil
 
 	case taskDetailLoadedMsg:

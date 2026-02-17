@@ -14,6 +14,7 @@ type Model struct {
 	titleStyle  lipgloss.Style
 	borderStyle lipgloss.Style
 	session     *data.Session
+	allSessions []data.Session
 	statusIcon  func(string) string
 	width       int
 	height      int
@@ -79,12 +80,23 @@ func (m Model) View() string {
 		}
 	}
 
+	// Show dependency graph if relationships exist
+	graph := ParseSessionDeps(m.session, m.allSessions)
+	if rendered := RenderDepGraph(graph, m.width); rendered != "" {
+		details = append(details, "", m.titleStyle.Render("Related Sessions"), rendered)
+	}
+
 	return m.borderStyle.Render(joinVertical(details))
 }
 
 // SetTask updates the session being displayed
 func (m *Model) SetTask(session *data.Session) {
 	m.session = session
+}
+
+// SetAllSessions updates the full session list for dependency graph rendering.
+func (m *Model) SetAllSessions(sessions []data.Session) {
+	m.allSessions = sessions
 }
 
 // SetSize updates the available rendering size for responsive layout.
@@ -159,6 +171,12 @@ func (m Model) ViewSplit() string {
 		if t.ConversationTurns == 0 && t.Duration == 0 {
 			details = append(details, "No usage data available")
 		}
+	}
+
+	// Show dependency graph if relationships exist
+	graph := ParseSessionDeps(m.session, m.allSessions)
+	if rendered := RenderDepGraph(graph, m.width); rendered != "" {
+		details = append(details, "", m.titleStyle.Render("Related Sessions"), rendered)
 	}
 
 	style := lipgloss.NewStyle().

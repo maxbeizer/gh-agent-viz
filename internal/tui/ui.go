@@ -17,6 +17,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/help"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/kanban"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/logview"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/mission"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/taskdetail"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/tasklist"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/toast"
@@ -32,6 +33,7 @@ const (
 	ViewModeLog
 	ViewModeKanban
 	ViewModeToolTimeline
+	ViewModeMission
 )
 
 // Model represents the main TUI application state
@@ -48,6 +50,7 @@ type Model struct {
 	kanban         kanban.Model
 	toolTimeline   tooltimeline.Model
 	conversationView conversation.Model
+	mission        mission.Model
 	dismissedStore *data.DismissedStore
 	viewMode       ViewMode
 	showConversation bool // true when conversation bubble view is active in log mode
@@ -117,6 +120,7 @@ func NewModel(repo string, debug bool) Model {
 		kanban:         kanban.New(theme.Title, theme.Border, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
 		toolTimeline:   tooltimeline.New(80, 20),
 		conversationView: conversation.New(80, 20),
+		mission:        mission.New(theme.Title, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
 		dismissedStore: dismissedStore,
 		viewMode:    ViewModeList,
 		showPreview: false,
@@ -151,6 +155,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.toolTimeline.SetSize(msg.Width-4, msg.Height-8)
 		m.conversationView.SetSize(msg.Width-4, msg.Height-8)
 		m.help.SetSize(msg.Width, msg.Height)
+		m.mission.SetSize(msg.Width, msg.Height-4)
 		m.updateSplitLayout()
 		m.ready = true
 		return m, nil
@@ -172,6 +177,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.taskList.SetTasks(msg.tasks)
 		m.taskDetail.SetAllSessions(msg.tasks)
 		m.kanban.SetSessions(msg.tasks)
+		m.mission.SetSessions(msg.tasks)
 
 		// Detect status changes and push toasts (skip first load)
 		if m.prevSessions != nil {
@@ -220,6 +226,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.taskList.SetAnimFrame(m.animFrame)
 		m.toast.Tick()
 		m.kanban.SetAnimFrame(m.animFrame)
+		m.mission.SetAnimFrame(m.animFrame)
 		return m, m.animationTickCmd()
 
 	case logPollTickMsg:
@@ -308,6 +315,8 @@ func (m Model) View() string {
 		mainView = m.kanban.View()
 	case ViewModeToolTimeline:
 		mainView = m.toolTimeline.View()
+	case ViewModeMission:
+		mainView = m.mission.View()
 	}
 
 	debugBanner := ""
@@ -378,6 +387,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleKanbanKeys(msg)
 	case ViewModeToolTimeline:
 		return m.handleToolTimelineKeys(msg)
+	case ViewModeMission:
+		return m.handleMissionKeys(msg)
 	}
 
 	return m, nil
@@ -455,6 +466,10 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "K":
 		m.viewMode = ViewModeKanban
 		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
+		return m, nil
+	case "M":
+		m.viewMode = ViewModeMission
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
 	}
 	return m, nil
@@ -616,6 +631,33 @@ func (m Model) handleToolTimelineKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.toolTimeline.HalfPageDown()
 	case "u":
 		m.toolTimeline.HalfPageUp()
+	}
+	return m, nil
+}
+
+// handleMissionKeys handles keys in mission control view mode
+func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "M":
+		m.viewMode = ViewModeList
+	case "j", "down":
+		m.mission.MoveCursor(1)
+	case "k", "up":
+		m.mission.MoveCursor(-1)
+	case "enter":
+		session := m.mission.SelectedSession()
+		if session != nil {
+			if session.Source == data.SourceLocalCopilot {
+				m.ctx.Error = nil
+				m.viewMode = ViewModeDetail
+				m.taskDetail.SetTask(session)
+				return m, nil
+			}
+			m.viewMode = ViewModeDetail
+			return m, m.fetchTaskDetail(session.ID, session.Repository)
+		}
+	case "r":
+		return m, m.fetchTasks
 	}
 	return m, nil
 }
@@ -993,6 +1035,7 @@ func (m *Model) updateFooterHints() {
 			m.keys.SelectTask,
 			m.keys.ToggleFilter,
 			m.keys.ToggleKanban,
+			m.keys.ToggleMission,
 			m.keys.ShowHelp,
 			m.keys.ExitApp,
 		}
@@ -1037,6 +1080,15 @@ func (m *Model) updateFooterHints() {
 			m.keys.ExitApp,
 		}
 		m.footer.SetHints(timelineHints)
+	case ViewModeMission:
+		missionHints := []key.Binding{
+			m.keys.NavigateBack,
+			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "navigate")),
+			m.keys.SelectTask,
+			m.keys.ShowHelp,
+			m.keys.ExitApp,
+		}
+		m.footer.SetHints(missionHints)
 	}
 }
 

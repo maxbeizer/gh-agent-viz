@@ -128,9 +128,14 @@ func (m Model) View() string {
 		Render(strings.Repeat("━", m.width))
 
 	if m.showBanner() {
-		styledBanner := m.titleStyle.Render(Banner)
+		bannerStyle := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(m.titleStyle.GetForeground())
+		styledBanner := bannerStyle.Render(Banner)
 		if m.tagline != "" {
-			tagStyle := lipgloss.NewStyle().Faint(true).Italic(true)
+			tagStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.AdaptiveColor{Light: "245", Dark: "250"}).
+				Italic(true)
 			tagBlock := tagStyle.Render(m.tagline)
 			styledBanner = lipgloss.JoinHorizontal(lipgloss.Center, styledBanner, "  ", tagBlock)
 		}

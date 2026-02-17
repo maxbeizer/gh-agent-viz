@@ -99,21 +99,58 @@ func (m *Model) SelectedSession() *data.Session {
 	return &s
 }
 
-// View renders the mission control dashboard.
+// View renders the mission control dashboard with pagination.
 func (m *Model) View() string {
 	if len(m.cards) == 0 {
 		return m.titleStyle.Render("  No sessions to display")
 	}
 
+	header := m.titleStyle.Render("⚡ Mission Control") +
+		lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("  %d sessions", len(m.cards)))
+
+	// Each card is 3 lines (line1 + line2 + separator)
+	cardHeight := 3
+	availableHeight := m.height - 6 // header + footer chrome
+	pageSize := availableHeight / cardHeight
+	if pageSize < 2 {
+		pageSize = 2
+	}
+
+	// Compute visible window around cursor
+	start := m.cursor - pageSize/2
+	if start < 0 {
+		start = 0
+	}
+	end := start + pageSize
+	if end > len(m.cards) {
+		end = len(m.cards)
+		start = end - pageSize
+		if start < 0 {
+			start = 0
+		}
+	}
+
 	var lines []string
-	for i, card := range m.cards {
+	lines = append(lines, header)
+	lines = append(lines, "")
+
+	if start > 0 {
+		lines = append(lines, lipgloss.NewStyle().Faint(true).Render(
+			fmt.Sprintf("  ↑ %d more above", start)))
+	}
+
+	for i := start; i < end; i++ {
 		isSelected := i == m.cursor
-		lines = append(lines, m.renderCard(card, isSelected))
-		// Separator between cards
-		if i < len(m.cards)-1 {
+		lines = append(lines, m.renderCard(m.cards[i], isSelected))
+		if i < end-1 {
 			sep := strings.Repeat("─", m.cardWidth())
 			lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render("  "+sep))
 		}
+	}
+
+	if end < len(m.cards) {
+		lines = append(lines, lipgloss.NewStyle().Faint(true).Render(
+			fmt.Sprintf("  ↓ %d more below", len(m.cards)-end)))
 	}
 
 	return strings.Join(lines, "\n")
@@ -136,7 +173,12 @@ func (m *Model) renderCard(card SessionCard, selected bool) string {
 		icon = m.animStatusIcon(s.Status, m.animFrame)
 	}
 
-	// Line 1: icon + title + repo + duration (right-aligned)
+	gutter := "  "
+	if selected {
+		gutter = "▎ "
+	}
+
+	// Line 1: gutter + icon + title + repo + duration (right-aligned)
 	title := s.Title
 	repo := s.Repository
 	if repo == "" {
@@ -144,9 +186,7 @@ func (m *Model) renderCard(card SessionCard, selected bool) string {
 	}
 	rightInfo := formatDuration(s)
 
-	// Compute available width for title
-	// "  {icon} {title}  {repo}  {rightInfo}"
-	fixedLen := 2 + runeWidth(icon) + 1 + 2 + len(repo) + 2 + len(rightInfo)
+	fixedLen := len(gutter) + runeWidth(icon) + 1 + 2 + len(repo) + 2 + len(rightInfo)
 	maxTitle := w - fixedLen
 	if maxTitle < 5 {
 		maxTitle = 5
@@ -155,7 +195,7 @@ func (m *Model) renderCard(card SessionCard, selected bool) string {
 		title = title[:maxTitle-1] + "…"
 	}
 
-	left := fmt.Sprintf("  %s %s", icon, title)
+	left := fmt.Sprintf("%s%s %s", gutter, icon, title)
 	right := fmt.Sprintf("%s  %s", repo, rightInfo)
 	padding := w - runeWidth(left) - len(right)
 	if padding < 2 {
@@ -172,7 +212,7 @@ func (m *Model) renderCard(card SessionCard, selected bool) string {
 	if len(action) > maxAction {
 		action = action[:maxAction-1] + "…"
 	}
-	actionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	actionStyle := lipgloss.NewStyle().Faint(true)
 	line2 := "    " + actionStyle.Render(action)
 
 	cardText := line1 + "\n" + line2

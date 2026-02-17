@@ -22,6 +22,7 @@ type Keybindings struct {
 	ToggleFollow   key.Binding
 	ToggleKanban   key.Binding
 	ToggleMission  key.Binding
+	ShowDiff       key.Binding
 	ShowHelp       key.Binding
 }
 
@@ -99,6 +100,10 @@ func NewKeybindings() Keybindings {
 		ToggleMission: key.NewBinding(
 			key.WithKeys("M"),
 			key.WithHelp("M", "mission"),
+		),
+		ShowDiff: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "diff"),
 		),
 		ShowHelp: key.NewBinding(
 			key.WithKeys("?"),

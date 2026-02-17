@@ -59,13 +59,15 @@ func (m Model) View() string {
 	)
 
 	if tl := RenderTimeline(m.session, timelineWidth(m.width)); tl != "" {
-		details = append(details, "", fmt.Sprintf("Timeline:   %s", tl))
+		details = append(details, sectionDivider(m.width-4))
+		details = append(details, fmt.Sprintf("Timeline:   %s", tl))
 	}
 
 	// Show telemetry if available
 	if m.session.Telemetry != nil {
 		t := m.session.Telemetry
-		details = append(details, "", m.titleStyle.Render("Session Stats"))
+		details = append(details, sectionDivider(m.width-4))
+		details = append(details, m.titleStyle.Render("Session Stats"))
 		if t.Duration > 0 {
 			details = append(details, fmt.Sprintf("⏱ Duration: %s", formatDuration(t.Duration)))
 		}
@@ -83,7 +85,8 @@ func (m Model) View() string {
 	// Show dependency graph if relationships exist
 	graph := ParseSessionDeps(m.session, m.allSessions)
 	if rendered := RenderDepGraph(graph, m.width); rendered != "" {
-		details = append(details, "", m.titleStyle.Render("Related Sessions"), rendered)
+		details = append(details, sectionDivider(m.width-4))
+		details = append(details, m.titleStyle.Render("Related Sessions"), rendered)
 	}
 
 	return m.borderStyle.Render(joinVertical(details))
@@ -153,12 +156,14 @@ func (m Model) ViewSplit() string {
 	)
 
 	if tl := RenderTimeline(m.session, timelineWidth(m.width)); tl != "" {
-		details = append(details, "", fmt.Sprintf("Timeline:   %s", tl))
+		details = append(details, sectionDivider(m.width-4))
+		details = append(details, fmt.Sprintf("Timeline:   %s", tl))
 	}
 
 	if m.session.Telemetry != nil {
 		t := m.session.Telemetry
-		details = append(details, "", m.titleStyle.Render("Session Stats"))
+		details = append(details, sectionDivider(m.width-4))
+		details = append(details, m.titleStyle.Render("Session Stats"))
 		if t.Duration > 0 {
 			details = append(details, fmt.Sprintf("⏱ Duration: %s", formatDuration(t.Duration)))
 		}
@@ -176,7 +181,8 @@ func (m Model) ViewSplit() string {
 	// Show dependency graph if relationships exist
 	graph := ParseSessionDeps(m.session, m.allSessions)
 	if rendered := RenderDepGraph(graph, m.width); rendered != "" {
-		details = append(details, "", m.titleStyle.Render("Related Sessions"), rendered)
+		details = append(details, sectionDivider(m.width-4))
+		details = append(details, m.titleStyle.Render("Related Sessions"), rendered)
 	}
 
 	style := lipgloss.NewStyle().
@@ -222,6 +228,14 @@ func detailTimestamp(ts time.Time) string {
 
 func detailTitle(title string) string {
 	return detailValue(title, "Untitled Session")
+}
+
+// sectionDivider renders a horizontal rule for visual separation between sections.
+func sectionDivider(width int) string {
+	if width <= 0 {
+		width = 40
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render(strings.Repeat("─", width))
 }
 
 func formatDuration(d time.Duration) string {

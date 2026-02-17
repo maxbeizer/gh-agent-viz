@@ -100,7 +100,18 @@ func (m Model) View() string {
 	}
 
 	if len(m.sessions) == 0 {
-		return m.titleStyle.Render("✨ All quiet on the agent front.\n\nNo sessions match this filter — your agents are either napping or haven't checked in yet.\nPress 'r' to refresh, or tab to try another filter.")
+		emptyArt := `
+    ╭──────────────────────────────╮
+    │                              │
+    │   ✨ All quiet out here      │
+    │                              │
+    │   No sessions match this     │
+    │   filter. Press 'r' to       │
+    │   refresh or tab to try      │
+    │   another filter.            │
+    │                              │
+    ╰──────────────────────────────╯`
+		return m.titleStyle.Render(emptyArt)
 	}
 
 	return m.renderFocusedList()
@@ -164,11 +175,8 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 
 	badge := sessionBadge(session, m.duplicateCounts[sessionIdx])
 
-	// Gutter indicator: selected row gets a bar, others get a space
-	gutter := "  "
-	if selected {
-		gutter = "▎ "
-	}
+	// Gutter indicator: colored by status, brighter when selected
+	gutter := m.statusGutter(session.Status, selected)
 
 	if width < 40 {
 		titleMax := width - 8
@@ -859,4 +867,31 @@ func (m Model) renderGroupedListWith(groupBy string) string {
 		}
 	}
 	return strings.Join(rows, "\n")
+}
+
+// statusColor returns a lipgloss.Color for the given session status.
+func (m Model) statusColor(status string) lipgloss.Color {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "running":
+		return lipgloss.Color("42")
+	case "queued":
+		return lipgloss.Color("226")
+	case "needs-input":
+		return lipgloss.Color("208")
+	case "completed":
+		return lipgloss.Color("46")
+	case "failed":
+		return lipgloss.Color("196")
+	default:
+		return lipgloss.Color("245")
+	}
+}
+
+// statusGutter renders a colored gutter bar based on session status.
+func (m Model) statusGutter(status string, selected bool) string {
+	color := m.statusColor(status)
+	if !selected {
+		return lipgloss.NewStyle().Foreground(color).Faint(true).Render("▎") + " "
+	}
+	return lipgloss.NewStyle().Foreground(color).Render("▎") + " "
 }

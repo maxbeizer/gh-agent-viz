@@ -70,8 +70,9 @@ func newDefaultTheme() *Theme {
 			Padding(0, 1),
 		TableRowSelected: lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(lipgloss.Color("237")).
-			Foreground(lipgloss.Color("15")),
+			Background(lipgloss.Color("236")).
+			Foreground(lipgloss.Color("15")).
+			Bold(true),
 		Border: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("238")),
@@ -125,8 +126,9 @@ func newAdaptiveDefaultTheme() *Theme {
 			Padding(0, 1),
 		TableRowSelected: lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(lipgloss.AdaptiveColor{Light: "254", Dark: "237"}).
-			Foreground(lipgloss.AdaptiveColor{Light: "0", Dark: "15"}),
+			Background(lipgloss.AdaptiveColor{Light: "254", Dark: "236"}).
+			Foreground(lipgloss.AdaptiveColor{Light: "0", Dark: "15"}).
+			Bold(true),
 		Border: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.AdaptiveColor{Light: "249", Dark: "238"}),
@@ -181,7 +183,8 @@ func newCatppuccinMochaTheme() *Theme {
 		TableRowSelected: lipgloss.NewStyle().
 			Padding(0, 1).
 			Background(lipgloss.Color("#313244")).
-			Foreground(lipgloss.Color("#cdd6f4")),
+			Foreground(lipgloss.Color("#cdd6f4")).
+			Bold(true),
 		Border: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#313244")),
@@ -236,7 +239,8 @@ func newDraculaTheme() *Theme {
 		TableRowSelected: lipgloss.NewStyle().
 			Padding(0, 1).
 			Background(lipgloss.Color("#44475a")).
-			Foreground(lipgloss.Color("#f8f8f2")),
+			Foreground(lipgloss.Color("#f8f8f2")).
+			Bold(true),
 		Border: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#44475a")),
@@ -291,7 +295,8 @@ func newTokyoNightTheme() *Theme {
 		TableRowSelected: lipgloss.NewStyle().
 			Padding(0, 1).
 			Background(lipgloss.Color("#33467c")).
-			Foreground(lipgloss.Color("#c0caf5")),
+			Foreground(lipgloss.Color("#c0caf5")).
+			Bold(true),
 		Border: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#33467c")),

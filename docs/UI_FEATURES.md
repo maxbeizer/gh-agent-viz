@@ -148,4 +148,33 @@ When follow mode is active:
 | `G` | Jump to bottom |
 | `esc` | Return to session list |
 
+## Filter Tabs
+
+The header shows filter tabs that organize sessions by status.
+
+### Tab behavior
+
+| Tab | Shows | When it matters |
+|-----|-------|-----------------|
+| **ATTENTION** | `needs-input` and `failed` sessions only | Something is waiting on **you** |
+| **RUNNING** | Active sessions (running, queued) | Sessions currently working |
+| **DONE** | Completed sessions | Finished work |
+| **FAILED** | Failed sessions | Errors to investigate |
+| **ALL** | Everything | Full overview |
+
+### Smart default tab
+
+On startup, the UI picks the most useful tab automatically:
+1. **ATTENTION** — if there are sessions waiting on you
+2. **RUNNING** — if there are active sessions
+3. **ALL** — fallback when nothing is active
+
+### What "needs attention" means
+
+Only two statuses trigger the ATTENTION tab:
+- **`needs-input`** — the agent has explicitly asked a question and is blocked waiting for your answer
+- **`failed`** — the agent hit an error and stopped
+
+Idle running sessions (e.g., an agent that finished responding and is waiting for your next message) show up under RUNNING with a `💤 idle` badge. This is a known limitation — the data source doesn't distinguish "agent actively working" from "agent waiting for the user to continue." See [#121](https://github.com/maxbeizer/gh-agent-viz/issues/121) for discussion.
+
 Follow mode is only available for sessions with status `running`. For completed or failed sessions, the log viewer shows the full static log.

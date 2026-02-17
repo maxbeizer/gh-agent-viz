@@ -445,7 +445,7 @@ func TestSessionBadge_IdleShowsDuration(t *testing.T) {
 		Status:    "running",
 		UpdatedAt: time.Now().Add(-30 * time.Minute),
 	}
-	badge := sessionBadge(session, false, 0)
+	badge := sessionBadge(session, 0)
 	if !strings.HasPrefix(badge, "💤 ~") {
 		t.Fatalf("expected idle badge with duration, got %q", badge)
 	}
@@ -459,7 +459,7 @@ func TestSessionBadge_StaleShowsEmoji(t *testing.T) {
 		Status:    "running",
 		UpdatedAt: time.Now().Add(-5 * time.Hour),
 	}
-	badge := sessionBadge(session, false, 0)
+	badge := sessionBadge(session, 0)
 	if badge != "😴 stale" {
 		t.Fatalf("expected stale badge for session idle >4h, got %q", badge)
 	}

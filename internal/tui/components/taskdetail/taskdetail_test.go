@@ -158,11 +158,11 @@ func TestAttentionReason_Idle(t *testing.T) {
 		UpdatedAt: time.Now().Add(-30 * time.Minute),
 	}
 	got := attentionReason(s)
-	if !strings.Contains(got, "⚠️") || !strings.Contains(got, "idle") {
+	if !strings.Contains(got, "⚠️") || !strings.Contains(strings.ToLower(got), "idle") {
 		t.Fatalf("expected idle attention reason, got %q", got)
 	}
-	if !strings.Contains(got, "stuck") {
-		t.Fatalf("expected stuck hint, got %q", got)
+	if !strings.Contains(got, "check logs") || !strings.Contains(got, "resume") {
+		t.Fatalf("expected actionable idle reason, got %q", got)
 	}
 }
 
@@ -172,7 +172,7 @@ func TestAttentionReason_Stale(t *testing.T) {
 		UpdatedAt: time.Now().Add(-5 * time.Hour),
 	}
 	got := attentionReason(s)
-	if !strings.Contains(got, "😴") || !strings.Contains(got, "abandoned") {
+	if !strings.Contains(got, "😴") || !strings.Contains(got, "dismiss") {
 		t.Fatalf("expected stale attention reason, got %q", got)
 	}
 }

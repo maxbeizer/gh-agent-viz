@@ -275,7 +275,7 @@ func TestView_CardShowsAttentionBadges(t *testing.T) {
 	if !strings.Contains(view, "🧑 waiting on you") {
 		t.Fatalf("expected needs-input badge, got: %s", view)
 	}
-	if !strings.Contains(view, "⚠️ idle ~30m — may be stuck") {
+	if !strings.Contains(view, "⚠️ idle ~30m — check logs") {
 		t.Fatalf("expected idle badge, got: %s", view)
 	}
 }
@@ -449,8 +449,8 @@ func TestSessionBadge_IdleShowsDuration(t *testing.T) {
 	if !strings.HasPrefix(badge, "⚠️ idle ~") {
 		t.Fatalf("expected idle badge with duration, got %q", badge)
 	}
-	if !strings.Contains(badge, "— may be stuck") {
-		t.Fatalf("expected 'may be stuck' suffix, got %q", badge)
+	if !strings.Contains(badge, "— check logs") {
+		t.Fatalf("expected 'check logs' suffix, got %q", badge)
 	}
 }
 
@@ -460,7 +460,7 @@ func TestSessionBadge_StaleShowsEmoji(t *testing.T) {
 		UpdatedAt: time.Now().Add(-5 * time.Hour),
 	}
 	badge := sessionBadge(session, 0)
-	if badge != "😴 stale — no activity 4h+" {
+	if badge != "😴 stale — consider dismissing" {
 		t.Fatalf("expected stale badge for session idle >4h, got %q", badge)
 	}
 }

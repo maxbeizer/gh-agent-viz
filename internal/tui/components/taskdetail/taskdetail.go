@@ -235,10 +235,10 @@ func attentionReason(session *data.Session) string {
 	}
 	idle := time.Since(session.UpdatedAt)
 	if idle >= data.AttentionStaleMax {
-		return fmt.Sprintf("😴 No activity for %s — session may be abandoned.", formatDuration(idle))
+		return fmt.Sprintf("😴 No activity for %s. Press 's' to resume or 'x' to dismiss.", formatDuration(idle))
 	}
 	if idle >= data.AttentionStaleThreshold {
-		return fmt.Sprintf("⚠️ Session has been idle for %s while status is \"%s\". This may indicate the agent is stuck.", formatDuration(idle), session.Status)
+		return fmt.Sprintf("⚠️ Idle for %s while %s. Press 'l' to check logs or 's' to resume.", formatDuration(idle), session.Status)
 	}
 	return ""
 }

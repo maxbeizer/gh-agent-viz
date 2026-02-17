@@ -29,14 +29,15 @@ func newTestModel() Model {
 }
 
 func testSessions() []data.Session {
+	now := time.Now()
 	return []data.Session{
-		{ID: "1", Status: "running", Title: "Fix auth bug", Repository: "owner/repo", CreatedAt: time.Now().Add(-12 * time.Minute)},
-		{ID: "2", Status: "needs-input", Title: "Review PR", Repository: "owner/repo", CreatedAt: time.Now().Add(-5 * time.Minute)},
-		{ID: "3", Status: "completed", Title: "Migrate DB", Repository: "owner/repo", CreatedAt: time.Now().Add(-1 * time.Hour)},
-		{ID: "4", Status: "completed", Title: "Add tests", Repository: "owner/repo", CreatedAt: time.Now().Add(-2 * time.Hour)},
-		{ID: "5", Status: "failed", Title: "Deploy fix", Repository: "owner/repo", CreatedAt: time.Now().Add(-30 * time.Minute)},
-		{ID: "6", Status: "queued", Title: "Queued task", Repository: "owner/repo", CreatedAt: time.Now().Add(-1 * time.Minute)},
-		{ID: "7", Status: "active", Title: "Active task", Repository: "owner/repo", CreatedAt: time.Now().Add(-3 * time.Minute)},
+		{ID: "1", Status: "running", Title: "Fix auth bug", Repository: "owner/repo", CreatedAt: now.Add(-12 * time.Minute), UpdatedAt: now.Add(-2 * time.Minute)},
+		{ID: "2", Status: "needs-input", Title: "Review PR", Repository: "owner/repo", CreatedAt: now.Add(-5 * time.Minute), UpdatedAt: now.Add(-1 * time.Minute)},
+		{ID: "3", Status: "completed", Title: "Migrate DB", Repository: "owner/repo", CreatedAt: now.Add(-1 * time.Hour), UpdatedAt: now.Add(-30 * time.Minute)},
+		{ID: "4", Status: "completed", Title: "Add tests", Repository: "owner/repo", CreatedAt: now.Add(-2 * time.Hour), UpdatedAt: now.Add(-1 * time.Hour)},
+		{ID: "5", Status: "failed", Title: "Deploy fix", Repository: "owner/repo", CreatedAt: now.Add(-30 * time.Minute), UpdatedAt: now.Add(-25 * time.Minute)},
+		{ID: "6", Status: "queued", Title: "Queued task", Repository: "owner/repo", CreatedAt: now.Add(-1 * time.Minute), UpdatedAt: now.Add(-30 * time.Second)},
+		{ID: "7", Status: "running", Title: "Idle task", Repository: "owner/repo", CreatedAt: now.Add(-3 * time.Hour), UpdatedAt: now.Add(-40 * time.Minute)},
 	}
 }
 
@@ -45,25 +46,21 @@ func TestSetSessions_DistributesIntoColumns(t *testing.T) {
 	m.SetSessions(testSessions())
 
 	cols := m.Columns()
-	if len(cols) != 4 {
-		t.Fatalf("expected 4 columns, got %d", len(cols))
+	if len(cols) != 3 {
+		t.Fatalf("expected 3 columns, got %d", len(cols))
 	}
 
-	// Running column: running + queued + active = 3
+	// IN PROGRESS: running(recent) + needs-input(recent) + queued = 3
 	if len(cols[0].Sessions) != 3 {
-		t.Errorf("RUNNING column: expected 3 sessions, got %d", len(cols[0].Sessions))
+		t.Errorf("IN PROGRESS column: expected 3 sessions, got %d", len(cols[0].Sessions))
 	}
-	// Needs input: 1
+	// IDLE: running(idle 40m) = 1
 	if len(cols[1].Sessions) != 1 {
-		t.Errorf("NEEDS INPUT column: expected 1 session, got %d", len(cols[1].Sessions))
+		t.Errorf("IDLE column: expected 1 session, got %d", len(cols[1].Sessions))
 	}
-	// Completed: 2
-	if len(cols[2].Sessions) != 2 {
-		t.Errorf("COMPLETED column: expected 2 sessions, got %d", len(cols[2].Sessions))
-	}
-	// Failed: 1
-	if len(cols[3].Sessions) != 1 {
-		t.Errorf("FAILED column: expected 1 session, got %d", len(cols[3].Sessions))
+	// DONE: completed(2) + failed(1) = 3
+	if len(cols[2].Sessions) != 3 {
+		t.Errorf("DONE column: expected 3 sessions, got %d", len(cols[2].Sessions))
 	}
 }
 
@@ -71,27 +68,23 @@ func TestMoveColumn_ClampsAtBounds(t *testing.T) {
 	m := newTestModel()
 	m.SetSessions(testSessions())
 
-	// Start at column 0
 	if m.ColCursor() != 0 {
 		t.Fatalf("expected initial column cursor 0, got %d", m.ColCursor())
 	}
 
-	// Move left past beginning
 	m.MoveColumn(-1)
 	if m.ColCursor() != 0 {
 		t.Errorf("expected column cursor clamped at 0, got %d", m.ColCursor())
 	}
 
-	// Move right
 	m.MoveColumn(1)
 	if m.ColCursor() != 1 {
 		t.Errorf("expected column cursor 1, got %d", m.ColCursor())
 	}
 
-	// Move to last
 	m.MoveColumn(10)
-	if m.ColCursor() != 3 {
-		t.Errorf("expected column cursor clamped at 3, got %d", m.ColCursor())
+	if m.ColCursor() != 2 {
+		t.Errorf("expected column cursor clamped at 2, got %d", m.ColCursor())
 	}
 }
 
@@ -99,7 +92,7 @@ func TestMoveRow_ClampsAtBounds(t *testing.T) {
 	m := newTestModel()
 	m.SetSessions(testSessions())
 
-	// Column 0 (RUNNING) has 3 sessions
+	// IN PROGRESS has 3 sessions
 	m.MoveRow(1)
 	if m.RowCursor() != 1 {
 		t.Errorf("expected row cursor 1, got %d", m.RowCursor())
@@ -110,13 +103,11 @@ func TestMoveRow_ClampsAtBounds(t *testing.T) {
 		t.Errorf("expected row cursor 2, got %d", m.RowCursor())
 	}
 
-	// Clamp at end
 	m.MoveRow(1)
 	if m.RowCursor() != 2 {
 		t.Errorf("expected row cursor clamped at 2, got %d", m.RowCursor())
 	}
 
-	// Move up past beginning
 	m.MoveRow(-10)
 	if m.RowCursor() != 0 {
 		t.Errorf("expected row cursor clamped at 0, got %d", m.RowCursor())
@@ -125,12 +116,12 @@ func TestMoveRow_ClampsAtBounds(t *testing.T) {
 
 func TestMoveRow_EmptyColumn(t *testing.T) {
 	m := newTestModel()
-	// Only put sessions in RUNNING column
+	now := time.Now()
 	m.SetSessions([]data.Session{
-		{ID: "1", Status: "running", Title: "Test"},
+		{ID: "1", Status: "running", Title: "Test", UpdatedAt: now},
 	})
 
-	// Move to NEEDS INPUT column (empty)
+	// Move to IDLE column (empty)
 	m.MoveColumn(1)
 	m.MoveRow(1)
 	if m.RowCursor() != 0 {
@@ -146,22 +137,12 @@ func TestSelectedSession_ReturnsCorrectSession(t *testing.T) {
 	if s == nil {
 		t.Fatal("expected non-nil selected session")
 	}
-	if s.ID != "1" {
-		t.Errorf("expected session ID '1', got %q", s.ID)
-	}
 
-	// Move to second row
-	m.MoveRow(1)
-	s = m.SelectedSession()
-	if s == nil || s.Status != "queued" {
-		t.Errorf("expected queued session at row 1")
-	}
-
-	// Move to NEEDS INPUT column
+	// Move to IDLE column
 	m.MoveColumn(1)
 	s = m.SelectedSession()
-	if s == nil || s.ID != "2" {
-		t.Errorf("expected session ID '2' in NEEDS INPUT column, got %v", s)
+	if s == nil || s.ID != "7" {
+		t.Errorf("expected idle session ID '7', got %v", s)
 	}
 }
 
@@ -181,8 +162,8 @@ func TestColumnWidth_Calculation(t *testing.T) {
 	m.SetSessions(testSessions())
 
 	w := m.ColumnWidth()
-	// 4 columns, 3 gaps of 1 space each = 97 available, 97/4 = 24
-	expected := (100 - 3) / 4
+	// 3 columns, 2 gaps of 1 space each = 98 available, 98/3 = 32
+	expected := (100 - 2) / 3
 	if w != expected {
 		t.Errorf("expected column width %d, got %d", expected, w)
 	}
@@ -190,7 +171,7 @@ func TestColumnWidth_Calculation(t *testing.T) {
 
 func TestColumnWidth_MinWidth(t *testing.T) {
 	m := newTestModel()
-	m.SetSize(40, 24) // 40 - 3 = 37, 37/4 = 9 which is < 20
+	m.SetSize(40, 24)
 	m.SetSessions(testSessions())
 
 	w := m.ColumnWidth()
@@ -205,26 +186,23 @@ func TestView_RendersAllColumns(t *testing.T) {
 	m.SetSessions(testSessions())
 
 	view := m.View()
-	if !strings.Contains(view, "RUNNING") {
-		t.Error("expected RUNNING column in view")
+	if !strings.Contains(view, "IN PROGRESS") {
+		t.Error("expected IN PROGRESS column in view")
 	}
-	if !strings.Contains(view, "NEEDS INPUT") {
-		t.Error("expected NEEDS INPUT column in view")
+	if !strings.Contains(view, "IDLE") {
+		t.Error("expected IDLE column in view")
 	}
-	if !strings.Contains(view, "COMPLETED") {
-		t.Error("expected COMPLETED column in view")
-	}
-	if !strings.Contains(view, "FAILED") {
-		t.Error("expected FAILED column in view")
+	if !strings.Contains(view, "DONE") {
+		t.Error("expected DONE column in view")
 	}
 }
 
 func TestView_EmptyColumnsShowPlaceholder(t *testing.T) {
 	m := newTestModel()
 	m.SetSize(120, 24)
-	// Only running sessions
+	now := time.Now()
 	m.SetSessions([]data.Session{
-		{ID: "1", Status: "running", Title: "Only runner"},
+		{ID: "1", Status: "running", Title: "Only runner", UpdatedAt: now},
 	})
 
 	view := m.View()
@@ -245,13 +223,13 @@ func TestMoveColumn_ResetsRowCursor(t *testing.T) {
 	m := newTestModel()
 	m.SetSessions(testSessions())
 
-	// Move to row 2 in RUNNING column (3 items)
+	// Move to row 2 in IN PROGRESS column (3 items)
 	m.MoveRow(2)
 	if m.RowCursor() != 2 {
 		t.Fatalf("expected row 2, got %d", m.RowCursor())
 	}
 
-	// Move to NEEDS INPUT column (1 item) — row should clamp to 0
+	// Move to IDLE column (1 item) — row should clamp to 0
 	m.MoveColumn(1)
 	if m.RowCursor() != 0 {
 		t.Errorf("expected row cursor clamped to 0 when moving to smaller column, got %d", m.RowCursor())

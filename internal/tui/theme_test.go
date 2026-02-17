@@ -123,39 +123,35 @@ func TestNewThemeFromConfig_UnknownFallsBackToDefault(t *testing.T) {
 }
 
 func TestAnimatedStatusIcon_Running(t *testing.T) {
-	// Frame 0 should contain the first pulsing dot character
+	// All frames should contain the steady dot
 	icon := AnimatedStatusIcon("running", 0)
 	if !strings.Contains(icon, "●") {
 		t.Errorf("expected ● in running frame 0, got %q", icon)
 	}
-	// Frame 2 should contain the ring character
-	icon = AnimatedStatusIcon("running", 2)
-	if !strings.Contains(icon, "◉") {
-		t.Errorf("expected ◉ in running frame 2, got %q", icon)
+	icon = AnimatedStatusIcon("running", 3)
+	if !strings.Contains(icon, "●") {
+		t.Errorf("expected ● in running frame 3, got %q", icon)
 	}
 }
 
 func TestAnimatedStatusIcon_Queued(t *testing.T) {
+	// Queued now uses static icon (no animation)
 	icon := AnimatedStatusIcon("queued", 0)
-	if !strings.Contains(icon, "◌") {
-		t.Errorf("expected ◌ in queued frame 0, got %q", icon)
-	}
-	icon = AnimatedStatusIcon("queued", 1)
 	if !strings.Contains(icon, "○") {
-		t.Errorf("expected ○ in queued frame 1, got %q", icon)
+		t.Errorf("expected ○ in queued frame 0, got %q", icon)
 	}
 }
 
 func TestAnimatedStatusIcon_WrapsFrames(t *testing.T) {
-	// Frame 6 should wrap to frame 0 for running (6 frames)
+	// Frame 6 should wrap and still show ●
 	icon := AnimatedStatusIcon("running", 6)
 	if !strings.Contains(icon, "●") {
 		t.Errorf("expected ● for running frame 6 (wrap), got %q", icon)
 	}
-	// Frame 4 should wrap to frame 0 for queued (4 frames)
+	// Queued is static now
 	icon = AnimatedStatusIcon("queued", 4)
-	if !strings.Contains(icon, "◌") {
-		t.Errorf("expected ◌ for queued frame 4 (wrap), got %q", icon)
+	if !strings.Contains(icon, "○") {
+		t.Errorf("expected ○ for queued (static), got %q", icon)
 	}
 }
 

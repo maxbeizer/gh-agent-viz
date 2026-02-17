@@ -170,6 +170,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.toast.Push(StatusIcon(s.Status), s.Title, prev+" → "+s.Status)
 				}
 			}
+		} else {
+			// First load: pick the best default tab based on actual data
+			m.ctx.StatusFilter = smartDefaultFilter(msg.counts)
+			m.taskList.SetLoading(true)
+			m.prevSessions = make(map[string]string, len(msg.tasks))
+			for _, s := range msg.tasks {
+				m.prevSessions[s.ID] = s.Status
+			}
+			return m, m.fetchTasks
 		}
 		// Update prevSessions for next comparison
 		m.prevSessions = make(map[string]string, len(msg.tasks))
@@ -756,6 +765,17 @@ func isValidFilter(filter string) bool {
 	default:
 		return false
 	}
+}
+
+// smartDefaultFilter picks the best starting tab based on actual session counts.
+func smartDefaultFilter(counts FilterCounts) string {
+	if counts.Attention > 0 {
+		return "attention"
+	}
+	if counts.Active > 0 {
+		return "active"
+	}
+	return "all"
 }
 
 // previewVisible returns true when the split-pane detail preview should render.

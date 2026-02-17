@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 )
@@ -34,12 +35,31 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(1)
 	}
 
-	if cmdParts[0] != "gh" || cmdParts[1] != "agent-task" {
+	if cmdParts[0] != "gh" {
 		fmt.Fprintf(os.Stderr, "wrong command: %v\n", cmdParts)
 		os.Exit(1)
 	}
 
 	testMode := os.Getenv("TEST_SCENARIO")
+
+	// Handle pr subcommands before agent-task guard
+	if len(cmdParts) >= 2 && cmdParts[1] == "pr" {
+		if testMode == "pr_diff_success" {
+			fmt.Fprint(os.Stdout, "diff --git a/main.go b/main.go\nindex abc..def 100644\n--- a/main.go\n+++ b/main.go\n@@ -1,3 +1,4 @@\n package main\n-func old() {}\n+func new() {}\n+func extra() {}\n")
+			os.Exit(0)
+		}
+		if testMode == "error" {
+			fmt.Fprintln(os.Stderr, "command execution failed")
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "unknown pr scenario: %s\n", testMode)
+		os.Exit(1)
+	}
+
+	if cmdParts[1] != "agent-task" {
+		fmt.Fprintf(os.Stderr, "wrong command: %v\n", cmdParts)
+		os.Exit(1)
+	}
 
 	if testMode == "list_success" {
 		result := []AgentTask{
@@ -309,6 +329,49 @@ func TestFetchAgentTaskLog_CommandError(t *testing.T) {
 	execCommand = createMockExecCommand("error")
 
 	_, err := FetchAgentTaskLog("abc123", "")
+	if err == nil {
+		t.Fatal("expected error when command fails, got none")
+	}
+}
+
+func TestFetchPRDiff_ValidData(t *testing.T) {
+	originalExecCommand := execCommand
+	defer func() { execCommand = originalExecCommand }()
+
+	execCommand = createMockExecCommand("pr_diff_success")
+
+	result, err := FetchPRDiff(42, "owner/repo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, "diff --git") {
+		t.Error("expected diff output to contain 'diff --git'")
+	}
+	if !strings.Contains(result, "+func new()") {
+		t.Error("expected diff output to contain added line")
+	}
+}
+
+func TestFetchPRDiff_InvalidInputs(t *testing.T) {
+	_, err := FetchPRDiff(0, "owner/repo")
+	if err == nil {
+		t.Error("expected error for PR number 0")
+	}
+
+	_, err = FetchPRDiff(1, "")
+	if err == nil {
+		t.Error("expected error for empty repo")
+	}
+}
+
+func TestFetchPRDiff_CommandError(t *testing.T) {
+	originalExecCommand := execCommand
+	defer func() { execCommand = originalExecCommand }()
+
+	execCommand = createMockExecCommand("error")
+
+	_, err := FetchPRDiff(42, "owner/repo")
 	if err == nil {
 		t.Fatal("expected error when command fails, got none")
 	}

@@ -275,6 +275,24 @@ func parseAgentTaskTime(value string) time.Time {
 	return time.Time{}
 }
 
+// FetchPRDiff retrieves the unified diff for a pull request
+func FetchPRDiff(prNumber int, repo string) (string, error) {
+	if prNumber <= 0 {
+		return "", fmt.Errorf("valid PR number is required")
+	}
+	if repo == "" {
+		return "", fmt.Errorf("repository is required")
+	}
+
+	args := []string{"pr", "diff", strconv.Itoa(prNumber), "-R", repo}
+	output, err := runGH(args...)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch PR diff: %s", strings.TrimSpace(string(output)))
+	}
+
+	return string(output), nil
+}
+
 func parseRelativeTime(value string) time.Time {
 	now := time.Now()
 	value = strings.TrimSuffix(strings.TrimSpace(value), " ago")

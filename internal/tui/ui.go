@@ -18,6 +18,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/kanban"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/logview"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/mission"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/diffview"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/taskdetail"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/tasklist"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/toast"
@@ -34,6 +35,7 @@ const (
 	ViewModeKanban
 	ViewModeToolTimeline
 	ViewModeMission
+	ViewModeDiff
 )
 
 // Model represents the main TUI application state
@@ -47,6 +49,7 @@ type Model struct {
 	taskList    tasklist.Model
 	taskDetail  taskdetail.Model
 	logView     logview.Model
+	diffView    diffview.Model
 	kanban         kanban.Model
 	toolTimeline   tooltimeline.Model
 	conversationView conversation.Model
@@ -117,6 +120,7 @@ func NewModel(repo string, debug bool) Model {
 		taskList:       tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, theme.SectionHeader, StatusIcon, animIconFunc, dismissedStore),
 		taskDetail:     taskdetail.New(theme.Title, theme.Border, StatusIcon),
 		logView:        logview.New(theme.Title, 80, 20),
+		diffView:       diffview.New(80, 20),
 		kanban:         kanban.New(theme.Title, theme.Border, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
 		toolTimeline:   tooltimeline.New(80, 20),
 		conversationView: conversation.New(80, 20),
@@ -154,6 +158,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logView.SetSize(msg.Width-4, msg.Height-8)
 		m.toolTimeline.SetSize(msg.Width-4, msg.Height-8)
 		m.conversationView.SetSize(msg.Width-4, msg.Height-8)
+		m.diffView.SetSize(msg.Width-4, msg.Height-8)
 		m.help.SetSize(msg.Width, msg.Height)
 		m.mission.SetSize(msg.Width, msg.Height-4)
 		m.updateSplitLayout()
@@ -218,6 +223,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.toolTimeline.SetEvents(msg.events)
 		return m, nil
 
+	case diffLoadedMsg:
+		m.ctx.Error = nil
+		m.diffView.SetDiffs(msg.files)
+		return m, nil
+
 	case refreshTickMsg:
 		return m, tea.Batch(m.fetchTasks, m.refreshCmd())
 
@@ -274,6 +284,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// Update the diff view if in diff mode
+	if m.viewMode == ViewModeDiff {
+		var cmd tea.Cmd
+		m.diffView, cmd = m.diffView.Update(msg)
+		return m, cmd
+	}
+
 	return m, nil
 }
 
@@ -317,6 +334,8 @@ func (m Model) View() string {
 		mainView = m.toolTimeline.View()
 	case ViewModeMission:
 		mainView = m.mission.View()
+	case ViewModeDiff:
+		mainView = m.diffView.View()
 	}
 
 	debugBanner := ""
@@ -383,6 +402,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleDetailKeys(msg)
 	case ViewModeLog:
 		return m.handleLogKeys(msg)
+	case ViewModeDiff:
+		return m.handleDiffKeys(msg)
 	case ViewModeKanban:
 		return m.handleKanbanKeys(msg)
 	case ViewModeToolTimeline:
@@ -508,11 +529,29 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.toolTimeline.SetSize(m.ctx.Width-4, m.ctx.Height-8)
 			return m, m.fetchToolTimeline(session.ID)
 		}
+	case "d":
+		session := m.taskList.SelectedTask()
+		if session != nil && canShowDiff(session) {
+			m.viewMode = ViewModeDiff
+			return m, m.fetchPRDiff(session)
+		}
 	}
 	return m, nil
 }
 
-// handleLogKeys handles keys in log view mode
+// handleDiffKeys handles keys in diff view mode
+func (m Model) handleDiffKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.viewMode = ViewModeDetail
+		return m, nil
+	}
+
+	// Delegate to viewport for scrolling
+	var cmd tea.Cmd
+	m.diffView, cmd = m.diffView.Update(msg)
+	return m, cmd
+}
 func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
@@ -694,6 +733,10 @@ type taskLogLoadedMsg struct {
 
 type toolTimelineLoadedMsg struct {
 	events []tooltimeline.ToolEvent
+}
+
+type diffLoadedMsg struct {
+	files []diffview.FileDiff
 }
 
 type refreshTickMsg struct{}
@@ -1049,6 +1092,10 @@ func (m *Model) updateFooterHints() {
 		if session != nil && session.Source == data.SourceLocalCopilot && session.HasLog {
 			hints = append(hints, key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tools")))
 		}
+		// Show diff hint when session has a PR
+		if canShowDiff(session) {
+			hints = append(hints, m.keys.ShowDiff)
+		}
 		hints = append(hints, m.keys.ShowHelp, m.keys.ExitApp)
 		m.footer.SetHints(hints)
 	case ViewModeLog:
@@ -1089,6 +1136,14 @@ func (m *Model) updateFooterHints() {
 			m.keys.ExitApp,
 		}
 		m.footer.SetHints(missionHints)
+	case ViewModeDiff:
+		diffHints := []key.Binding{
+			m.keys.NavigateBack,
+			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "scroll")),
+			m.keys.ShowHelp,
+			m.keys.ExitApp,
+		}
+		m.footer.SetHints(diffHints)
 	}
 }
 
@@ -1119,4 +1174,26 @@ func canResumeLocalSession(session *data.Session) bool {
 	}
 	status := strings.ToLower(strings.TrimSpace(session.Status))
 	return status == "running" || status == "queued" || status == "needs-input"
+}
+
+// canShowDiff returns true when the session has a PR whose diff can be fetched
+func canShowDiff(session *data.Session) bool {
+	if session == nil {
+		return false
+	}
+	return session.PRNumber > 0 && strings.TrimSpace(session.Repository) != ""
+}
+
+// fetchPRDiff fetches the PR diff for a session
+func (m Model) fetchPRDiff(session *data.Session) tea.Cmd {
+	prNumber := session.PRNumber
+	repo := session.Repository
+	return func() tea.Msg {
+		raw, err := data.FetchPRDiff(prNumber, repo)
+		if err != nil {
+			return errMsg{err}
+		}
+		files := diffview.ParseUnifiedDiff(raw)
+		return diffLoadedMsg{files}
+	}
 }

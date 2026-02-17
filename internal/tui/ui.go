@@ -180,9 +180,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		m.taskList.SetLoading(false)
 		m.taskList.SetTasks(msg.tasks)
-		m.taskDetail.SetAllSessions(msg.tasks)
-		m.kanban.SetSessions(msg.tasks)
-		m.mission.SetSessions(msg.tasks)
+		m.taskDetail.SetAllSessions(msg.allSessions)
+		m.kanban.SetSessions(msg.allSessions)
+		m.mission.SetSessions(msg.allSessions)
 
 		// Detect status changes and push toasts (skip first load)
 		if m.prevSessions != nil {
@@ -738,8 +738,9 @@ func (m *Model) cycleFilter(delta int) {
 
 // Message types
 type tasksLoadedMsg struct {
-	tasks  []data.Session
-	counts FilterCounts
+	tasks       []data.Session
+	allSessions []data.Session // unfiltered, for kanban/mission
+	counts      FilterCounts
 }
 
 type taskDetailLoadedMsg struct {
@@ -829,7 +830,7 @@ func (m Model) fetchTasks() tea.Msg {
 		sessions = filtered
 	}
 
-	return tasksLoadedMsg{sessions, counts}
+	return tasksLoadedMsg{sessions, visible, counts}
 }
 
 // fetchTaskDetail fetches detailed information for a session

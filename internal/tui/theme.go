@@ -70,7 +70,6 @@ func newDefaultTheme() *Theme {
 			Padding(0, 1),
 		TableRowSelected: lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(lipgloss.Color("236")).
 			Foreground(lipgloss.Color("15")).
 			Bold(true),
 		Border: lipgloss.NewStyle().
@@ -130,7 +129,6 @@ func newAdaptiveDefaultTheme() *Theme {
 			Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"}),
 		TableRowSelected: lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(lipgloss.AdaptiveColor{Light: "254", Dark: "235"}).
 			Foreground(lipgloss.AdaptiveColor{Light: "0", Dark: "255"}).
 			Bold(true),
 		Border: lipgloss.NewStyle().
@@ -186,7 +184,6 @@ func newCatppuccinMochaTheme() *Theme {
 			Foreground(lipgloss.Color("#cdd6f4")),
 		TableRowSelected: lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(lipgloss.Color("#313244")).
 			Foreground(lipgloss.Color("#cdd6f4")).
 			Bold(true),
 		Border: lipgloss.NewStyle().
@@ -242,7 +239,6 @@ func newDraculaTheme() *Theme {
 			Foreground(lipgloss.Color("#f8f8f2")),
 		TableRowSelected: lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(lipgloss.Color("#44475a")).
 			Foreground(lipgloss.Color("#f8f8f2")).
 			Bold(true),
 		Border: lipgloss.NewStyle().
@@ -298,7 +294,6 @@ func newTokyoNightTheme() *Theme {
 			Foreground(lipgloss.Color("#c0caf5")),
 		TableRowSelected: lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(lipgloss.Color("#33467c")).
 			Foreground(lipgloss.Color("#c0caf5")).
 			Bold(true),
 		Border: lipgloss.NewStyle().

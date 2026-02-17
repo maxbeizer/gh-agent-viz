@@ -423,6 +423,11 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "k", "up":
 		m.taskList.MoveCursor(-1)
 	case "enter":
+		// If cursor is on a collapsed group header, expand it instead of opening detail
+		if m.taskList.IsCursorOnCollapsedGroup() {
+			m.taskList.ToggleGroupExpand()
+			return m, nil
+		}
 		session := m.taskList.SelectedTask()
 		if session != nil {
 			if session.Source == data.SourceLocalCopilot {
@@ -445,6 +450,13 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, m.fetchTaskLog(session.ID, session.Repository)
 		}
+case "c":
+session := m.taskList.SelectedTask()
+if session != nil && session.Source == data.SourceLocalCopilot && session.HasLog {
+m.viewMode = ViewModeLog
+m.showConversation = true
+return m, m.fetchConversation(session.ID)
+}
 	case "o":
 		session := m.taskList.SelectedTask()
 		if session != nil {
@@ -512,6 +524,13 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, m.fetchTaskLog(session.ID, session.Repository)
 		}
+case "c":
+session := m.taskList.SelectedTask()
+if session != nil && session.Source == data.SourceLocalCopilot && session.HasLog {
+m.viewMode = ViewModeLog
+m.showConversation = true
+return m, m.fetchConversation(session.ID)
+}
 	case "o":
 		session := m.taskList.SelectedTask()
 		if session != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/footer"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/help"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/kanban"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/logview"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/taskdetail"
@@ -37,6 +38,7 @@ type Model struct {
 	keys        Keybindings
 	header      header.Model
 	footer      footer.Model
+	help        help.Model
 	taskList    tasklist.Model
 	taskDetail  taskdetail.Model
 	logView     logview.Model
@@ -101,6 +103,7 @@ func NewModel(repo string, debug bool) Model {
 		keys:        keys,
 		header:      header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter, ctx.Config.AsciiHeaderEnabled()),
 		footer:      footer.New(theme.Footer, footerKeys),
+		help:        help.New(),
 		taskList:    tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, theme.SectionHeader, StatusIcon, animIconFunc, dismissedStore),
 		taskDetail:  taskdetail.New(theme.Title, theme.Border, StatusIcon),
 		logView:     logview.New(theme.Title, 80, 20),
@@ -135,6 +138,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ctx.Height = msg.Height
 		m.header.SetSize(msg.Width, msg.Height)
 		m.logView.SetSize(msg.Width-4, msg.Height-8)
+		m.help.SetSize(msg.Width, msg.Height)
 		m.updateSplitLayout()
 		m.ready = true
 		return m, nil
@@ -274,6 +278,11 @@ func (m Model) View() string {
 
 	result := headerView + mainView + footerView
 
+	// Overlay help panel when visible
+	if m.help.Visible() {
+		result = m.help.View()
+	}
+
 	// Overlay toasts in the top-right corner
 	if m.toast.HasToasts() {
 		toastWidth := m.ctx.Width / 3
@@ -290,6 +299,20 @@ func (m Model) View() string {
 
 // handleKeyPress processes keyboard input
 func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// When help overlay is visible, only ? and esc close it; ignore everything else
+	if m.help.Visible() {
+		if msg.String() == "?" || msg.Type == tea.KeyEscape {
+			m.help.Toggle()
+		}
+		return m, nil
+	}
+
+	// ? toggles help overlay in any mode
+	if msg.String() == "?" {
+		m.help.Toggle()
+		return m, nil
+	}
+
 	// Global quit key
 	if msg.String() == "q" || msg.String() == "ctrl+c" {
 		return m, tea.Quit
@@ -746,75 +769,37 @@ func (m *Model) updateFooterHints() {
 	switch m.viewMode {
 	case ViewModeList:
 		hints := []key.Binding{
-			m.keys.MoveUp,
-			m.keys.MoveDown,
+			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "navigate")),
 			m.keys.SelectTask,
+			m.keys.ToggleFilter,
+			m.keys.ToggleKanban,
+			m.keys.ShowHelp,
+			m.keys.ExitApp,
 		}
-		selected := m.taskList.SelectedTask()
-		if canShowLogs(selected) {
-			hints = append(hints, m.keys.ShowLogs)
-		}
-		if canOpenPR(selected) {
-			hints = append(hints, m.keys.OpenInBrowser)
-		}
-		if canResumeLocalSession(selected) {
-			hints = append(hints, m.keys.ResumeSession)
-		}
-		if selected != nil {
-			hints = append(hints, m.keys.DismissSession)
-		}
-		hints = append(hints, m.keys.TogglePreview, m.keys.ToggleFilter, m.keys.FocusAttention, m.keys.RefreshData)
-		if label := m.taskList.GroupByLabel(); label != "" {
-			hints = append(hints, key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "group: "+label)))
-		} else {
-			hints = append(hints, m.keys.GroupBy)
-		}
-		if m.taskList.IsGrouped() {
-			hints = append(hints, m.keys.ExpandGroup)
-		}
-		hints = append(hints, m.keys.ToggleKanban, m.keys.ExitApp)
 		m.footer.SetHints(hints)
 	case ViewModeDetail:
 		hints := []key.Binding{
-			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
+			m.keys.NavigateBack,
+			m.keys.ShowLogs,
+			m.keys.ShowHelp,
+			m.keys.ExitApp,
 		}
-		selected := m.taskList.SelectedTask()
-		if canShowLogs(selected) {
-			hints = append(hints, m.keys.ShowLogs)
-		}
-		if canOpenPR(selected) {
-			hints = append(hints, m.keys.OpenInBrowser)
-		}
-		if canResumeLocalSession(selected) {
-			hints = append(hints, m.keys.ResumeSession)
-		}
-		hints = append(hints, m.keys.ExitApp)
 		m.footer.SetHints(hints)
 	case ViewModeLog:
 		logHints := []key.Binding{
-			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
-			key.NewBinding(key.WithKeys("↑/k"), key.WithHelp("↑/k", "up")),
-			key.NewBinding(key.WithKeys("↓/j"), key.WithHelp("↓/j", "down")),
-			key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "page down")),
-			key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "page up")),
-			key.NewBinding(key.WithKeys("g/G"), key.WithHelp("g/G", "top/bottom")),
+			m.keys.NavigateBack,
+			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "scroll")),
+			m.keys.ToggleFollow,
+			m.keys.ShowHelp,
+			m.keys.ExitApp,
 		}
-		selected := m.taskList.SelectedTask()
-		if m.logView.IsLive() {
-			logHints = append(logHints, m.keys.ToggleFollow)
-		}
-		if canResumeLocalSession(selected) {
-			logHints = append(logHints, m.keys.ResumeSession)
-		}
-		logHints = append(logHints, m.keys.ExitApp)
 		m.footer.SetHints(logHints)
 	case ViewModeKanban:
 		kanbanHints := []key.Binding{
-			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
+			m.keys.NavigateBack,
 			key.NewBinding(key.WithKeys("h/l"), key.WithHelp("h/l", "column")),
 			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "card")),
-			m.keys.SelectTask,
-			m.keys.RefreshData,
+			m.keys.ShowHelp,
 			m.keys.ExitApp,
 		}
 		m.footer.SetHints(kanbanHints)

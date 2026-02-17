@@ -168,7 +168,7 @@ func (m Model) renderFocusedList() string {
 func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, width int) string {
 	style := m.tableRowStyle
 	if selected {
-		style = m.tableRowSelected
+		style = m.statusSelectedStyle(session.Status)
 	}
 
 	icon := m.currentStatusIcon(session.Status)
@@ -207,18 +207,18 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 		leftPart += strings.Repeat(" ", pad) + badge
 	}
 
-	// Meta line: repo + time, right-aligned telemetry
-	// Skip attentionReason when badge already communicates the state
+	// Meta line: repo + time, dimmed for visual hierarchy
 	repo := truncate(rowRepository(session), width/2)
-	meta := fmt.Sprintf("    %s  %s", repo, formatTime(session.UpdatedAt))
+	metaText := fmt.Sprintf("    %s  %s", repo, formatTime(session.UpdatedAt))
 	if dur := compactDuration(session); dur != "" {
 		durStr := "⏱ " + dur
-		pad := width - len(meta) - len(durStr)
+		pad := width - len(metaText) - len(durStr)
 		if pad < 1 {
 			pad = 1
 		}
-		meta += strings.Repeat(" ", pad) + durStr
+		metaText += strings.Repeat(" ", pad) + durStr
 	}
+	meta := lipgloss.NewStyle().Faint(true).Render(metaText)
 
 	return style.Render(leftPart + "\n" + meta)
 }
@@ -902,15 +902,32 @@ func (m Model) statusColor(status string) lipgloss.Color {
 	case "running":
 		return lipgloss.Color("42")
 	case "queued":
-		return lipgloss.Color("226")
+		return lipgloss.Color("222")
 	case "needs-input":
-		return lipgloss.Color("208")
+		return lipgloss.Color("214")
 	case "completed":
-		return lipgloss.Color("46")
+		return lipgloss.Color("72")
 	case "failed":
-		return lipgloss.Color("196")
+		return lipgloss.Color("203")
 	default:
 		return lipgloss.Color("245")
+	}
+}
+
+// statusSelectedStyle returns a row style tinted by status color.
+func (m Model) statusSelectedStyle(status string) lipgloss.Style {
+	base := m.tableRowSelected
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "running":
+		return base.Background(lipgloss.Color("22"))
+	case "needs-input":
+		return base.Background(lipgloss.Color("94"))
+	case "failed":
+		return base.Background(lipgloss.Color("52"))
+	case "completed":
+		return base.Background(lipgloss.Color("23"))
+	default:
+		return base
 	}
 }
 

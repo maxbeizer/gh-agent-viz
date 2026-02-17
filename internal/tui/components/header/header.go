@@ -105,8 +105,8 @@ func (m Model) View() string {
 	tabLine := lipgloss.JoinHorizontal(lipgloss.Center, title, "  ", tabBar)
 
 	separator := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("238")).
-		Render(strings.Repeat("─", m.width))
+		Foreground(lipgloss.AdaptiveColor{Light: "249", Dark: "240"}).
+		Render(strings.Repeat("━", m.width))
 
 	if m.showBanner() {
 		styledBanner := m.titleStyle.Render(Banner)

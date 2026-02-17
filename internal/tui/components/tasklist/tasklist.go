@@ -171,7 +171,11 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 		style = m.tableRowSelected
 	}
 
-	icon := m.currentStatusIcon(session.Status)
+	// Only animate icon for sessions that are actively working (not idle)
+	icon := m.statusIcon(session.Status)
+	if m.animStatusIcon != nil && isActiveNotIdle(session) {
+		icon = m.animStatusIcon(session.Status, m.animFrame)
+	}
 
 	badge := sessionBadge(session, m.duplicateCounts[sessionIdx])
 
@@ -439,6 +443,17 @@ func formatTime(t time.Time) string {
 
 func isActiveStatus(status string) bool {
 	return data.StatusIsActive(status) || strings.EqualFold(strings.TrimSpace(status), "needs-input")
+}
+
+// isActiveNotIdle returns true for sessions that are actively working (not idle 20+ min)
+func isActiveNotIdle(session data.Session) bool {
+	if !isActiveStatus(session.Status) {
+		return false
+	}
+	if session.UpdatedAt.IsZero() {
+		return true
+	}
+	return time.Since(session.UpdatedAt) < data.AttentionStaleThreshold
 }
 
 func sessionBadge(session data.Session, duplicateCount int) string {

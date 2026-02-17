@@ -449,14 +449,15 @@ func sessionBadge(session data.Session, duplicateCount int) string {
 		return badge
 	}
 	if data.SessionNeedsAttention(session) {
-		badge := fmt.Sprintf("💤 %s", formatIdleDuration(time.Since(session.UpdatedAt)))
+		idle := time.Since(session.UpdatedAt)
+		badge := fmt.Sprintf("⚠️ idle %s — may be stuck", formatIdleDuration(idle))
 		if duplicateCount > 0 {
 			badge += fmt.Sprintf(" (+%d older)", duplicateCount)
 		}
 		return badge
 	}
 	if isActiveStatus(session.Status) && !session.UpdatedAt.IsZero() && time.Since(session.UpdatedAt) >= data.AttentionStaleMax {
-		return "😴 stale"
+		return "😴 stale — no activity 4h+"
 	}
 	if !isActiveStatus(session.Status) || session.UpdatedAt.IsZero() {
 		return ""

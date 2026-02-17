@@ -129,3 +129,106 @@ func TestFormatDuration(t *testing.T) {
 		}
 	}
 }
+
+func TestAttentionReason_NilSession(t *testing.T) {
+	if got := attentionReason(nil); got != "" {
+		t.Fatalf("expected empty for nil session, got %q", got)
+	}
+}
+
+func TestAttentionReason_NeedsInput(t *testing.T) {
+	s := &data.Session{Status: "needs-input"}
+	got := attentionReason(s)
+	if !strings.Contains(got, "waiting for your input") {
+		t.Fatalf("expected needs-input reason, got %q", got)
+	}
+}
+
+func TestAttentionReason_Failed(t *testing.T) {
+	s := &data.Session{Status: "failed"}
+	got := attentionReason(s)
+	if !strings.Contains(got, "has failed") {
+		t.Fatalf("expected failed reason, got %q", got)
+	}
+}
+
+func TestAttentionReason_Idle(t *testing.T) {
+	s := &data.Session{
+		Status:    "running",
+		UpdatedAt: time.Now().Add(-30 * time.Minute),
+	}
+	got := attentionReason(s)
+	if !strings.Contains(got, "⚠️") || !strings.Contains(got, "idle") {
+		t.Fatalf("expected idle attention reason, got %q", got)
+	}
+	if !strings.Contains(got, "stuck") {
+		t.Fatalf("expected stuck hint, got %q", got)
+	}
+}
+
+func TestAttentionReason_Stale(t *testing.T) {
+	s := &data.Session{
+		Status:    "running",
+		UpdatedAt: time.Now().Add(-5 * time.Hour),
+	}
+	got := attentionReason(s)
+	if !strings.Contains(got, "😴") || !strings.Contains(got, "abandoned") {
+		t.Fatalf("expected stale attention reason, got %q", got)
+	}
+}
+
+func TestAttentionReason_NoAttention(t *testing.T) {
+	s := &data.Session{
+		Status:    "running",
+		UpdatedAt: time.Now().Add(-2 * time.Minute),
+	}
+	got := attentionReason(s)
+	if got != "" {
+		t.Fatalf("expected no attention reason for active session, got %q", got)
+	}
+}
+
+func TestAttentionReason_CompletedSession(t *testing.T) {
+	s := &data.Session{
+		Status:    "completed",
+		UpdatedAt: time.Now().Add(-2 * time.Hour),
+	}
+	got := attentionReason(s)
+	if got != "" {
+		t.Fatalf("expected no attention reason for completed session, got %q", got)
+	}
+}
+
+func TestView_ShowsAttentionReason(t *testing.T) {
+	model := New(
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		func(string) string { return "•" },
+	)
+	model.SetTask(&data.Session{
+		ID:        "session-5",
+		Status:    "needs-input",
+		Title:     "Blocked Session",
+	})
+	view := model.View()
+	if !strings.Contains(view, "waiting for your input") {
+		t.Fatalf("expected attention reason in detail view, got: %s", view)
+	}
+}
+
+func TestViewSplit_ShowsAttentionReason(t *testing.T) {
+	model := New(
+		lipgloss.NewStyle(),
+		lipgloss.NewStyle(),
+		func(string) string { return "•" },
+	)
+	model.SetTask(&data.Session{
+		ID:     "session-6",
+		Status: "failed",
+		Title:  "Broken Session",
+	})
+	view := model.ViewSplit()
+	if !strings.Contains(view, "has failed") {
+		t.Fatalf("expected attention reason in split view, got: %s", view)
+	}
+}

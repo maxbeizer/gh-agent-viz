@@ -1,12 +1,13 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 )
 
 func TestStatusIcon_Running(t *testing.T) {
 	icon := StatusIcon("running")
-	expected := "🟢"
+	expected := "●"
 	if icon != expected {
 		t.Errorf("expected icon '%s' for running status, got '%s'", expected, icon)
 	}
@@ -14,7 +15,7 @@ func TestStatusIcon_Running(t *testing.T) {
 
 func TestStatusIcon_Queued(t *testing.T) {
 	icon := StatusIcon("queued")
-	expected := "🟡"
+	expected := "○"
 	if icon != expected {
 		t.Errorf("expected icon '%s' for queued status, got '%s'", expected, icon)
 	}
@@ -122,39 +123,39 @@ func TestNewThemeFromConfig_UnknownFallsBackToDefault(t *testing.T) {
 }
 
 func TestAnimatedStatusIcon_Running(t *testing.T) {
-	// Frame 0 should return first braille frame
+	// Frame 0 should contain the first pulsing dot character
 	icon := AnimatedStatusIcon("running", 0)
-	if icon != "⠋" {
-		t.Errorf("expected ⠋ for running frame 0, got %q", icon)
+	if !strings.Contains(icon, "●") {
+		t.Errorf("expected ● in running frame 0, got %q", icon)
 	}
-	// Frame 1 should return second braille frame
-	icon = AnimatedStatusIcon("running", 1)
-	if icon != "⠙" {
-		t.Errorf("expected ⠙ for running frame 1, got %q", icon)
+	// Frame 2 should contain the ring character
+	icon = AnimatedStatusIcon("running", 2)
+	if !strings.Contains(icon, "◉") {
+		t.Errorf("expected ◉ in running frame 2, got %q", icon)
 	}
 }
 
 func TestAnimatedStatusIcon_Queued(t *testing.T) {
 	icon := AnimatedStatusIcon("queued", 0)
-	if icon != "⠿" {
-		t.Errorf("expected ⠿ for queued frame 0, got %q", icon)
+	if !strings.Contains(icon, "◌") {
+		t.Errorf("expected ◌ in queued frame 0, got %q", icon)
 	}
 	icon = AnimatedStatusIcon("queued", 1)
-	if icon != "⠷" {
-		t.Errorf("expected ⠷ for queued frame 1, got %q", icon)
+	if !strings.Contains(icon, "○") {
+		t.Errorf("expected ○ in queued frame 1, got %q", icon)
 	}
 }
 
 func TestAnimatedStatusIcon_WrapsFrames(t *testing.T) {
-	// Frame 10 should wrap to frame 0 for running (10 frames)
-	icon := AnimatedStatusIcon("running", 10)
-	if icon != "⠋" {
-		t.Errorf("expected ⠋ for running frame 10 (wrap), got %q", icon)
+	// Frame 6 should wrap to frame 0 for running (6 frames)
+	icon := AnimatedStatusIcon("running", 6)
+	if !strings.Contains(icon, "●") {
+		t.Errorf("expected ● for running frame 6 (wrap), got %q", icon)
 	}
-	// Frame 6 should wrap to frame 0 for queued (6 frames)
-	icon = AnimatedStatusIcon("queued", 6)
-	if icon != "⠿" {
-		t.Errorf("expected ⠿ for queued frame 6 (wrap), got %q", icon)
+	// Frame 4 should wrap to frame 0 for queued (4 frames)
+	icon = AnimatedStatusIcon("queued", 4)
+	if !strings.Contains(icon, "◌") {
+		t.Errorf("expected ◌ for queued frame 4 (wrap), got %q", icon)
 	}
 }
 

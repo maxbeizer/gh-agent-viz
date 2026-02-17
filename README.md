@@ -17,6 +17,14 @@ An interactive terminal UI for visualizing GitHub Copilot coding agent sessions.
 - 🔄 **Resume Sessions** - Jump directly into active Copilot CLI sessions with one keystroke
 - ⌨️ **Vim-style Keys** - j/k navigation, familiar keybindings
 - 🛡️ **Tolerant Parsing** - Gracefully handles malformed session files without crashing
+- 🎯 **Kanban board view** — `K` to toggle status-column layout
+- 🔔 **Toast notifications** — status change alerts overlay
+- 📊 **Session timeline** — Unicode lifecycle bar in detail view
+- 🔗 **Dependency graph** — related session visualization
+- 🎨 **Color themes** — catppuccin-mocha, dracula, tokyo-night presets
+- 📡 **Live log tailing** — real-time log streaming with follow mode
+
+See [docs/UI_FEATURES.md](docs/UI_FEATURES.md) for a comprehensive guide to all visual features.
 
 ## Installation
 
@@ -81,18 +89,23 @@ When enabled, the UI also shows a persistent debug banner with the log path.
 
 | Key | Action |
 |-----|--------|
-| `h` / `←` | Move to previous column |
-| `→` | Move to next column |
-| `j` / `↓` | Move down |
-| `k` / `↑` | Move up |
-| `enter` | View task details |
-| `l` | View task logs (remote agent sessions) |
-| `o` | Open linked PR in browser (only when a PR is available) |
-| `s` | Resume active local session (running/queued/needs-input) |
-| `a` | Toggle needs-action view (sessions needing action) |
-| `r` | Refresh task list |
-| `tab` / `shift+tab` | Cycle status filter forward/backward (`all ↔ needs action ↔ running ↔ done ↔ failed`) |
-| `esc` | Go back to task list |
+| `↑` / `↓` / `j` / `k` | Navigate sessions |
+| `enter` | View session details |
+| `esc` | Go back |
+| `l` | View logs |
+| `o` | Open PR in browser |
+| `s` | Resume session |
+| `x` | Dismiss session |
+| `r` | Refresh |
+| `p` | Toggle preview pane |
+| `K` | Toggle kanban view |
+| `tab` / `shift+tab` | Cycle filter tabs |
+| `a` | Jump to attention tab |
+| `g` | Cycle group-by mode |
+| `space` | Expand/collapse group |
+| `f` | Toggle follow mode (in logs) |
+| `d` / `u` | Page down/up (in logs) |
+| `g` / `G` | Top/bottom (in logs) |
 | `q` | Quit |
 
 Action hints in the footer are contextual: unavailable actions are hidden for the currently highlighted session.
@@ -125,6 +138,7 @@ When viewing logs:
 | `u` | Scroll up half page |
 | `g` | Go to top |
 | `G` | Go to bottom |
+| `f` | Toggle follow mode (live tailing) |
 | `esc` | Return to task list |
 
 ## Configuration
@@ -142,6 +156,9 @@ refreshInterval: 30
 
 # Default status filter: all, attention, active, completed, failed (default: all)
 defaultFilter: all
+
+# Color theme: default, catppuccin-mocha, dracula, tokyo-night
+theme: catppuccin-mocha
 ```
 
 ## Documentation
@@ -152,6 +169,7 @@ defaultFilter: all
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Fast fixes for common issues
 - **[Debug Mode](docs/DEBUG_MODE.md)** - Capture actionable diagnostics
 - **[Developer Workflow](docs/DEVELOPER_WORKFLOW.md)** - Makefile commands for build/test/smoke
+- **[UI Features](docs/UI_FEATURES.md)** - Kanban, toasts, timeline, dependency graph, themes, live tailing
 - **[Architecture Decisions](docs/DECISIONS.md)** - Technical design rationale and patterns
 
 ## Requirements

@@ -20,6 +20,7 @@ type Keybindings struct {
 	GroupBy        key.Binding
 	ExpandGroup    key.Binding
 	ToggleFollow   key.Binding
+	ToggleKanban   key.Binding
 }
 
 // NewKeybindings creates the default key bindings for the TUI
@@ -88,6 +89,10 @@ func NewKeybindings() Keybindings {
 		ToggleFollow: key.NewBinding(
 			key.WithKeys("f"),
 			key.WithHelp("f", "follow"),
+		),
+		ToggleKanban: key.NewBinding(
+			key.WithKeys("K"),
+			key.WithHelp("K", "kanban"),
 		),
 	}
 }

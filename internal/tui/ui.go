@@ -13,6 +13,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/footer"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/kanban"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/logview"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/taskdetail"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/tasklist"
@@ -26,6 +27,7 @@ const (
 	ViewModeList ViewMode = iota
 	ViewModeDetail
 	ViewModeLog
+	ViewModeKanban
 )
 
 // Model represents the main TUI application state
@@ -38,6 +40,7 @@ type Model struct {
 	taskList    tasklist.Model
 	taskDetail  taskdetail.Model
 	logView     logview.Model
+	kanban       kanban.Model
 	viewMode     ViewMode
 	showPreview  bool
 	ready        bool
@@ -101,6 +104,7 @@ func NewModel(repo string, debug bool) Model {
 		taskList:    tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, theme.SectionHeader, StatusIcon, animIconFunc, dismissedStore),
 		taskDetail:  taskdetail.New(theme.Title, theme.Border, StatusIcon),
 		logView:     logview.New(theme.Title, 80, 20),
+		kanban:      kanban.New(theme.Title, theme.Border, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
 		viewMode:    ViewModeList,
 		showPreview: false,
 		ready:       false,
@@ -151,6 +155,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.taskList.SetLoading(false)
 		m.taskList.SetTasks(msg.tasks)
 		m.taskDetail.SetAllSessions(msg.tasks)
+		m.kanban.SetSessions(msg.tasks)
 
 		// Detect status changes and push toasts (skip first load)
 		if m.prevSessions != nil {
@@ -184,6 +189,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.animFrame++
 		m.taskList.SetAnimFrame(m.animFrame)
 		m.toast.Tick()
+		m.kanban.SetAnimFrame(m.animFrame)
 		return m, m.animationTickCmd()
 
 	case logPollTickMsg:
@@ -247,6 +253,8 @@ func (m Model) View() string {
 		mainView = m.taskDetail.View()
 	case ViewModeLog:
 		mainView = m.logView.View()
+	case ViewModeKanban:
+		mainView = m.kanban.View()
 	}
 
 	debugBanner := ""
@@ -294,6 +302,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleDetailKeys(msg)
 	case ViewModeLog:
 		return m.handleLogKeys(msg)
+	case ViewModeKanban:
+		return m.handleKanbanKeys(msg)
 	}
 
 	return m, nil
@@ -368,6 +378,10 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.taskList.ToggleGroupExpand()
 			return m, nil
 		}
+	case "K":
+		m.viewMode = ViewModeKanban
+		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
+		return m, nil
 	}
 	return m, nil
 }
@@ -437,6 +451,37 @@ func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if session != nil {
 			return m, m.resumeSession(session)
 		}
+	}
+	return m, nil
+}
+
+// handleKanbanKeys handles keys in kanban view mode
+func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "K":
+		m.viewMode = ViewModeList
+	case "h", "left":
+		m.kanban.MoveColumn(-1)
+	case "l", "right":
+		m.kanban.MoveColumn(1)
+	case "j", "down":
+		m.kanban.MoveRow(1)
+	case "k", "up":
+		m.kanban.MoveRow(-1)
+	case "enter":
+		session := m.kanban.SelectedSession()
+		if session != nil {
+			if session.Source == data.SourceLocalCopilot {
+				m.ctx.Error = nil
+				m.viewMode = ViewModeDetail
+				m.taskDetail.SetTask(session)
+				return m, nil
+			}
+			m.viewMode = ViewModeDetail
+			return m, m.fetchTaskDetail(session.ID, session.Repository)
+		}
+	case "r":
+		return m, m.fetchTasks
 	}
 	return m, nil
 }
@@ -693,6 +738,7 @@ func (m *Model) updateSplitLayout() {
 		m.taskList.SetSize(m.ctx.Width, m.ctx.Height)
 		m.taskList.SetSplitMode(false)
 	}
+	m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
 }
 
 // updateFooterHints updates footer hints based on current view mode and state
@@ -726,7 +772,7 @@ func (m *Model) updateFooterHints() {
 		if m.taskList.IsGrouped() {
 			hints = append(hints, m.keys.ExpandGroup)
 		}
-		hints = append(hints, m.keys.ExitApp)
+		hints = append(hints, m.keys.ToggleKanban, m.keys.ExitApp)
 		m.footer.SetHints(hints)
 	case ViewModeDetail:
 		hints := []key.Binding{
@@ -762,6 +808,16 @@ func (m *Model) updateFooterHints() {
 		}
 		logHints = append(logHints, m.keys.ExitApp)
 		m.footer.SetHints(logHints)
+	case ViewModeKanban:
+		kanbanHints := []key.Binding{
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
+			key.NewBinding(key.WithKeys("h/l"), key.WithHelp("h/l", "column")),
+			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "card")),
+			m.keys.SelectTask,
+			m.keys.RefreshData,
+			m.keys.ExitApp,
+		}
+		m.footer.SetHints(kanbanHints)
 	}
 }
 

@@ -19,25 +19,34 @@ type Column struct {
 // defaultColumns returns the fixed set of kanban columns.
 func defaultColumns() []Column {
 	return []Column{
-		{Title: "RUNNING", Status: "running"},
-		{Title: "NEEDS INPUT", Status: "needs-input"},
-		{Title: "COMPLETED", Status: "completed"},
-		{Title: "FAILED", Status: "failed"},
+		{Title: "IN PROGRESS", Status: "in-progress"},
+		{Title: "IDLE", Status: "idle"},
+		{Title: "DONE", Status: "done"},
 	}
 }
 
 // statusBelongsToColumn returns true when a session status belongs in the given column.
-func statusBelongsToColumn(sessionStatus, colStatus string) bool {
-	s := strings.ToLower(strings.TrimSpace(sessionStatus))
+func statusBelongsToColumn(session data.Session, colStatus string) bool {
+	s := strings.ToLower(strings.TrimSpace(session.Status))
 	switch colStatus {
-	case "running":
-		return s == "running" || s == "active" || s == "queued"
-	case "needs-input":
-		return s == "needs-input"
-	case "completed":
-		return s == "completed"
-	case "failed":
-		return s == "failed"
+	case "in-progress":
+		isActive := s == "running" || s == "active" || s == "queued" || s == "needs-input"
+		if !isActive {
+			return false
+		}
+		// Active but idle for 20+ minutes → goes to IDLE column
+		if !session.UpdatedAt.IsZero() && time.Since(session.UpdatedAt) >= data.AttentionStaleThreshold {
+			return false
+		}
+		return true
+	case "idle":
+		isActive := s == "running" || s == "active" || s == "needs-input"
+		if !isActive {
+			return false
+		}
+		return !session.UpdatedAt.IsZero() && time.Since(session.UpdatedAt) >= data.AttentionStaleThreshold
+	case "done":
+		return s == "completed" || s == "failed"
 	}
 	return false
 }
@@ -88,7 +97,7 @@ func (m *Model) SetSessions(sessions []data.Session) {
 	}
 	for _, s := range sessions {
 		for i := range cols {
-			if statusBelongsToColumn(s.Status, cols[i].Status) {
+			if statusBelongsToColumn(s, cols[i].Status) {
 				cols[i].Sessions = append(cols[i].Sessions, s)
 				break
 			}

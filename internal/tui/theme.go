@@ -354,30 +354,16 @@ func StatusIcon(status string) string {
 	}
 }
 
-// Pulsing dot frames for running sessions — solid → ring → hollow → ring → solid
-var runningFrames = []string{"●", "●", "◉", "○", "◉", "●"}
+// Running sessions: steady dot, gentle color breathing between two close greens
+var runningColors = []string{"42", "42", "42", "36", "36", "42"}
 
-// Gentle waiting frames for queued sessions
-var queuedFrames = []string{"◌", "○", "◎", "○"}
-
-// AnimatedStatusIcon returns an animated icon for running/queued statuses,
-// or the static icon for all other statuses. The frame parameter selects
-// which animation frame to display and cycles color intensity.
+// AnimatedStatusIcon returns a subtly animated icon for running sessions.
+// Queued and other statuses use their static icon — only "in progress"
+// sessions get the gentle color pulse.
 func AnimatedStatusIcon(status string, frame int) string {
-	switch status {
-	case "running":
-		f := runningFrames[frame%len(runningFrames)]
-		// Cycle between bright and dim green
-		colors := []string{"42", "34", "28", "34", "42", "42"}
-		color := colors[frame%len(colors)]
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(f)
-	case "queued":
-		f := queuedFrames[frame%len(queuedFrames)]
-		// Cycle through amber tones
-		colors := []string{"226", "220", "214", "220"}
-		color := colors[frame%len(colors)]
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(f)
-	default:
-		return StatusIcon(status)
+	if status == "running" {
+		color := runningColors[frame%len(runningColors)]
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render("●")
 	}
+	return StatusIcon(status)
 }

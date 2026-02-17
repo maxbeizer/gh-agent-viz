@@ -57,6 +57,10 @@ func (m Model) View() string {
 		fmt.Sprintf("Session ID: %s", m.session.ID),
 	)
 
+	if tl := RenderTimeline(m.session, timelineWidth(m.width)); tl != "" {
+		details = append(details, "", fmt.Sprintf("Timeline:   %s", tl))
+	}
+
 	// Show telemetry if available
 	if m.session.Telemetry != nil {
 		t := m.session.Telemetry
@@ -135,6 +139,10 @@ func (m Model) ViewSplit() string {
 		fmt.Sprintf("Updated:    %s", detailTimestamp(m.session.UpdatedAt)),
 		fmt.Sprintf("Session ID: %s", m.session.ID),
 	)
+
+	if tl := RenderTimeline(m.session, timelineWidth(m.width)); tl != "" {
+		details = append(details, "", fmt.Sprintf("Timeline:   %s", tl))
+	}
 
 	if m.session.Telemetry != nil {
 		t := m.session.Telemetry
@@ -219,4 +227,21 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dh %dm", hours, minutes)
 	}
 	return fmt.Sprintf("%dh", hours)
+}
+
+// timelineWidth picks a reasonable bar width based on available space.
+func timelineWidth(availableWidth int) int {
+	const defaultWidth = 24
+	if availableWidth <= 0 {
+		return defaultWidth
+	}
+	// Leave room for "Timeline:   " prefix (12) + "  Xh ago → now" suffix (~16)
+	w := availableWidth - 28
+	if w < 8 {
+		return 8
+	}
+	if w > 48 {
+		return 48
+	}
+	return w
 }

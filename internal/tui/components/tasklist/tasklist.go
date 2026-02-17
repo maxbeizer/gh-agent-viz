@@ -456,16 +456,18 @@ func sessionBadge(session data.Session, duplicateCount int) string {
 		}
 		return badge
 	}
-	if data.SessionNeedsAttention(session) {
+	if isActiveStatus(session.Status) && !session.UpdatedAt.IsZero() {
 		idle := time.Since(session.UpdatedAt)
-		badge := fmt.Sprintf("⚠️ idle %s — check logs", formatIdleDuration(idle))
-		if duplicateCount > 0 {
-			badge += fmt.Sprintf(" (+%d older)", duplicateCount)
+		if idle >= data.AttentionStaleMax {
+			return "💤 idle " + formatIdleDuration(idle)
 		}
-		return badge
-	}
-	if isActiveStatus(session.Status) && !session.UpdatedAt.IsZero() && time.Since(session.UpdatedAt) >= data.AttentionStaleMax {
-		return "😴 stale — consider dismissing"
+		if idle >= data.AttentionStaleThreshold {
+			badge := "💤 idle " + formatIdleDuration(idle)
+			if duplicateCount > 0 {
+				badge += fmt.Sprintf(" (+%d older)", duplicateCount)
+			}
+			return badge
+		}
 	}
 	if !isActiveStatus(session.Status) || session.UpdatedAt.IsZero() {
 		return ""
@@ -524,7 +526,11 @@ func isQuietDuplicateSession(session data.Session) bool {
 	if status == "needs-input" || status == "failed" {
 		return false
 	}
-	return data.SessionNeedsAttention(session)
+	// Idle active sessions are candidates for quiet duplicate grouping
+	if !isActiveStatus(session.Status) || session.UpdatedAt.IsZero() {
+		return false
+	}
+	return time.Since(session.UpdatedAt) >= data.AttentionStaleThreshold
 }
 
 func quietDuplicateKey(session data.Session) string {

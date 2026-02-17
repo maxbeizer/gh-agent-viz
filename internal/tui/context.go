@@ -28,6 +28,6 @@ func NewProgramContext() *ProgramContext {
 		Config:       config.DefaultConfig(),
 		Width:        80,
 		Height:       24,
-		StatusFilter: "attention",
+		StatusFilter: "active",
 	}
 }

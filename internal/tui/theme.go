@@ -331,9 +331,9 @@ func newTokyoNightTheme() *Theme {
 func StatusIcon(status string) string {
 	switch status {
 	case "running":
-		return "🟢"
+		return "●"
 	case "queued":
-		return "🟡"
+		return "○"
 	case "needs-input":
 		return "🧑"
 	case "completed":
@@ -345,21 +345,29 @@ func StatusIcon(status string) string {
 	}
 }
 
-// Braille spinner frames for running sessions
-var runningFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+// Pulsing dot frames for running sessions — solid → ring → hollow → ring → solid
+var runningFrames = []string{"●", "●", "◉", "○", "◉", "●"}
 
-// Pulsing dot frames for queued sessions
-var queuedFrames = []string{"⠿", "⠷", "⠯", "⠟", "⠻", "⠽"}
+// Gentle waiting frames for queued sessions
+var queuedFrames = []string{"◌", "○", "◎", "○"}
 
 // AnimatedStatusIcon returns an animated icon for running/queued statuses,
 // or the static icon for all other statuses. The frame parameter selects
-// which animation frame to display.
+// which animation frame to display and cycles color intensity.
 func AnimatedStatusIcon(status string, frame int) string {
 	switch status {
 	case "running":
-		return runningFrames[frame%len(runningFrames)]
+		f := runningFrames[frame%len(runningFrames)]
+		// Cycle between bright and dim green
+		colors := []string{"42", "34", "28", "34", "42", "42"}
+		color := colors[frame%len(colors)]
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(f)
 	case "queued":
-		return queuedFrames[frame%len(queuedFrames)]
+		f := queuedFrames[frame%len(queuedFrames)]
+		// Cycle through amber tones
+		colors := []string{"226", "220", "214", "220"}
+		color := colors[frame%len(colors)]
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(f)
 	default:
 		return StatusIcon(status)
 	}

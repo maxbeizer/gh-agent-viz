@@ -131,7 +131,8 @@ func (m Model) View() string {
 		styledBanner := m.titleStyle.Render(Banner)
 		if m.tagline != "" {
 			tagStyle := lipgloss.NewStyle().Faint(true).Italic(true)
-			styledBanner += "  " + tagStyle.Render(m.tagline)
+			tagBlock := tagStyle.Render(m.tagline)
+			styledBanner = lipgloss.JoinHorizontal(lipgloss.Center, styledBanner, "  ", tagBlock)
 		}
 		return styledBanner + "\n" + tabLine + "\n" + separator + "\n"
 	}

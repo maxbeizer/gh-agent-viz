@@ -71,3 +71,16 @@ To reduce noise:
 2. Open a row (`enter`)
 3. Check logs (`l`) if needed
 4. Open PR (`o`) or resume (`s`) depending on row source
+
+## 6) Views & Visualizations
+
+gh-agent-viz includes several visual features beyond the default list view:
+
+- **Kanban board** (`K`) — status-column layout for monitoring many sessions at once
+- **Toast notifications** — automatic alerts when session statuses change
+- **Session timeline bar** — Unicode lifecycle visualization in detail view
+- **Dependency graph** — related session visualization in detail view
+- **Color themes** — configurable presets (catppuccin-mocha, dracula, tokyo-night)
+- **Live log tailing** — real-time log streaming with follow mode (`f` in log viewer)
+
+See [UI_FEATURES.md](UI_FEATURES.md) for the full guide.

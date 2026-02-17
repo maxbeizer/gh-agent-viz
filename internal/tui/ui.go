@@ -16,6 +16,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/logview"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/taskdetail"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/tasklist"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/toast"
 )
 
 // ViewMode represents the current view mode
@@ -37,12 +38,14 @@ type Model struct {
 	taskList    tasklist.Model
 	taskDetail  taskdetail.Model
 	logView     logview.Model
-	viewMode    ViewMode
-	showPreview bool
-	ready       bool
-	repo        string
-	refreshInt  time.Duration
-	animFrame   int
+	viewMode     ViewMode
+	showPreview  bool
+	ready        bool
+	repo         string
+	refreshInt   time.Duration
+	animFrame    int
+	toast        toast.Model
+	prevSessions map[string]string // session ID → previous status
 }
 
 // NewModel creates a new TUI model
@@ -103,6 +106,7 @@ func NewModel(repo string, debug bool) Model {
 		ready:       false,
 		repo:        repo,
 		refreshInt:  time.Duration(refreshSeconds) * time.Second,
+		toast:       toast.New(),
 	}
 }
 
@@ -147,6 +151,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.taskList.SetLoading(false)
 		m.taskList.SetTasks(msg.tasks)
 		m.taskDetail.SetAllSessions(msg.tasks)
+
+		// Detect status changes and push toasts (skip first load)
+		if m.prevSessions != nil {
+			for _, s := range msg.tasks {
+				if prev, ok := m.prevSessions[s.ID]; ok && prev != s.Status {
+					m.toast.Push(StatusIcon(s.Status), s.Title, prev+" → "+s.Status)
+				}
+			}
+		}
+		// Update prevSessions for next comparison
+		m.prevSessions = make(map[string]string, len(msg.tasks))
+		for _, s := range msg.tasks {
+			m.prevSessions[s.ID] = s.Status
+		}
 		return m, nil
 
 	case taskDetailLoadedMsg:
@@ -165,6 +183,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case animationTickMsg:
 		m.animFrame++
 		m.taskList.SetAnimFrame(m.animFrame)
+		m.toast.Tick()
 		return m, m.animationTickCmd()
 
 	case logPollTickMsg:
@@ -245,7 +264,20 @@ func (m Model) View() string {
 		mainView = debugBanner + mainView
 	}
 
-	return headerView + mainView + footerView
+	result := headerView + mainView + footerView
+
+	// Overlay toasts in the top-right corner
+	if m.toast.HasToasts() {
+		toastWidth := m.ctx.Width / 3
+		if toastWidth < 30 {
+			toastWidth = 30
+		}
+		m.toast.SetWidth(toastWidth)
+		toastView := lipgloss.PlaceHorizontal(m.ctx.Width, lipgloss.Right, m.toast.View())
+		result = toastView + "\n" + result
+	}
+
+	return result
 }
 
 // handleKeyPress processes keyboard input

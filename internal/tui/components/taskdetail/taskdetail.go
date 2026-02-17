@@ -58,6 +58,10 @@ func (m Model) View() string {
 		fmt.Sprintf("Session ID: %s", m.session.ID),
 	)
 
+	if reason := attentionReason(m.session); reason != "" {
+		details = append(details, "", reason)
+	}
+
 	if tl := RenderTimeline(m.session, timelineWidth(m.width)); tl != "" {
 		details = append(details, "", fmt.Sprintf("Timeline:   %s", tl))
 	}
@@ -152,6 +156,10 @@ func (m Model) ViewSplit() string {
 		fmt.Sprintf("Session ID: %s", m.session.ID),
 	)
 
+	if reason := attentionReason(m.session); reason != "" {
+		details = append(details, "", reason)
+	}
+
 	if tl := RenderTimeline(m.session, timelineWidth(m.width)); tl != "" {
 		details = append(details, "", fmt.Sprintf("Timeline:   %s", tl))
 	}
@@ -203,6 +211,30 @@ func joinVertical(lines []string) string {
 		result += line + "\n"
 	}
 	return result
+}
+
+func attentionReason(session *data.Session) string {
+	if session == nil {
+		return ""
+	}
+	status := strings.ToLower(strings.TrimSpace(session.Status))
+	if status == "needs-input" {
+		return "🧑 This session is waiting for your input to continue."
+	}
+	if status == "failed" {
+		return "🚨 This session has failed. Check logs for details."
+	}
+	if !data.StatusIsActive(session.Status) || session.UpdatedAt.IsZero() {
+		return ""
+	}
+	idle := time.Since(session.UpdatedAt)
+	if idle >= data.AttentionStaleMax {
+		return fmt.Sprintf("😴 No activity for %s — session may be abandoned.", formatDuration(idle))
+	}
+	if idle >= data.AttentionStaleThreshold {
+		return fmt.Sprintf("⚠️ Session has been idle for %s while status is \"%s\". This may indicate the agent is stuck.", formatDuration(idle), session.Status)
+	}
+	return ""
 }
 
 func detailValue(value string, fallback string) string {

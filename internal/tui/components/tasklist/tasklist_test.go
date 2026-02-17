@@ -275,7 +275,7 @@ func TestView_CardShowsAttentionBadges(t *testing.T) {
 	if !strings.Contains(view, "🧑 waiting on you") {
 		t.Fatalf("expected needs-input badge, got: %s", view)
 	}
-	if !strings.Contains(view, "💤 ~30m") {
+	if !strings.Contains(view, "⚠️ idle ~30m — may be stuck") {
 		t.Fatalf("expected idle badge, got: %s", view)
 	}
 }
@@ -446,11 +446,11 @@ func TestSessionBadge_IdleShowsDuration(t *testing.T) {
 		UpdatedAt: time.Now().Add(-30 * time.Minute),
 	}
 	badge := sessionBadge(session, 0)
-	if !strings.HasPrefix(badge, "💤 ~") {
+	if !strings.HasPrefix(badge, "⚠️ idle ~") {
 		t.Fatalf("expected idle badge with duration, got %q", badge)
 	}
-	if strings.Contains(badge, "check progress") {
-		t.Fatalf("old 'check progress' text should be gone, got %q", badge)
+	if !strings.Contains(badge, "— may be stuck") {
+		t.Fatalf("expected 'may be stuck' suffix, got %q", badge)
 	}
 }
 
@@ -460,8 +460,22 @@ func TestSessionBadge_StaleShowsEmoji(t *testing.T) {
 		UpdatedAt: time.Now().Add(-5 * time.Hour),
 	}
 	badge := sessionBadge(session, 0)
-	if badge != "😴 stale" {
+	if badge != "😴 stale — no activity 4h+" {
 		t.Fatalf("expected stale badge for session idle >4h, got %q", badge)
+	}
+}
+
+func TestSessionBadge_IdleWithDuplicates(t *testing.T) {
+	session := data.Session{
+		Status:    "running",
+		UpdatedAt: time.Now().Add(-25 * time.Minute),
+	}
+	badge := sessionBadge(session, 3)
+	if !strings.Contains(badge, "⚠️ idle") {
+		t.Fatalf("expected idle badge, got %q", badge)
+	}
+	if !strings.Contains(badge, "(+3 older)") {
+		t.Fatalf("expected duplicate count, got %q", badge)
 	}
 }
 

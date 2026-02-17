@@ -543,6 +543,99 @@ func FetchSessionEvents(sessionID string) ([]SessionEvent, error) {
 	return events, nil
 }
 
+// FetchLastSessionAction returns a brief description of the session's most recent action.
+// It reads the last lines of events.jsonl to find the latest tool execution or message.
+func FetchLastSessionAction(session Session) string {
+	if session.Source != SourceLocalCopilot || session.ID == "" {
+		return ""
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	eventsFile := filepath.Join(homeDir, ".copilot", "session-state", session.ID, "events.jsonl")
+	f, err := os.Open(eventsFile)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	var lastToolName string
+	for scanner.Scan() {
+		var event struct {
+			Type string          `json:"type"`
+			Data json.RawMessage `json:"data"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
+			continue
+		}
+
+		if event.Type == "tool.execution_start" {
+			var d struct {
+				ToolName string `json:"toolName"`
+			}
+			if json.Unmarshal(event.Data, &d) == nil && d.ToolName != "" {
+				lastToolName = d.ToolName
+			}
+		}
+	}
+
+	if lastToolName != "" {
+		return "🔧 " + lastToolName
+	}
+	return ""
+}
+
+// FetchLastAssistantMessage returns the last assistant message content from
+// the session's events.jsonl, or empty string if not found.
+func FetchLastAssistantMessage(sessionID string) string {
+	if sessionID == "" {
+		return ""
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	eventsFile := filepath.Join(homeDir, ".copilot", "session-state", sessionID, "events.jsonl")
+	f, err := os.Open(eventsFile)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	var lastMsg string
+	for scanner.Scan() {
+		var event struct {
+			Type string          `json:"type"`
+			Data json.RawMessage `json:"data"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
+			continue
+		}
+
+		if event.Type == "assistant.message" {
+			var d struct {
+				Content string `json:"content"`
+			}
+			if json.Unmarshal(event.Data, &d) == nil && d.Content != "" {
+				lastMsg = strings.TrimSpace(d.Content)
+			}
+		}
+	}
+
+	return lastMsg
+}
+
 // FetchAllSessions fetches both agent-task and local Copilot sessions
 func FetchAllSessions(repo string) ([]Session, error) {
 	var allSessions []Session

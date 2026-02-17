@@ -228,17 +228,7 @@ func attentionReason(session *data.Session) string {
 		return "🧑 This session is waiting for your input to continue."
 	}
 	if status == "failed" {
-		return "🚨 This session has failed. Check logs for details."
-	}
-	if !data.StatusIsActive(session.Status) || session.UpdatedAt.IsZero() {
-		return ""
-	}
-	idle := time.Since(session.UpdatedAt)
-	if idle >= data.AttentionStaleMax {
-		return fmt.Sprintf("😴 No activity for %s. Press 's' to resume or 'x' to dismiss.", formatDuration(idle))
-	}
-	if idle >= data.AttentionStaleThreshold {
-		return fmt.Sprintf("⚠️ Idle for %s while %s. Press 'l' to check logs or 's' to resume.", formatDuration(idle), session.Status)
+		return "🚨 This session has failed. Press 'l' to check logs."
 	}
 	return ""
 }

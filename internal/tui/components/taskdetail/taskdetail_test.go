@@ -152,28 +152,25 @@ func TestAttentionReason_Failed(t *testing.T) {
 	}
 }
 
-func TestAttentionReason_Idle(t *testing.T) {
+func TestAttentionReason_Idle_NoLongerAttention(t *testing.T) {
 	s := &data.Session{
 		Status:    "running",
 		UpdatedAt: time.Now().Add(-30 * time.Minute),
 	}
 	got := attentionReason(s)
-	if !strings.Contains(got, "⚠️") || !strings.Contains(strings.ToLower(got), "idle") {
-		t.Fatalf("expected idle attention reason, got %q", got)
-	}
-	if !strings.Contains(got, "check logs") || !strings.Contains(got, "resume") {
-		t.Fatalf("expected actionable idle reason, got %q", got)
+	if got != "" {
+		t.Fatalf("idle sessions should not have attention reason, got %q", got)
 	}
 }
 
-func TestAttentionReason_Stale(t *testing.T) {
+func TestAttentionReason_Stale_NoLongerAttention(t *testing.T) {
 	s := &data.Session{
 		Status:    "running",
 		UpdatedAt: time.Now().Add(-5 * time.Hour),
 	}
 	got := attentionReason(s)
-	if !strings.Contains(got, "😴") || !strings.Contains(got, "dismiss") {
-		t.Fatalf("expected stale attention reason, got %q", got)
+	if got != "" {
+		t.Fatalf("stale sessions should not have attention reason, got %q", got)
 	}
 }
 

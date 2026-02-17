@@ -22,9 +22,9 @@ func TestSessionNeedsAttention(t *testing.T) {
 			want:    true,
 		},
 		{
-			name:    "active stale session",
+			name:    "active idle session is not attention",
 			session: Session{Status: "running", UpdatedAt: time.Now().Add(-AttentionStaleThreshold - time.Minute)},
-			want:    true,
+			want:    false,
 		},
 		{
 			name:    "active fresh session",
@@ -32,12 +32,12 @@ func TestSessionNeedsAttention(t *testing.T) {
 			want:    false,
 		},
 		{
-			name:    "active session idle 2h needs attention",
+			name:    "active session idle 2h not attention",
 			session: Session{Status: "running", UpdatedAt: time.Now().Add(-2 * time.Hour)},
-			want:    true,
+			want:    false,
 		},
 		{
-			name:    "active session idle 5h past max",
+			name:    "active session idle 5h not attention",
 			session: Session{Status: "running", UpdatedAt: time.Now().Add(-5 * time.Hour)},
 			want:    false,
 		},

@@ -75,19 +75,12 @@ func (s Session) ToAgentTask() AgentTask {
 	}
 }
 
-// SessionNeedsAttention indicates whether a session likely requires operator action.
+// SessionNeedsAttention indicates whether a session requires operator action.
+// Only true for sessions explicitly waiting on user input or that have failed.
+// Idle sessions are informational, not actionable.
 func SessionNeedsAttention(session Session) bool {
 	status := strings.ToLower(strings.TrimSpace(session.Status))
-	if status == "needs-input" || status == "failed" {
-		return true
-	}
-
-	if !StatusIsActive(session.Status) || session.UpdatedAt.IsZero() {
-		return false
-	}
-
-	idle := time.Since(session.UpdatedAt)
-	return idle >= AttentionStaleThreshold && idle < AttentionStaleMax
+	return status == "needs-input" || status == "failed"
 }
 
 // StatusIsActive determines if a status string represents an active session.

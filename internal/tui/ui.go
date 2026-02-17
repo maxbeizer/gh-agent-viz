@@ -19,6 +19,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/taskdetail"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/tasklist"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/toast"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/tooltimeline"
 )
 
 // ViewMode represents the current view mode
@@ -29,6 +30,7 @@ const (
 	ViewModeDetail
 	ViewModeLog
 	ViewModeKanban
+	ViewModeToolTimeline
 )
 
 // Model represents the main TUI application state
@@ -43,6 +45,7 @@ type Model struct {
 	taskDetail  taskdetail.Model
 	logView     logview.Model
 	kanban         kanban.Model
+	toolTimeline   tooltimeline.Model
 	dismissedStore *data.DismissedStore
 	viewMode       ViewMode
 	showPreview  bool
@@ -109,6 +112,7 @@ func NewModel(repo string, debug bool) Model {
 		taskDetail:     taskdetail.New(theme.Title, theme.Border, StatusIcon),
 		logView:        logview.New(theme.Title, 80, 20),
 		kanban:         kanban.New(theme.Title, theme.Border, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
+		toolTimeline:   tooltimeline.New(80, 20),
 		dismissedStore: dismissedStore,
 		viewMode:    ViewModeList,
 		showPreview: false,
@@ -140,6 +144,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ctx.Height = msg.Height
 		m.header.SetSize(msg.Width, msg.Height)
 		m.logView.SetSize(msg.Width-4, msg.Height-8)
+		m.toolTimeline.SetSize(msg.Width-4, msg.Height-8)
 		m.help.SetSize(msg.Width, msg.Height)
 		m.updateSplitLayout()
 		m.ready = true
@@ -197,6 +202,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logView.SetContent(msg.log)
 		return m, nil
 
+	case toolTimelineLoadedMsg:
+		m.ctx.Error = nil
+		m.toolTimeline.SetEvents(msg.events)
+		return m, nil
+
 	case refreshTickMsg:
 		return m, tea.Batch(m.fetchTasks, m.refreshCmd())
 
@@ -235,6 +245,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// Update the tool timeline if in timeline mode
+	if m.viewMode == ViewModeToolTimeline {
+		var cmd tea.Cmd
+		m.toolTimeline, cmd = m.toolTimeline.Update(msg)
+		return m, cmd
+	}
+
 	return m, nil
 }
 
@@ -270,6 +287,8 @@ func (m Model) View() string {
 		mainView = m.logView.View()
 	case ViewModeKanban:
 		mainView = m.kanban.View()
+	case ViewModeToolTimeline:
+		mainView = m.toolTimeline.View()
 	}
 
 	debugBanner := ""
@@ -338,6 +357,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleLogKeys(msg)
 	case ViewModeKanban:
 		return m.handleKanbanKeys(msg)
+	case ViewModeToolTimeline:
+		return m.handleToolTimelineKeys(msg)
 	}
 
 	return m, nil
@@ -446,6 +467,13 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if session != nil {
 			return m, m.resumeSession(session)
 		}
+	case "t":
+		session := m.taskList.SelectedTask()
+		if session != nil && session.Source == data.SourceLocalCopilot && session.HasLog {
+			m.viewMode = ViewModeToolTimeline
+			m.toolTimeline.SetSize(m.ctx.Width-4, m.ctx.Height-8)
+			return m, m.fetchToolTimeline(session.ID)
+		}
 	}
 	return m, nil
 }
@@ -520,6 +548,23 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleToolTimelineKeys handles keys in tool timeline view mode
+func (m Model) handleToolTimelineKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.viewMode = ViewModeDetail
+	case "j", "down":
+		m.toolTimeline.LineDown()
+	case "k", "up":
+		m.toolTimeline.LineUp()
+	case "d":
+		m.toolTimeline.HalfPageDown()
+	case "u":
+		m.toolTimeline.HalfPageUp()
+	}
+	return m, nil
+}
+
 // cycleFilter cycles through status filters by delta (+1 forward, -1 backward)
 func (m *Model) cycleFilter(delta int) {
 	filters := []string{"attention", "active", "completed", "failed", "all"}
@@ -548,6 +593,10 @@ type taskDetailLoadedMsg struct {
 
 type taskLogLoadedMsg struct {
 	log string
+}
+
+type toolTimelineLoadedMsg struct {
+	events []tooltimeline.ToolEvent
 }
 
 type refreshTickMsg struct{}
@@ -652,6 +701,29 @@ func (m Model) fetchTaskLog(id string, repo string) tea.Cmd {
 			return errMsg{err}
 		}
 		return taskLogLoadedMsg{log}
+	}
+}
+
+// fetchToolTimeline fetches tool execution events for the timeline view
+func (m Model) fetchToolTimeline(sessionID string) tea.Cmd {
+	return func() tea.Msg {
+		events, err := data.FetchSessionEvents(sessionID)
+		if err != nil {
+			return errMsg{err}
+		}
+
+		var toolEvents []tooltimeline.ToolEvent
+		for _, ev := range events {
+			if ev.Type == "tool.execution_start" && ev.ToolName != "" {
+				toolEvents = append(toolEvents, tooltimeline.ToolEvent{
+					Timestamp: ev.Timestamp,
+					ToolName:  ev.ToolName,
+					Icon:      tooltimeline.ToolIcon(ev.ToolName),
+				})
+			}
+		}
+
+		return toolTimelineLoadedMsg{events: toolEvents}
 	}
 }
 
@@ -816,9 +888,12 @@ func (m *Model) updateFooterHints() {
 		hints := []key.Binding{
 			m.keys.NavigateBack,
 			m.keys.ShowLogs,
-			m.keys.ShowHelp,
-			m.keys.ExitApp,
 		}
+		session := m.taskList.SelectedTask()
+		if session != nil && session.Source == data.SourceLocalCopilot && session.HasLog {
+			hints = append(hints, key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tools")))
+		}
+		hints = append(hints, m.keys.ShowHelp, m.keys.ExitApp)
 		m.footer.SetHints(hints)
 	case ViewModeLog:
 		logHints := []key.Binding{
@@ -838,6 +913,14 @@ func (m *Model) updateFooterHints() {
 			m.keys.ExitApp,
 		}
 		m.footer.SetHints(kanbanHints)
+	case ViewModeToolTimeline:
+		timelineHints := []key.Binding{
+			m.keys.NavigateBack,
+			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "scroll")),
+			m.keys.ShowHelp,
+			m.keys.ExitApp,
+		}
+		m.footer.SetHints(timelineHints)
 	}
 }
 

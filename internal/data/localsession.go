@@ -464,6 +464,75 @@ func truncateLogContent(s string, maxLen int) string {
 	return s[:maxLen] + "\n\n_(truncated)_"
 }
 
+// SessionEvent represents a single parsed event from events.jsonl
+type SessionEvent struct {
+	Type      string
+	Timestamp string
+	Content   string
+	ToolName  string
+}
+
+// FetchSessionEvents reads events.jsonl for a local session and returns
+// structured event data suitable for timeline and analytics views.
+func FetchSessionEvents(sessionID string) ([]SessionEvent, error) {
+	if sessionID == "" {
+		return nil, fmt.Errorf("session ID is required")
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	eventsFile := filepath.Join(homeDir, ".copilot", "session-state", sessionID, "events.jsonl")
+	f, err := os.Open(eventsFile)
+	if err != nil {
+		return nil, fmt.Errorf("no event log found for this session")
+	}
+	defer f.Close()
+
+	var events []SessionEvent
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		var raw struct {
+			Type      string          `json:"type"`
+			Timestamp string          `json:"timestamp"`
+			Data      json.RawMessage `json:"data"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &raw); err != nil {
+			continue
+		}
+
+		ev := SessionEvent{
+			Type:      raw.Type,
+			Timestamp: raw.Timestamp,
+		}
+
+		switch raw.Type {
+		case "tool.execution_start":
+			var d struct {
+				ToolName string `json:"toolName"`
+			}
+			if json.Unmarshal(raw.Data, &d) == nil {
+				ev.ToolName = d.ToolName
+			}
+		case "user.message", "assistant.message":
+			var d struct {
+				Content string `json:"content"`
+			}
+			if json.Unmarshal(raw.Data, &d) == nil {
+				ev.Content = d.Content
+			}
+		}
+
+		events = append(events, ev)
+	}
+
+	return events, nil
+}
+
 // FetchAllSessions fetches both agent-task and local Copilot sessions
 func FetchAllSessions(repo string) ([]Session, error) {
 	var allSessions []Session

@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/maxbeizer/gh-agent-viz/internal/config"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/conversation"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/footer"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/help"
@@ -46,8 +47,10 @@ type Model struct {
 	logView     logview.Model
 	kanban         kanban.Model
 	toolTimeline   tooltimeline.Model
+	conversationView conversation.Model
 	dismissedStore *data.DismissedStore
 	viewMode       ViewMode
+	showConversation bool // true when conversation bubble view is active in log mode
 	showPreview  bool
 	ready        bool
 	repo         string
@@ -113,6 +116,7 @@ func NewModel(repo string, debug bool) Model {
 		logView:        logview.New(theme.Title, 80, 20),
 		kanban:         kanban.New(theme.Title, theme.Border, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
 		toolTimeline:   tooltimeline.New(80, 20),
+		conversationView: conversation.New(80, 20),
 		dismissedStore: dismissedStore,
 		viewMode:    ViewModeList,
 		showPreview: false,
@@ -145,6 +149,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.header.SetSize(msg.Width, msg.Height)
 		m.logView.SetSize(msg.Width-4, msg.Height-8)
 		m.toolTimeline.SetSize(msg.Width-4, msg.Height-8)
+		m.conversationView.SetSize(msg.Width-4, msg.Height-8)
 		m.help.SetSize(msg.Width, msg.Height)
 		m.updateSplitLayout()
 		m.ready = true
@@ -233,6 +238,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case conversationLoadedMsg:
+		m.conversationView.SetMessages(msg.messages)
+		m.showConversation = true
+		return m, nil
+
 	case errMsg:
 		m.ctx.Error = msg.err
 		return m, nil
@@ -240,6 +250,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Update the log view if in log mode
 	if m.viewMode == ViewModeLog {
+		if m.showConversation {
+			var cmd tea.Cmd
+			m.conversationView, cmd = m.conversationView.Update(msg)
+			return m, cmd
+		}
 		var cmd tea.Cmd
 		m.logView, cmd = m.logView.Update(msg)
 		return m, cmd
@@ -284,7 +299,11 @@ func (m Model) View() string {
 	case ViewModeDetail:
 		mainView = m.taskDetail.View()
 	case ViewModeLog:
-		mainView = m.logView.View()
+		if m.showConversation {
+			mainView = m.conversationView.View()
+		} else {
+			mainView = m.logView.View()
+		}
 	case ViewModeKanban:
 		mainView = m.kanban.View()
 	case ViewModeToolTimeline:
@@ -485,28 +504,64 @@ func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.viewMode = ViewModeList
 		m.logView.SetLive(false)
 		m.logView.SetFollowMode(false)
+		m.showConversation = false
+	case "c":
+		session := m.taskList.SelectedTask()
+		if session != nil && session.Source == data.SourceLocalCopilot {
+			if m.showConversation {
+				m.showConversation = false
+			} else {
+				return m, m.fetchConversation(session.ID)
+			}
+		}
 	case "j", "down":
-		m.logView.SetFollowMode(false)
-		m.logView.LineDown()
+		if m.showConversation {
+			m.conversationView.LineDown()
+		} else {
+			m.logView.SetFollowMode(false)
+			m.logView.LineDown()
+		}
 	case "k", "up":
-		m.logView.SetFollowMode(false)
-		m.logView.LineUp()
+		if m.showConversation {
+			m.conversationView.LineUp()
+		} else {
+			m.logView.SetFollowMode(false)
+			m.logView.LineUp()
+		}
 	case "d":
-		m.logView.SetFollowMode(false)
-		m.logView.HalfPageDown()
+		if m.showConversation {
+			m.conversationView.HalfPageDown()
+		} else {
+			m.logView.SetFollowMode(false)
+			m.logView.HalfPageDown()
+		}
 	case "u":
-		m.logView.SetFollowMode(false)
-		m.logView.HalfPageUp()
+		if m.showConversation {
+			m.conversationView.HalfPageUp()
+		} else {
+			m.logView.SetFollowMode(false)
+			m.logView.HalfPageUp()
+		}
 	case "g":
-		m.logView.SetFollowMode(false)
-		m.logView.GotoTop()
+		if m.showConversation {
+			m.conversationView.GotoTop()
+		} else {
+			m.logView.SetFollowMode(false)
+			m.logView.GotoTop()
+		}
 	case "G":
-		m.logView.SetFollowMode(true)
-		m.logView.GotoBottom()
-	case "f":
-		m.logView.SetFollowMode(!m.logView.FollowMode())
-		if m.logView.FollowMode() {
+		if m.showConversation {
+			m.conversationView.GotoBottom()
+		} else {
+			m.logView.SetFollowMode(true)
 			m.logView.GotoBottom()
+		}
+	case "f":
+		if !m.showConversation {
+			m.logView.SetFollowMode(!m.logView.FollowMode())
+			if m.logView.FollowMode() {
+				m.logView.GotoBottom()
+			}
 		}
 	case "s":
 		session := m.taskList.SelectedTask()
@@ -612,6 +667,10 @@ type logPollResultMsg struct {
 
 type errMsg struct {
 	err error
+}
+
+type conversationLoadedMsg struct {
+	messages []conversation.ChatMessage
 }
 
 // fetchTasks fetches the list of sessions (both agent tasks and local sessions)
@@ -724,6 +783,60 @@ func (m Model) fetchToolTimeline(sessionID string) tea.Cmd {
 		}
 
 		return toolTimelineLoadedMsg{events: toolEvents}
+	}
+}
+
+// fetchConversation loads events for a local session and converts them to chat messages.
+func (m Model) fetchConversation(sessionID string) tea.Cmd {
+	return func() tea.Msg {
+		events, err := data.FetchSessionEvents(sessionID)
+		if err != nil {
+			return errMsg{err}
+		}
+
+		var messages []conversation.ChatMessage
+		var pendingTools []string
+
+		for _, ev := range events {
+		switch ev.Type {
+			case "session.start":
+				messages = append(messages, conversation.ChatMessage{
+					Role:      conversation.RoleSystem,
+					Content:   "Session started",
+					Timestamp: ev.Timestamp,
+				})
+			case "user.message":
+				if ev.Content != "" {
+					messages = append(messages, conversation.ChatMessage{
+						Role:      conversation.RoleUser,
+						Content:   ev.Content,
+						Timestamp: ev.Timestamp,
+					})
+				}
+			case "tool.execution_start":
+				if ev.ToolName != "" {
+					pendingTools = append(pendingTools, ev.ToolName)
+				}
+			case "assistant.message":
+				if ev.Content != "" {
+					messages = append(messages, conversation.ChatMessage{
+						Role:      conversation.RoleAssistant,
+						Content:   ev.Content,
+						Timestamp: ev.Timestamp,
+						Tools:     pendingTools,
+					})
+					pendingTools = nil
+				}
+			case "abort":
+				messages = append(messages, conversation.ChatMessage{
+					Role:      conversation.RoleSystem,
+					Content:   "Session aborted",
+					Timestamp: ev.Timestamp,
+				})
+			}
+		}
+
+		return conversationLoadedMsg{messages: messages}
 	}
 }
 
@@ -900,9 +1013,12 @@ func (m *Model) updateFooterHints() {
 			m.keys.NavigateBack,
 			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "scroll")),
 			m.keys.ToggleFollow,
-			m.keys.ShowHelp,
-			m.keys.ExitApp,
 		}
+		session := m.taskList.SelectedTask()
+		if session != nil && session.Source == data.SourceLocalCopilot {
+			logHints = append(logHints, key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "convo")))
+		}
+		logHints = append(logHints, m.keys.ShowHelp, m.keys.ExitApp)
 		m.footer.SetHints(logHints)
 	case ViewModeKanban:
 		kanbanHints := []key.Binding{

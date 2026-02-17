@@ -464,16 +464,17 @@ func truncateLogContent(s string, maxLen int) string {
 	return s[:maxLen] + "\n\n_(truncated)_"
 }
 
-// SessionEvent represents a single parsed event from events.jsonl
+// SessionEvent represents a single parsed event from events.jsonl with full content.
 type SessionEvent struct {
-	Type      string
-	Timestamp string
-	Content   string
-	ToolName  string
+	Type      string // e.g. "user.message", "assistant.message", "tool.execution_start"
+	Timestamp string // RFC3339 timestamp
+	Role      string // "user" or "assistant" for messages
+	Content   string // full content (not truncated)
+	ToolName  string // for tool.execution_start events
 }
 
 // FetchSessionEvents reads events.jsonl for a local session and returns
-// structured event data suitable for timeline and analytics views.
+// structured events without content truncation.
 func FetchSessionEvents(sessionID string) ([]SessionEvent, error) {
 	if sessionID == "" {
 		return nil, fmt.Errorf("session ID is required")
@@ -511,19 +512,28 @@ func FetchSessionEvents(sessionID string) ([]SessionEvent, error) {
 		}
 
 		switch raw.Type {
+		case "user.message":
+			var d struct {
+				Content string `json:"content"`
+			}
+			if json.Unmarshal(raw.Data, &d) == nil {
+				ev.Role = "user"
+				ev.Content = d.Content
+			}
+		case "assistant.message":
+			var d struct {
+				Content string `json:"content"`
+			}
+			if json.Unmarshal(raw.Data, &d) == nil {
+				ev.Role = "assistant"
+				ev.Content = d.Content
+			}
 		case "tool.execution_start":
 			var d struct {
 				ToolName string `json:"toolName"`
 			}
 			if json.Unmarshal(raw.Data, &d) == nil {
 				ev.ToolName = d.ToolName
-			}
-		case "user.message", "assistant.message":
-			var d struct {
-				Content string `json:"content"`
-			}
-			if json.Unmarshal(raw.Data, &d) == nil {
-				ev.Content = d.Content
 			}
 		}
 

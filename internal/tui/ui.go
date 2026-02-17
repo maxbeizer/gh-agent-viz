@@ -42,8 +42,9 @@ type Model struct {
 	taskList    tasklist.Model
 	taskDetail  taskdetail.Model
 	logView     logview.Model
-	kanban       kanban.Model
-	viewMode     ViewMode
+	kanban         kanban.Model
+	dismissedStore *data.DismissedStore
+	viewMode       ViewMode
 	showPreview  bool
 	ready        bool
 	repo         string
@@ -104,10 +105,11 @@ func NewModel(repo string, debug bool) Model {
 		header:      header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter, ctx.Config.AsciiHeaderEnabled()),
 		footer:      footer.New(theme.Footer, footerKeys),
 		help:        help.New(),
-		taskList:    tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, theme.SectionHeader, StatusIcon, animIconFunc, dismissedStore),
-		taskDetail:  taskdetail.New(theme.Title, theme.Border, StatusIcon),
-		logView:     logview.New(theme.Title, 80, 20),
-		kanban:      kanban.New(theme.Title, theme.Border, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
+		taskList:       tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, theme.SectionHeader, StatusIcon, animIconFunc, dismissedStore),
+		taskDetail:     taskdetail.New(theme.Title, theme.Border, StatusIcon),
+		logView:        logview.New(theme.Title, 80, 20),
+		kanban:         kanban.New(theme.Title, theme.Border, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
+		dismissedStore: dismissedStore,
 		viewMode:    ViewModeList,
 		showPreview: false,
 		ready:       false,
@@ -561,7 +563,20 @@ func (m Model) fetchTasks() tea.Msg {
 		return errMsg{err}
 	}
 
-	// Compute counts across ALL sessions before filtering
+	// Exclude dismissed sessions before computing anything
+	dismissedIDs := map[string]struct{}{}
+	if m.dismissedStore != nil {
+		dismissedIDs = m.dismissedStore.IDs()
+	}
+	visible := make([]data.Session, 0, len(sessions))
+	for _, session := range sessions {
+		if _, dismissed := dismissedIDs[session.ID]; !dismissed {
+			visible = append(visible, session)
+		}
+	}
+	sessions = visible
+
+	// Compute counts across all visible (non-dismissed) sessions
 	counts := FilterCounts{All: len(sessions)}
 	for _, session := range sessions {
 		if data.SessionNeedsAttention(session) {

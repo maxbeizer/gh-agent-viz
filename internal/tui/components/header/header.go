@@ -91,8 +91,6 @@ func (m Model) showBanner() bool {
 
 // View renders the header as a tab bar
 func (m Model) View() string {
-	title := m.titleStyle.Render(m.title)
-
 	activeFilter := "attention"
 	if m.filter != nil && *m.filter != "" {
 		activeFilter = *m.filter
@@ -121,7 +119,7 @@ func (m Model) View() string {
 	}
 
 	tabBar := strings.Join(renderedTabs, "")
-	tabLine := lipgloss.JoinHorizontal(lipgloss.Center, title, "  ", tabBar)
+	tabLine := tabBar
 
 	separator := lipgloss.NewStyle().
 		Foreground(lipgloss.AdaptiveColor{Light: "249", Dark: "240"}).
@@ -145,7 +143,7 @@ func (m Model) View() string {
 	// No banner: show tagline beside the title
 	if m.tagline != "" && m.height >= 18 {
 		tagStyle := lipgloss.NewStyle().Faint(true).Italic(true)
-		tabLine = lipgloss.JoinHorizontal(lipgloss.Center, title, "  ", tagStyle.Render(m.tagline), "  ", tabBar)
+		tabLine = lipgloss.JoinHorizontal(lipgloss.Center, tagStyle.Render(m.tagline), "  ", tabBar)
 	}
 
 	return tabLine + "\n" + separator + "\n"

@@ -42,14 +42,12 @@ func TestNew_NilFilter(t *testing.T) {
 	}
 }
 
-func TestView_RendersTitle(t *testing.T) {
-	title := "My Application"
-
-	model := newTestModel(title, nil)
+func TestView_RendersTabs(t *testing.T) {
+	model := newTestModel("My Application", nil)
 	view := model.View()
 
-	if !strings.Contains(view, title) {
-		t.Errorf("expected view to contain title '%s', got: %s", title, view)
+	if !strings.Contains(view, "RUNNING") {
+		t.Errorf("expected view to contain RUNNING tab, got: %s", view)
 	}
 }
 
@@ -61,9 +59,6 @@ func TestView_WithFilter(t *testing.T) {
 	model.SetCounts(FilterCounts{All: 5, Completed: 2})
 	view := model.View()
 
-	if !strings.Contains(view, title) {
-		t.Errorf("expected view to contain title '%s'", title)
-	}
 	// Active tab should be highlighted
 	if !strings.Contains(view, "DONE") {
 		t.Errorf("expected view to contain DONE tab for completed filter, got: %s", view)
@@ -114,15 +109,14 @@ func TestView_BannerRendersWhenEnabled(t *testing.T) {
 }
 
 func TestView_PlainTitleWhenBannerDisabled(t *testing.T) {
-	title := "⚡ Agent Sessions"
-	model := newTestModelWithBanner(title, nil, false)
+	model := newTestModelWithBanner("⚡ Agent Sessions", nil, false)
 	view := model.View()
 
 	if strings.Contains(view, "A G E N T   V I Z") {
 		t.Error("expected view NOT to contain ASCII banner when disabled")
 	}
-	if !strings.Contains(view, title) {
-		t.Errorf("expected view to contain plain title '%s'", title)
+	if !strings.Contains(view, "RUNNING") {
+		t.Errorf("expected view to contain tabs when banner is disabled, got: %s", view)
 	}
 }
 

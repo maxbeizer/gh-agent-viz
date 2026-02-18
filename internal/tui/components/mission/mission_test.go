@@ -51,10 +51,11 @@ func TestSetSessions(t *testing.T) {
 
 func TestCursorNavigation(t *testing.T) {
 	m := newTestModel()
+	now := time.Now()
 	sessions := []data.Session{
-		{ID: "1", Status: "running", Title: "One"},
-		{ID: "2", Status: "running", Title: "Two"},
-		{ID: "3", Status: "running", Title: "Three"},
+		{ID: "1", Status: "running", Title: "One", Repository: "owner/repo-a", UpdatedAt: now},
+		{ID: "2", Status: "running", Title: "Two", Repository: "owner/repo-b", UpdatedAt: now},
+		{ID: "3", Status: "running", Title: "Three", Repository: "owner/repo-c", UpdatedAt: now},
 	}
 	m.SetSessions(sessions)
 
@@ -100,23 +101,23 @@ func TestCursorNavigationEmpty(t *testing.T) {
 	}
 }
 
-func TestSelectedSession(t *testing.T) {
+func TestSelectedSession_ReturnsNil(t *testing.T) {
 	m := newTestModel()
+	now := time.Now()
 	sessions := []data.Session{
-		{ID: "1", Status: "running", Title: "First"},
-		{ID: "2", Status: "completed", Title: "Second"},
+		{ID: "1", Status: "running", Title: "First", Repository: "owner/repo", UpdatedAt: now},
 	}
 	m.SetSessions(sessions)
 
-	s := m.SelectedSession()
-	if s == nil || s.ID != "1" {
-		t.Fatal("expected selected session to be first")
+	// Summary view doesn't select individual sessions
+	if m.SelectedSession() != nil {
+		t.Fatal("expected nil — summary view doesn't select sessions")
 	}
 
-	m.MoveCursor(1)
-	s = m.SelectedSession()
-	if s == nil || s.ID != "2" {
-		t.Fatal("expected selected session to be second after cursor move")
+	// But SelectedRepo should work
+	repo := m.SelectedRepo()
+	if repo != "owner/repo" {
+		t.Fatalf("expected repo 'owner/repo', got %q", repo)
 	}
 }
 
@@ -137,29 +138,35 @@ func TestViewEmpty(t *testing.T) {
 	}
 }
 
-func TestViewRendersCards(t *testing.T) {
+func TestViewRendersSummary(t *testing.T) {
 	m := newTestModel()
 	m.SetSize(100, 30)
+	now := time.Now()
 	sessions := []data.Session{
-		{ID: "1", Status: "running", Title: "Fix auth bug", Repository: "owner/repo", CreatedAt: time.Now().Add(-12 * time.Minute)},
-		{ID: "2", Status: "completed", Title: "Update docs", Repository: "owner/docs", PRNumber: 42},
+		{ID: "1", Status: "running", Title: "Fix auth bug", Repository: "owner/repo", UpdatedAt: now},
+		{ID: "2", Status: "completed", Title: "Update docs", Repository: "owner/docs", PRNumber: 42, UpdatedAt: now.Add(-1 * time.Hour)},
 	}
 	m.SetSessions(sessions)
 
 	view := m.View()
 
-	if !strings.Contains(view, "Fix auth bug") {
-		t.Fatal("expected running session title in view")
-	}
-	if !strings.Contains(view, "Update docs") {
-		t.Fatal("expected completed session title in view")
-	}
+	// Should show repo names
 	if !strings.Contains(view, "owner/repo") {
-		t.Fatal("expected repo in view")
+		t.Fatal("expected repo owner/repo in view")
 	}
-	// Should have separator between cards
-	if !strings.Contains(view, "───") {
-		t.Fatal("expected separator between cards")
+	if !strings.Contains(view, "owner/docs") {
+		t.Fatal("expected repo owner/docs in view")
+	}
+	// Should show aggregate stats
+	if !strings.Contains(view, "in progress") {
+		t.Fatal("expected 'in progress' in summary")
+	}
+	if !strings.Contains(view, "done") {
+		t.Fatal("expected 'done' in summary")
+	}
+	// Should have section headers
+	if !strings.Contains(view, "Repos") {
+		t.Fatal("expected Repos section")
 	}
 }
 
@@ -211,24 +218,21 @@ func TestDeriveLastAction_NeedsInput(t *testing.T) {
 	}
 }
 
-func TestFormatDuration(t *testing.T) {
+func TestFormatAge(t *testing.T) {
 	tests := []struct {
 		name   string
-		s      data.Session
+		t      time.Time
 		expect string
 	}{
-		{"completed", data.Session{Status: "completed"}, "done"},
-		{"failed", data.Session{Status: "failed"}, "failed"},
-		{"queued", data.Session{Status: "queued"}, "queued"},
-		{"zero time", data.Session{Status: "running"}, ""},
-		{"recent", data.Session{Status: "running", CreatedAt: time.Now().Add(-30 * time.Second)}, "⏱ <1m"},
-		{"minutes", data.Session{Status: "running", CreatedAt: time.Now().Add(-12 * time.Minute)}, "⏱ 12m"},
-		{"hours", data.Session{Status: "running", CreatedAt: time.Now().Add(-3 * time.Hour)}, "⏱ 3h"},
-		{"days", data.Session{Status: "running", CreatedAt: time.Now().Add(-48 * time.Hour)}, "⏱ 2d"},
+		{"zero", time.Time{}, ""},
+		{"recent", time.Now().Add(-30 * time.Second), "just now"},
+		{"minutes", time.Now().Add(-12 * time.Minute), "12m ago"},
+		{"hours", time.Now().Add(-3 * time.Hour), "3h ago"},
+		{"days", time.Now().Add(-48 * time.Hour), "2d ago"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := formatDuration(tt.s)
+			got := formatAge(tt.t)
 			if got != tt.expect {
 				t.Fatalf("expected %q, got %q", tt.expect, got)
 			}

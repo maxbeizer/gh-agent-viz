@@ -706,18 +706,6 @@ func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mission.MoveCursor(1)
 	case "k", "up":
 		m.mission.MoveCursor(-1)
-	case "enter":
-		session := m.mission.SelectedSession()
-		if session != nil {
-			if session.Source == data.SourceLocalCopilot {
-				m.ctx.Error = nil
-				m.viewMode = ViewModeDetail
-				m.taskDetail.SetTask(session)
-				return m, nil
-			}
-			m.viewMode = ViewModeDetail
-			return m, m.fetchTaskDetail(session.ID, session.Repository)
-		}
 	case "r":
 		return m, m.fetchTasks
 	}

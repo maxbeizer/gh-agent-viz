@@ -226,6 +226,26 @@ func RunGH(args ...string) ([]byte, error) {
 	return runGH(args...)
 }
 
+// FetchPRForBranch looks up an open PR for the given repo and branch.
+// Returns (prNumber, prURL, err). If no PR is found, returns (0, "", nil).
+func FetchPRForBranch(repo, branch string) (int, string, error) {
+	if repo == "" || branch == "" {
+		return 0, "", nil
+	}
+	output, err := runGH("pr", "list", "-R", repo, "--head", branch, "--json", "number,url", "--limit", "1")
+	if err != nil {
+		return 0, "", nil // silently fail — PR lookup is best-effort
+	}
+	var prs []struct {
+		Number int    `json:"number"`
+		URL    string `json:"url"`
+	}
+	if err := json.Unmarshal(output, &prs); err != nil || len(prs) == 0 {
+		return 0, "", nil
+	}
+	return prs[0].Number, prs[0].URL, nil
+}
+
 func logDebugEntry(args []string, output []byte, cmdErr error) {
 	f, err := os.OpenFile(DebugLogPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {

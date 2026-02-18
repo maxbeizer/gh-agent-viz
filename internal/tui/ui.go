@@ -792,6 +792,21 @@ func (m Model) fetchTasks() tea.Msg {
 	}
 	sessions = visible
 
+	// Enrich sessions with token usage from CLI logs
+	tokenUsage, _ := data.FetchTokenUsage()
+	for i := range sessions {
+		if usage, ok := tokenUsage[sessions[i].ID]; ok {
+			if sessions[i].Telemetry == nil {
+				sessions[i].Telemetry = &data.SessionTelemetry{}
+			}
+			sessions[i].Telemetry.Model = usage.Model
+			sessions[i].Telemetry.InputTokens = usage.InputTokens
+			sessions[i].Telemetry.OutputTokens = usage.OutputTokens
+			sessions[i].Telemetry.CachedTokens = usage.CachedTokens
+			sessions[i].Telemetry.ModelCalls = usage.Calls
+		}
+	}
+
 	// Compute counts across all visible (non-dismissed) sessions
 	counts := FilterCounts{All: len(sessions)}
 	for _, session := range sessions {

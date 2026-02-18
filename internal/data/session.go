@@ -26,6 +26,12 @@ type SessionTelemetry struct {
 	ConversationTurns int           // number of conversation exchanges
 	UserMessages      int           // messages from user
 	AssistantMessages int           // messages from assistant
+	// Token usage from CLI logs
+	Model        string // last model used
+	InputTokens  int64  // total prompt tokens
+	OutputTokens int64  // total completion tokens
+	CachedTokens int64  // total cached prompt tokens
+	ModelCalls   int    // number of model API calls
 }
 
 // Session represents a unified model for both agent-task and local Copilot sessions

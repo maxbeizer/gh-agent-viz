@@ -223,7 +223,17 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 		}
 		metaText += strings.Repeat(" ", pad) + durStr
 	}
-	meta := lipgloss.NewStyle().Faint(true).Render(metaText)
+
+	dimStyle := lipgloss.NewStyle().Faint(true)
+	meta := dimStyle.Render(metaText)
+
+	// PR tag rendered separately so it's visible (not faint)
+	if hasPRBranch(session) {
+		prTag := lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "73"}).
+			Render(" PR")
+		meta = dimStyle.Render(metaText) + prTag
+	}
 
 	return style.Render(leftPart + "\n" + meta)
 }
@@ -590,11 +600,7 @@ func rowRepository(session data.Session) string {
 	if branch == "" {
 		return repository
 	}
-	base := fmt.Sprintf("%s @ %s", repository, branch)
-	if hasPRBranch(session) {
-		return base + " · PR"
-	}
-	return base
+	return fmt.Sprintf("%s @ %s", repository, branch)
 }
 
 // compactDuration returns a short duration string for the metadata line.

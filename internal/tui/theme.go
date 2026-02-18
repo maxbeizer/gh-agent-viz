@@ -46,6 +46,8 @@ func NewThemeFromConfig(themeName string) *Theme {
 		return newDraculaTheme()
 	case "tokyo-night":
 		return newTokyoNightTheme()
+	case "solarized-light":
+		return newSolarizedLightTheme()
 	case "default":
 		return newDefaultTheme()
 	default:
@@ -326,6 +328,63 @@ func newTokyoNightTheme() *Theme {
 			Bold(true),
 		SectionHeader: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#7aa2f7")).
+			Bold(true).
+			Padding(0, 1),
+	}
+}
+
+// newSolarizedLightTheme returns a theme designed for light terminals
+// using the Solarized Light palette.
+func newSolarizedLightTheme() *Theme {
+	return &Theme{
+		name:            "solarized-light",
+		StatusRunning:   lipgloss.NewStyle().Foreground(lipgloss.Color("#859900")),
+		StatusQueued:    lipgloss.NewStyle().Foreground(lipgloss.Color("#b58900")),
+		StatusCompleted: lipgloss.NewStyle().Foreground(lipgloss.Color("#2aa198")),
+		StatusFailed:    lipgloss.NewStyle().Foreground(lipgloss.Color("#dc322f")),
+		TableHeader: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#268bd2")).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderBottom(true).
+			BorderForeground(lipgloss.Color("#eee8d5")),
+		TableRow: lipgloss.NewStyle().
+			Padding(0, 1).
+			Foreground(lipgloss.Color("#586e75")),
+		TableRowSelected: lipgloss.NewStyle().
+			Padding(0, 1).
+			Foreground(lipgloss.Color("#073642")).
+			Bold(true),
+		Border: lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#eee8d5")),
+		Title: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#268bd2")).
+			Padding(0, 1),
+		Footer: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#93a1a1")).
+			Padding(0, 1),
+		TabActive: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#fdf6e3")).
+			Background(lipgloss.Color("#268bd2")).
+			Padding(0, 2),
+		TabInactive: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#93a1a1")).
+			Padding(0, 2),
+		TabCount: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#93a1a1")),
+		FocusBorder: lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#2aa198")),
+		RowGutter: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#eee8d5")),
+		RowGutterSel: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#268bd2")).
+			Bold(true),
+		SectionHeader: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#2aa198")).
 			Bold(true).
 			Padding(0, 1),
 	}

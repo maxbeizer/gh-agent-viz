@@ -24,6 +24,7 @@ type Model struct {
 	width    int
 	height   int
 	ready    bool
+	loading  bool
 }
 
 // Styles for diff rendering
@@ -48,9 +49,16 @@ func New(width, height int) Model {
 // SetDiffs updates the file diffs and re-renders the viewport content
 func (m *Model) SetDiffs(files []FileDiff) {
 	m.files = files
+	m.loading = false
 	m.viewport.SetContent(m.renderDiffs())
 	m.viewport.GotoTop()
 	m.ready = true
+}
+
+// SetLoading puts the diff view in a loading state
+func (m *Model) SetLoading() {
+	m.loading = true
+	m.ready = false
 }
 
 // SetSize updates the viewport dimensions
@@ -66,8 +74,11 @@ func (m *Model) SetSize(width, height int) {
 
 // View renders the diff view
 func (m Model) View() string {
+	if m.loading {
+		return lipgloss.NewStyle().Padding(1, 2).Render("🔄 Loading diff...")
+	}
 	if !m.ready || len(m.files) == 0 {
-		return "No diffs available"
+		return lipgloss.NewStyle().Padding(1, 2).Render("No diffs available")
 	}
 	return m.viewport.View()
 }

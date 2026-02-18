@@ -214,6 +214,12 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 	// Meta line: repo + time, dimmed for visual hierarchy
 	repo := truncate(rowRepository(session), width/2)
 	metaText := fmt.Sprintf("    %s  %s", repo, formatTime(session.UpdatedAt))
+
+	// Show PR indicator for sessions with feature branches
+	if hasPRBranch(session) {
+		metaText += "  🔀"
+	}
+
 	if dur := compactDuration(session); dur != "" {
 		durStr := "⏱ " + dur
 		pad := width - len(metaText) - len(durStr)
@@ -621,6 +627,15 @@ func sessionHasLinkedPR(session data.Session) bool {
 		return true
 	}
 	return session.PRNumber > 0 && strings.TrimSpace(session.Repository) != ""
+}
+
+// hasPRBranch returns true if the session is on a feature branch (not main/master)
+func hasPRBranch(session data.Session) bool {
+	branch := strings.ToLower(strings.TrimSpace(session.Branch))
+	if branch == "" || branch == "main" || branch == "master" {
+		return false
+	}
+	return strings.TrimSpace(session.Repository) != ""
 }
 
 // SetSize updates the available rendering size for responsive layout.

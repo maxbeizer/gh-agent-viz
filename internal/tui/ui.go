@@ -496,6 +496,7 @@ return m, m.fetchConversation(session.ID)
 	case "d":
 		session := m.taskList.SelectedTask()
 		if session != nil && canShowDiff(session) {
+			m.diffView.SetLoading()
 			m.viewMode = ViewModeDiff
 			return m, m.fetchPRDiff(session)
 		} else if session != nil {
@@ -555,6 +556,7 @@ return m, m.fetchConversation(session.ID)
 	case "d":
 		session := m.taskList.SelectedTask()
 		if session != nil && canShowDiff(session) {
+			m.diffView.SetLoading()
 			m.viewMode = ViewModeDiff
 			return m, m.fetchPRDiff(session)
 		}

@@ -131,7 +131,7 @@ func TestRenderFileHeader(t *testing.T) {
 func TestModel_EmptyState(t *testing.T) {
 	m := New(80, 24)
 	view := m.View()
-	if view != "No diffs available" {
+	if !strings.Contains(view, "No diffs available") {
 		t.Errorf("expected empty state message, got %q", view)
 	}
 }

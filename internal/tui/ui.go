@@ -568,7 +568,7 @@ return m, m.fetchConversation(session.ID)
 func (m Model) handleDiffKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.viewMode = ViewModeDetail
+		m.viewMode = ViewModeList
 		return m, nil
 	}
 

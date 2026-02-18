@@ -963,27 +963,37 @@ func (m Model) openTaskPR(session *data.Session) tea.Cmd {
 			return errMsg{fmt.Errorf("no session selected")}
 		}
 
-		// Local sessions don't have PR URLs
-		if session.Source == data.SourceLocalCopilot {
-			return errMsg{fmt.Errorf("local sessions don't have associated pull requests")}
-		}
-
-		switch {
-		case session.PRURL != "":
+		// If we already have PR info, use it
+		if session.PRURL != "" {
 			output, err := data.RunGH("pr", "view", session.PRURL, "--web")
 			if err != nil {
 				return errMsg{fmt.Errorf("failed to open PR: %s", strings.TrimSpace(string(output)))}
 			}
-		case session.PRNumber > 0 && session.Repository != "":
+			return nil
+		}
+		if session.PRNumber > 0 && session.Repository != "" {
 			output, err := data.RunGH("pr", "view", fmt.Sprintf("%d", session.PRNumber), "-R", session.Repository, "--web")
 			if err != nil {
 				return errMsg{fmt.Errorf("failed to open PR: %s", strings.TrimSpace(string(output)))}
 			}
-		default:
-			return errMsg{fmt.Errorf("selected session has no pull request to open")}
+			return nil
 		}
 
-		return nil
+		// Try to discover PR by branch name
+		if session.Repository != "" && session.Branch != "" {
+			prNumber, prURL, _ := data.FetchPRForBranch(session.Repository, session.Branch)
+			if prURL != "" {
+				session.PRNumber = prNumber
+				session.PRURL = prURL
+				output, err := data.RunGH("pr", "view", prURL, "--web")
+				if err != nil {
+					return errMsg{fmt.Errorf("failed to open PR: %s", strings.TrimSpace(string(output)))}
+				}
+				return nil
+			}
+		}
+
+		return errMsg{fmt.Errorf("no pull request found for this session")}
 	}
 }
 
@@ -1191,13 +1201,18 @@ func canShowLogs(session *data.Session) bool {
 }
 
 func canOpenPR(session *data.Session) bool {
-	if session == nil || session.Source != data.SourceAgentTask {
+	if session == nil {
 		return false
 	}
+	// Has explicit PR info
 	if strings.TrimSpace(session.PRURL) != "" {
 		return true
 	}
-	return session.PRNumber > 0 && strings.TrimSpace(session.Repository) != ""
+	if session.PRNumber > 0 && strings.TrimSpace(session.Repository) != "" {
+		return true
+	}
+	// Can discover PR by branch lookup
+	return strings.TrimSpace(session.Repository) != "" && strings.TrimSpace(session.Branch) != ""
 }
 
 func canResumeLocalSession(session *data.Session) bool {
@@ -1208,19 +1223,36 @@ func canResumeLocalSession(session *data.Session) bool {
 	return status == "running" || status == "queued" || status == "needs-input"
 }
 
-// canShowDiff returns true when the session has a PR whose diff can be fetched
+// canShowDiff returns true when the session has a PR or can discover one
 func canShowDiff(session *data.Session) bool {
 	if session == nil {
 		return false
 	}
-	return session.PRNumber > 0 && strings.TrimSpace(session.Repository) != ""
+	if session.PRNumber > 0 && strings.TrimSpace(session.Repository) != "" {
+		return true
+	}
+	// Can discover PR by branch
+	return strings.TrimSpace(session.Repository) != "" && strings.TrimSpace(session.Branch) != ""
 }
 
-// fetchPRDiff fetches the PR diff for a session
+// fetchPRDiff fetches the PR diff for a session, discovering the PR by branch if needed
 func (m Model) fetchPRDiff(session *data.Session) tea.Cmd {
 	prNumber := session.PRNumber
 	repo := session.Repository
+	branch := session.Branch
 	return func() tea.Msg {
+		// Try to discover PR if not already known
+		if prNumber == 0 && repo != "" && branch != "" {
+			n, url, _ := data.FetchPRForBranch(repo, branch)
+			if n > 0 {
+				prNumber = n
+				session.PRNumber = n
+				session.PRURL = url
+			}
+		}
+		if prNumber == 0 {
+			return errMsg{fmt.Errorf("no pull request found for this session")}
+		}
 		raw, err := data.FetchPRDiff(prNumber, repo)
 		if err != nil {
 			return errMsg{err}

@@ -44,8 +44,8 @@ func (m Model) View() string {
 		fmt.Sprintf("Branch:     %s", detailValue(m.session.Branch, "not available")),
 	}
 
-	// Add PR info for agent-task sessions
-	if m.session.Source == data.SourceAgentTask {
+	// Add PR info when available (any source)
+	if m.session.PRNumber > 0 || m.session.PRURL != "" {
 		details = append(details,
 			fmt.Sprintf("PR:         #%d", m.session.PRNumber),
 			fmt.Sprintf("PR URL:     %s", m.session.PRURL),
@@ -146,7 +146,7 @@ func (m Model) ViewSplit() string {
 		fmt.Sprintf("Branch:     %s", detailValue(m.session.Branch, "n/a")),
 	}
 
-	if m.session.Source == data.SourceAgentTask {
+	if m.session.PRNumber > 0 || m.session.PRURL != "" {
 		details = append(details,
 			fmt.Sprintf("PR:         #%d", m.session.PRNumber),
 			fmt.Sprintf("PR URL:     %s", m.session.PRURL),

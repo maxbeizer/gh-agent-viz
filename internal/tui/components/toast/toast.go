@@ -70,28 +70,30 @@ func (m *Model) Tick() {
 	m.toasts = alive
 }
 
-// View renders the toast stack as a right-aligned overlay block.
+// View renders the toast stack as minimal single-line notifications.
 // Returns empty string when no active toasts.
 func (m Model) View() string {
 	if len(m.toasts) == 0 {
 		return ""
 	}
 
-	border := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.AdaptiveColor{Light: "244", Dark: "238"}).
-		Padding(0, 1).
-		Width(m.width)
+	style := lipgloss.NewStyle().
+		PaddingLeft(1).
+		PaddingRight(1)
 
-	var blocks []string
+	titleStyle := lipgloss.NewStyle().Bold(true)
+	msgStyle := lipgloss.NewStyle().Faint(true)
+
+	var lines []string
 	for _, t := range m.toasts {
-		line1 := fmt.Sprintf("%s \"%s\"", t.Icon, t.Title)
-		line2 := fmt.Sprintf("   %s", t.Message)
-		block := border.Render(line1 + "\n" + line2)
-		blocks = append(blocks, block)
+		line := fmt.Sprintf("%s %s %s",
+			t.Icon,
+			titleStyle.Render(t.Title),
+			msgStyle.Render(t.Message))
+		lines = append(lines, style.Render(line))
 	}
 
-	return strings.Join(blocks, "\n")
+	return strings.Join(lines, "\n")
 }
 
 // HasToasts returns true if there are active toasts to display.

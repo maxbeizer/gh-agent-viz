@@ -360,14 +360,9 @@ func (m Model) View() string {
 		result = m.help.View()
 	}
 
-	// Overlay toasts in the top-right corner
+	// Show toasts inline below header
 	if m.toast.HasToasts() {
-		toastWidth := m.ctx.Width / 3
-		if toastWidth < 30 {
-			toastWidth = 30
-		}
-		m.toast.SetWidth(toastWidth)
-		toastView := lipgloss.PlaceHorizontal(m.ctx.Width, lipgloss.Right, m.toast.View())
+		toastView := m.toast.View()
 		result = toastView + "\n" + result
 	}
 
@@ -993,7 +988,7 @@ func (m Model) openTaskPR(session *data.Session) tea.Cmd {
 			}
 		}
 
-		return errMsg{fmt.Errorf("no pull request found for this session")}
+		return errMsg{fmt.Errorf("no PR found for this branch")}
 	}
 }
 
@@ -1251,7 +1246,7 @@ func (m Model) fetchPRDiff(session *data.Session) tea.Cmd {
 			}
 		}
 		if prNumber == 0 {
-			return errMsg{fmt.Errorf("no pull request found for this session")}
+			return errMsg{fmt.Errorf("no PR found for this branch")}
 		}
 		raw, err := data.FetchPRDiff(prNumber, repo)
 		if err != nil {

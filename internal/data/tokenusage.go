@@ -87,7 +87,10 @@ func parseLogFile(path string, result map[string]*TokenUsage) {
 	scanner.Buffer(make([]byte, 0, 512*1024), 2*1024*1024)
 
 	var currentSession string
-	var inResponse bool
+	var collectingJSON bool
+	var jsonBuf strings.Builder
+	var braceDepth int
+	var jsonLines int
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -98,52 +101,80 @@ func parseLogFile(path string, result map[string]*TokenUsage) {
 			continue
 		}
 
-		// Detect start of response block
-		if strings.Contains(line, "[DEBUG] response (Request-ID") {
-			inResponse = true
-			continue
-		}
-
-		// Look for JSON data lines inside response blocks
-		if inResponse && strings.Contains(line, "[DEBUG] {") {
-			jsonStr := extractJSON(line)
-			if jsonStr != "" {
-				var block responseBlock
-				if err := json.Unmarshal([]byte(jsonStr), &block); err == nil && block.Usage.TotalTokens > 0 {
-					sid := currentSession
-					if sid == "" {
-						sid = "_unknown"
-					}
-					usage, ok := result[sid]
-					if !ok {
-						usage = &TokenUsage{SessionID: sid}
-						result[sid] = usage
-					}
-					usage.InputTokens += block.Usage.PromptTokens
-					usage.OutputTokens += block.Usage.CompletionTokens
-					usage.CachedTokens += block.Usage.PromptDetails.CachedTokens
-					usage.Calls++
-					if block.Model != "" {
-						usage.Model = block.Model
-					}
+		// Accumulate multi-line JSON from response blocks
+		if collectingJSON {
+			jsonLines++
+			// If we see a new JSON block start, abandon old collection
+			if strings.Contains(line, "[DEBUG] {") {
+				jsonBuf.Reset()
+				jsonLines = 0
+				content := line[strings.Index(line, "{"):]
+				jsonBuf.WriteString(content)
+				braceDepth = strings.Count(content, "{") - strings.Count(content, "}")
+				if braceDepth <= 0 {
+					collectingJSON = false
+					processJSONBlock(jsonBuf.String(), currentSession, result)
 				}
+				continue
 			}
-			inResponse = false
+			// Safety: bail if JSON block is too long
+			if jsonLines > 500 {
+				collectingJSON = false
+				continue
+			}
+			// Strip [DEBUG] prefix if present, otherwise use line as-is
+			content := line
+			if idx := strings.Index(content, "] "); idx >= 0 && strings.Contains(content[:idx], "[DEBUG") {
+				content = content[idx+2:]
+			}
+			jsonBuf.WriteString(content)
+			braceDepth += strings.Count(content, "{") - strings.Count(content, "}")
+			if braceDepth <= 0 {
+				collectingJSON = false
+				processJSONBlock(jsonBuf.String(), currentSession, result)
+			}
 			continue
 		}
 
-		// Reset response tracking on non-data lines after response header
-		if inResponse && !strings.Contains(line, "[DEBUG] data:") {
-			inResponse = false
+		// Detect start of JSON response data
+		if strings.Contains(line, "[DEBUG] {") {
+			collectingJSON = true
+			jsonLines = 0
+			jsonBuf.Reset()
+			content := line[strings.Index(line, "{"):]
+			jsonBuf.WriteString(content)
+			braceDepth = strings.Count(content, "{") - strings.Count(content, "}")
+			if braceDepth <= 0 {
+				collectingJSON = false
+				processJSONBlock(jsonBuf.String(), currentSession, result)
+			}
 		}
 	}
 }
 
-// extractJSON pulls a JSON object from a log line like `[DEBUG] { ... }`
-func extractJSON(line string) string {
-	idx := strings.Index(line, "{")
-	if idx < 0 {
-		return ""
+func processJSONBlock(jsonStr string, sessionID string, result map[string]*TokenUsage) {
+	var block responseBlock
+	if err := json.Unmarshal([]byte(jsonStr), &block); err != nil || block.Usage.TotalTokens == 0 {
+		return
 	}
-	return line[idx:]
+	sid := sessionID
+	if sid == "" {
+		sid = "_unknown"
+	}
+	usage, ok := result[sid]
+	if !ok {
+		usage = &TokenUsage{SessionID: sid}
+		result[sid] = usage
+	}
+	usage.InputTokens += block.Usage.PromptTokens
+	usage.OutputTokens += block.Usage.CompletionTokens
+	usage.CachedTokens += block.Usage.PromptDetails.CachedTokens
+	usage.Calls++
+	if block.Model != "" {
+		model := block.Model
+		if idx := strings.LastIndex(model, ":"); idx >= 0 {
+			model = model[idx+1:]
+		}
+		usage.Model = model
+	}
 }

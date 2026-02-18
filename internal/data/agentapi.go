@@ -226,13 +226,19 @@ func RunGH(args ...string) ([]byte, error) {
 	return runGH(args...)
 }
 
-// FetchPRForBranch looks up an open PR for the given repo and branch.
+// FetchPRForBranch looks up a PR (open or merged) for the given repo and branch.
 // Returns (prNumber, prURL, err). If no PR is found, returns (0, "", nil).
+// Skips default branches (main, master) since they don't have PRs.
 func FetchPRForBranch(repo, branch string) (int, string, error) {
 	if repo == "" || branch == "" {
 		return 0, "", nil
 	}
-	output, err := runGH("pr", "list", "-R", repo, "--head", branch, "--json", "number,url", "--limit", "1")
+	// Default branches won't have PRs
+	b := strings.ToLower(strings.TrimSpace(branch))
+	if b == "main" || b == "master" {
+		return 0, "", nil
+	}
+	output, err := runGH("pr", "list", "-R", repo, "--head", branch, "--state", "all", "--json", "number,url", "--limit", "1")
 	if err != nil {
 		return 0, "", nil // silently fail — PR lookup is best-effort
 	}

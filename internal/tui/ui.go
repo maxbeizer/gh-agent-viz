@@ -343,17 +343,17 @@ func (m Model) View() string {
 		mainView = fmt.Sprintf("DEBUG ON • command logs: %s\n", data.DebugLogPath()) + mainView
 	}
 
-	result := headerView + mainView + footerView
+	// Show toasts just above the footer
+	toastView := ""
+	if m.toast.HasToasts() {
+		toastView = "\n" + m.toast.View()
+	}
+
+	result := headerView + mainView + toastView + footerView
 
 	// Overlay help panel when visible
 	if m.help.Visible() {
 		result = m.help.View()
-	}
-
-	// Show toasts inline below header
-	if m.toast.HasToasts() {
-		toastView := m.toast.View()
-		result = toastView + "\n" + result
 	}
 
 	return result

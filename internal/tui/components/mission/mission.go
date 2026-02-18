@@ -1,320 +1,468 @@
 package mission
 
 import (
-	"fmt"
-	"strings"
-	"time"
+"fmt"
+"sort"
+"strings"
+"time"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/maxbeizer/gh-agent-viz/internal/data"
+"github.com/charmbracelet/lipgloss"
+"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
 // SessionCard pairs a session with its derived last-action text.
 type SessionCard struct {
-	Session    data.Session
-	LastAction string
+Session    data.Session
+LastAction string
 }
 
 // isActiveNotIdle returns true for sessions actively working (not idle 20+ min)
 func isActiveNotIdle(s data.Session) bool {
-	status := strings.ToLower(strings.TrimSpace(s.Status))
-	isActive := status == "running" || status == "active" || status == "queued" || status == "needs-input"
-	if !isActive {
-		return false
-	}
-	if s.UpdatedAt.IsZero() {
-		return true
-	}
-	return time.Since(s.UpdatedAt) < data.AttentionStaleThreshold
+status := strings.ToLower(strings.TrimSpace(s.Status))
+isActive := status == "running" || status == "active" || status == "queued" || status == "needs-input"
+if !isActive {
+return false
+}
+if s.UpdatedAt.IsZero() {
+return true
+}
+return time.Since(s.UpdatedAt) < data.AttentionStaleThreshold
 }
 
-// Model represents the mission control dashboard state.
+// repoSummary holds aggregate counts for a single repository.
+type repoSummary struct {
+Name       string
+Active     int
+Idle       int
+NeedsInput int
+Done       int
+Failed     int
+MostRecent time.Time
+}
+
+// fleetStats holds global aggregate counts.
+type fleetStats struct {
+Total      int
+Active     int
+Idle       int
+NeedsInput int
+Done       int
+Failed     int
+}
+
+// attentionItem is a session needing user action.
+type attentionItem struct {
+Session data.Session
+Reason  string
+}
+
+// Model represents the mission control summary dashboard.
 type Model struct {
-	cards          []SessionCard
-	cursor         int
-	statusIcon     func(string) string
-	animStatusIcon func(string, int) string
-	animFrame      int
-	width          int
-	height         int
-	titleStyle     lipgloss.Style
-	cardStyle      lipgloss.Style
-	cardSelStyle   lipgloss.Style
+sessions   []data.Session
+stats      fleetStats
+repos      []repoSummary
+attention  []attentionItem
+cursor     int // navigates repo rows
+statusIcon func(string) string
+animStatusIcon func(string, int) string
+animFrame  int
+width      int
+height     int
+titleStyle lipgloss.Style
+cardStyle  lipgloss.Style
+cardSelStyle lipgloss.Style
 }
 
 // New creates a new mission control model.
 func New(
-	titleStyle lipgloss.Style,
-	cardStyle lipgloss.Style,
-	cardSelStyle lipgloss.Style,
-	statusIconFunc func(string) string,
-	animStatusIconFunc func(string, int) string,
+titleStyle lipgloss.Style,
+cardStyle lipgloss.Style,
+cardSelStyle lipgloss.Style,
+statusIconFunc func(string) string,
+animStatusIconFunc func(string, int) string,
 ) Model {
-	return Model{
-		statusIcon:     statusIconFunc,
-		animStatusIcon: animStatusIconFunc,
-		titleStyle:     titleStyle,
-		cardStyle:      cardStyle,
-		cardSelStyle:   cardSelStyle,
-		width:          80,
-		height:         24,
-	}
+return Model{
+statusIcon:     statusIconFunc,
+animStatusIcon: animStatusIconFunc,
+titleStyle:     titleStyle,
+cardStyle:      cardStyle,
+cardSelStyle:   cardSelStyle,
+width:          80,
+height:         24,
+}
 }
 
-// SetSessions populates the dashboard cards from sessions.
+// SetSessions recomputes all dashboard data from sessions.
 func (m *Model) SetSessions(sessions []data.Session) {
-	m.cards = make([]SessionCard, len(sessions))
-	for i, s := range sessions {
-		m.cards[i] = SessionCard{
-			Session:    s,
-			LastAction: DeriveLastAction(s),
-		}
-	}
-	m.clampCursor()
+m.sessions = sessions
+m.computeStats()
+m.computeRepos()
+m.computeAttention()
+m.clampCursor()
+}
+
+func (m *Model) computeStats() {
+m.stats = fleetStats{Total: len(m.sessions)}
+for _, s := range m.sessions {
+status := strings.ToLower(strings.TrimSpace(s.Status))
+switch {
+case status == "needs-input":
+m.stats.NeedsInput++
+case status == "failed":
+m.stats.Failed++
+case status == "completed":
+m.stats.Done++
+case isActiveNotIdle(s):
+m.stats.Active++
+case data.StatusIsActive(s.Status):
+m.stats.Idle++
+default:
+m.stats.Done++
+}
+}
+}
+
+func (m *Model) computeRepos() {
+repoMap := map[string]*repoSummary{}
+var order []string
+for _, s := range m.sessions {
+repo := strings.TrimSpace(s.Repository)
+if repo == "" {
+repo = "local"
+}
+r, exists := repoMap[repo]
+if !exists {
+r = &repoSummary{Name: repo}
+repoMap[repo] = r
+order = append(order, repo)
+}
+status := strings.ToLower(strings.TrimSpace(s.Status))
+switch {
+case status == "needs-input":
+r.NeedsInput++
+case status == "failed":
+r.Failed++
+case status == "completed":
+r.Done++
+case isActiveNotIdle(s):
+r.Active++
+case data.StatusIsActive(s.Status):
+r.Idle++
+default:
+r.Done++
+}
+if s.UpdatedAt.After(r.MostRecent) {
+r.MostRecent = s.UpdatedAt
+}
+}
+m.repos = make([]repoSummary, 0, len(order))
+for _, name := range order {
+m.repos = append(m.repos, *repoMap[name])
+}
+sort.SliceStable(m.repos, func(i, j int) bool {
+return m.repos[i].MostRecent.After(m.repos[j].MostRecent)
+})
+}
+
+func (m *Model) computeAttention() {
+m.attention = nil
+for _, s := range m.sessions {
+status := strings.ToLower(strings.TrimSpace(s.Status))
+if status == "needs-input" {
+reason := "🧑 Waiting for input"
+if s.Source == data.SourceLocalCopilot {
+if msg := data.FetchLastAssistantMessage(s.ID); msg != "" {
+if len(msg) > 60 {
+msg = msg[:57] + "..."
+}
+reason = "🧑 \"" + msg + "\""
+}
+}
+m.attention = append(m.attention, attentionItem{Session: s, Reason: reason})
+} else if status == "failed" {
+m.attention = append(m.attention, attentionItem{Session: s, Reason: "❌ Failed"})
+}
+}
 }
 
 // SetSize sets the available rendering dimensions.
 func (m *Model) SetSize(width, height int) {
-	m.width = width
-	m.height = height
+m.width = width
+m.height = height
 }
 
 // SetAnimFrame updates the animation frame counter.
 func (m *Model) SetAnimFrame(frame int) {
-	m.animFrame = frame
+m.animFrame = frame
 }
 
-// MoveCursor moves the cursor by delta.
+// MoveCursor moves the cursor by delta (navigates repo rows).
 func (m *Model) MoveCursor(delta int) {
-	if len(m.cards) == 0 {
-		return
-	}
-	m.cursor += delta
-	m.clampCursor()
+if len(m.repos) == 0 {
+return
+}
+m.cursor += delta
+m.clampCursor()
 }
 
-// Cursor returns the current cursor position (for testing).
+// Cursor returns the current cursor position.
 func (m *Model) Cursor() int {
-	return m.cursor
+return m.cursor
 }
 
-// Cards returns the current cards (for testing).
+// Cards returns session cards (kept for interface compat).
 func (m *Model) Cards() []SessionCard {
-	return m.cards
+cards := make([]SessionCard, len(m.sessions))
+for i, s := range m.sessions {
+cards[i] = SessionCard{Session: s, LastAction: DeriveLastAction(s)}
+}
+return cards
 }
 
-// SelectedSession returns a pointer to the currently selected session, or nil.
+// SelectedSession returns nil — summary view doesn't select individual sessions.
+// Use SelectedRepo to get the focused repo name.
 func (m *Model) SelectedSession() *data.Session {
-	if len(m.cards) == 0 || m.cursor < 0 || m.cursor >= len(m.cards) {
-		return nil
-	}
-	s := m.cards[m.cursor].Session
-	return &s
+return nil
 }
 
-// View renders the mission control dashboard with pagination.
+// SelectedRepo returns the repository name at the cursor position.
+func (m *Model) SelectedRepo() string {
+if len(m.repos) == 0 || m.cursor < 0 || m.cursor >= len(m.repos) {
+return ""
+}
+return m.repos[m.cursor].Name
+}
+
+// View renders the summary dashboard.
 func (m *Model) View() string {
-	if len(m.cards) == 0 {
-		return m.titleStyle.Render("  No sessions to display")
-	}
-
-	header := m.titleStyle.Render("⚡ Mission Control") +
-		lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("  %d sessions", len(m.cards)))
-
-	// Each card is 3 lines (line1 + line2 + separator)
-	cardHeight := 3
-	availableHeight := m.height - 6 // header + footer chrome
-	pageSize := availableHeight / cardHeight
-	if pageSize < 2 {
-		pageSize = 2
-	}
-
-	// Compute visible window around cursor
-	start := m.cursor - pageSize/2
-	if start < 0 {
-		start = 0
-	}
-	end := start + pageSize
-	if end > len(m.cards) {
-		end = len(m.cards)
-		start = end - pageSize
-		if start < 0 {
-			start = 0
-		}
-	}
-
-	var lines []string
-	lines = append(lines, header)
-	lines = append(lines, "")
-
-	if start > 0 {
-		lines = append(lines, lipgloss.NewStyle().Faint(true).Render(
-			fmt.Sprintf("  ↑ %d more above", start)))
-	}
-
-	for i := start; i < end; i++ {
-		isSelected := i == m.cursor
-		lines = append(lines, m.renderCard(m.cards[i], isSelected))
-		if i < end-1 {
-			sep := strings.Repeat("─", m.cardWidth())
-			lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render("  "+sep))
-		}
-	}
-
-	if end < len(m.cards) {
-		lines = append(lines, lipgloss.NewStyle().Faint(true).Render(
-			fmt.Sprintf("  ↓ %d more below", len(m.cards)-end)))
-	}
-
-	return strings.Join(lines, "\n")
+if len(m.sessions) == 0 {
+return m.titleStyle.Render("  No sessions to display")
 }
 
-func (m *Model) cardWidth() int {
-	w := m.width - 4
-	if w < 40 {
-		w = 40
-	}
-	return w
+w := m.width - 4
+if w < 40 {
+w = 40
 }
 
-func (m *Model) renderCard(card SessionCard, selected bool) string {
-	s := card.Session
-	w := m.cardWidth()
+dim := lipgloss.NewStyle().Faint(true)
+sectionHead := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
 
-	icon := m.statusIcon(s.Status)
-	if m.animStatusIcon != nil && isActiveNotIdle(s) {
-		icon = m.animStatusIcon(s.Status, m.animFrame)
-	}
+var lines []string
 
-	gutter := "  "
-	if selected {
-		gutter = "▎ "
-	}
+// ── Fleet summary bar ──
+lines = append(lines, "")
+summaryParts := []string{}
+if m.stats.Active > 0 {
+summaryParts = append(summaryParts, fmt.Sprintf("● %d in progress", m.stats.Active))
+}
+if m.stats.Idle > 0 {
+summaryParts = append(summaryParts, fmt.Sprintf("💤 %d idle", m.stats.Idle))
+}
+if m.stats.NeedsInput > 0 {
+summaryParts = append(summaryParts, fmt.Sprintf("🧑 %d waiting on you", m.stats.NeedsInput))
+}
+if m.stats.Done > 0 {
+summaryParts = append(summaryParts, fmt.Sprintf("✅ %d done", m.stats.Done))
+}
+if m.stats.Failed > 0 {
+summaryParts = append(summaryParts, fmt.Sprintf("❌ %d failed", m.stats.Failed))
+}
+lines = append(lines, "  "+strings.Join(summaryParts, "    "))
 
-	// Line 1: gutter + icon + title + repo + duration (right-aligned)
-	title := s.Title
-	repo := s.Repository
-	if repo == "" {
-		repo = "local"
-	}
-	rightInfo := formatDuration(s)
+// ── Proportional bar ──
+barWidth := w - 4
+if barWidth > 60 {
+barWidth = 60
+}
+if barWidth > 0 && m.stats.Total > 0 {
+bar := m.renderBar(barWidth)
+lines = append(lines, "  "+bar)
+}
+lines = append(lines, "")
 
-	fixedLen := len(gutter) + runeWidth(icon) + 1 + 2 + len(repo) + 2 + len(rightInfo)
-	maxTitle := w - fixedLen
-	if maxTitle < 5 {
-		maxTitle = 5
-	}
-	if len(title) > maxTitle {
-		title = title[:maxTitle-1] + "…"
-	}
+// ── Repos with activity ──
+lines = append(lines, "  "+sectionHead.Render("Repos"))
+lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
 
-	left := fmt.Sprintf("%s%s %s", gutter, icon, title)
-	right := fmt.Sprintf("%s  %s", repo, rightInfo)
-	padding := w - runeWidth(left) - len(right)
-	if padding < 2 {
-		padding = 2
-	}
-	line1 := left + strings.Repeat(" ", padding) + right
+for i, r := range m.repos {
+selected := i == m.cursor
+lines = append(lines, m.renderRepoRow(r, selected, w))
+}
 
-	// Line 2: action (indented, dimmed)
-	action := card.LastAction
-	maxAction := w - 4
-	if maxAction < 10 {
-		maxAction = 10
-	}
-	if len(action) > maxAction {
-		action = action[:maxAction-1] + "…"
-	}
-	actionStyle := lipgloss.NewStyle().Faint(true)
-	line2 := "    " + actionStyle.Render(action)
+// ── Needs your attention ──
+if len(m.attention) > 0 {
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render("Needs your attention"))
+lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
+for _, item := range m.attention {
+title := item.Session.Title
+if len(title) > 30 {
+title = title[:27] + "..."
+}
+repo := item.Session.Repository
+if repo == "" {
+repo = "local"
+}
+ago := formatAge(item.Session.UpdatedAt)
+line := fmt.Sprintf("  %s  %-30s  %s  %s", item.Reason, "", repo, ago)
+// Build it properly
+reasonPart := item.Reason
+if len(reasonPart) > w/2 {
+reasonPart = reasonPart[:w/2-3] + "..."
+}
+right := dim.Render(fmt.Sprintf("%s  %s", repo, ago))
+pad := w - len(reasonPart) - len(repo) - len(ago) - 6
+if pad < 2 {
+pad = 2
+}
+_ = line // suppress unused
+lines = append(lines, fmt.Sprintf("  %s%s%s", reasonPart, strings.Repeat(" ", pad), right))
+}
+}
 
-	cardText := line1 + "\n" + line2
+return strings.Join(lines, "\n")
+}
 
-	if selected {
-		return m.cardSelStyle.Width(w + 4).Render(cardText)
-	}
-	return m.cardStyle.Width(w + 4).Render(cardText)
+func (m *Model) renderBar(width int) string {
+total := m.stats.Total
+if total == 0 {
+return ""
+}
+// Compute segment widths
+segments := []struct {
+count int
+char  string
+color string
+}{
+{m.stats.Active, "█", "42"},
+{m.stats.Idle, "▓", "243"},
+{m.stats.NeedsInput, "█", "214"},
+{m.stats.Done, "░", "72"},
+{m.stats.Failed, "█", "203"},
+}
+
+var parts []string
+for _, seg := range segments {
+if seg.count == 0 {
+continue
+}
+segWidth := (seg.count * width) / total
+if segWidth < 1 {
+segWidth = 1
+}
+parts = append(parts, lipgloss.NewStyle().
+Foreground(lipgloss.Color(seg.color)).
+Render(strings.Repeat(seg.char, segWidth)))
+}
+return strings.Join(parts, "")
+}
+
+func (m *Model) renderRepoRow(r repoSummary, selected bool, width int) string {
+gutter := "  "
+if selected {
+gutter = "▎ "
+}
+
+// Build counts
+var counts []string
+if r.Active > 0 {
+counts = append(counts, fmt.Sprintf("● %d active", r.Active))
+}
+if r.Idle > 0 {
+counts = append(counts, fmt.Sprintf("💤 %d idle", r.Idle))
+}
+if r.NeedsInput > 0 {
+counts = append(counts, fmt.Sprintf("🧑 %d", r.NeedsInput))
+}
+if r.Done > 0 {
+counts = append(counts, fmt.Sprintf("✅ %d done", r.Done))
+}
+if r.Failed > 0 {
+counts = append(counts, fmt.Sprintf("❌ %d", r.Failed))
+}
+
+name := r.Name
+maxName := width / 3
+if len(name) > maxName {
+name = name[:maxName-1] + "…"
+}
+
+right := strings.Join(counts, "   ")
+pad := width - len(gutter) - len(name) - len(right) - 4
+if pad < 2 {
+pad = 2
+}
+
+line := fmt.Sprintf("%s%-*s%s%s", gutter, len(name), name, strings.Repeat(" ", pad), right)
+
+if selected {
+return lipgloss.NewStyle().Bold(true).Render(line)
+}
+return line
 }
 
 func (m *Model) clampCursor() {
-	if len(m.cards) == 0 {
-		m.cursor = 0
-		return
-	}
-	if m.cursor < 0 {
-		m.cursor = 0
-	}
-	if m.cursor >= len(m.cards) {
-		m.cursor = len(m.cards) - 1
-	}
+if len(m.repos) == 0 {
+m.cursor = 0
+return
+}
+if m.cursor < 0 {
+m.cursor = 0
+}
+if m.cursor >= len(m.repos) {
+m.cursor = len(m.repos) - 1
+}
 }
 
-// runeWidth is a simple approximation for display width.
-func runeWidth(s string) int {
-	return len([]rune(s))
+func formatAge(t time.Time) string {
+if t.IsZero() {
+return ""
 }
-
-// formatDuration returns a concise duration or status label for the session.
-func formatDuration(s data.Session) string {
-	status := strings.ToLower(strings.TrimSpace(s.Status))
-	switch status {
-	case "completed":
-		return "done"
-	case "failed":
-		return "failed"
-	case "queued":
-		return "queued"
-	}
-	if s.CreatedAt.IsZero() {
-		return ""
-	}
-	d := time.Since(s.CreatedAt)
-	switch {
-	case d < time.Minute:
-		return "⏱ <1m"
-	case d < time.Hour:
-		return fmt.Sprintf("⏱ %dm", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("⏱ %dh", int(d.Hours()))
-	default:
-		return fmt.Sprintf("⏱ %dd", int(d.Hours()/24))
-	}
+d := time.Since(t)
+switch {
+case d < time.Minute:
+return "just now"
+case d < time.Hour:
+return fmt.Sprintf("%dm ago", int(d.Minutes()))
+case d < 24*time.Hour:
+return fmt.Sprintf("%dh ago", int(d.Hours()))
+default:
+return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+}
 }
 
 // DeriveLastAction returns a brief description of what the session is currently doing.
 func DeriveLastAction(s data.Session) string {
-	status := strings.ToLower(strings.TrimSpace(s.Status))
-
-	switch status {
-	case "queued":
-		return "⏳ Waiting to start"
-	case "failed":
-		return "❌ Session failed"
-	case "completed":
-		if s.PRNumber > 0 {
-			return fmt.Sprintf("📤 PR #%d ready for review", s.PRNumber)
-		}
-		return "✅ Completed"
-	case "needs-input":
-		// For local sessions, try to get the last assistant message
-		if s.Source == data.SourceLocalCopilot {
-			if msg := data.FetchLastAssistantMessage(s.ID); msg != "" {
-				truncated := msg
-				if len(truncated) > 80 {
-					truncated = truncated[:77] + "..."
-				}
-				return "❓ \"" + truncated + "\""
-			}
-		}
-		return "🧑 Waiting for input"
-	case "running":
-		if s.Source == data.SourceLocalCopilot {
-			if action := data.FetchLastSessionAction(s); action != "" {
-				return action
-			}
-		}
-		return "● Working..."
-	default:
-		return "● Working..."
-	}
+status := strings.ToLower(strings.TrimSpace(s.Status))
+switch status {
+case "queued":
+return "⏳ Waiting to start"
+case "failed":
+return "❌ Session failed"
+case "completed":
+if s.PRNumber > 0 {
+return fmt.Sprintf("📤 PR #%d ready for review", s.PRNumber)
+}
+return "✅ Completed"
+case "needs-input":
+if s.Source == data.SourceLocalCopilot {
+if msg := data.FetchLastAssistantMessage(s.ID); msg != "" {
+truncated := msg
+if len(truncated) > 80 {
+truncated = truncated[:77] + "..."
+}
+return "❓ \"" + truncated + "\""
+}
+}
+return "🧑 Waiting for input"
+case "running":
+if s.Source == data.SourceLocalCopilot {
+if action := data.FetchLastSessionAction(s); action != "" {
+return action
+}
+}
+return "● Working..."
+default:
+return "● Working..."
+}
 }

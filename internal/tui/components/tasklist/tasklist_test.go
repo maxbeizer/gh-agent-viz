@@ -738,6 +738,99 @@ func TestAutoGroupDisabledByManualToggle(t *testing.T) {
 	}
 }
 
+func TestHasPRBranch_FeatureBranchWithRepo(t *testing.T) {
+	s := data.Session{Branch: "feature-auth", Repository: "owner/repo"}
+	if !hasPRBranch(s) {
+		t.Fatal("expected hasPRBranch true for feature branch with repo")
+	}
+}
+
+func TestHasPRBranch_MainBranch(t *testing.T) {
+	s := data.Session{Branch: "main", Repository: "owner/repo"}
+	if hasPRBranch(s) {
+		t.Fatal("expected hasPRBranch false for main branch")
+	}
+}
+
+func TestHasPRBranch_EmptyBranch(t *testing.T) {
+	s := data.Session{Branch: "", Repository: "owner/repo"}
+	if hasPRBranch(s) {
+		t.Fatal("expected hasPRBranch false for empty branch")
+	}
+}
+
+func TestHasPRBranch_EmptyRepo(t *testing.T) {
+	s := data.Session{Branch: "feature-branch", Repository: ""}
+	if hasPRBranch(s) {
+		t.Fatal("expected hasPRBranch false for empty repo")
+	}
+}
+
+func TestIsActiveNotIdle_RecentlyUpdatedRunning(t *testing.T) {
+	s := data.Session{Status: "running", UpdatedAt: time.Now().Add(-2 * time.Minute)}
+	if !isActiveNotIdle(s) {
+		t.Fatal("expected isActiveNotIdle true for recently updated running session")
+	}
+}
+
+func TestIsActiveNotIdle_IdleThirtyMinutes(t *testing.T) {
+	s := data.Session{Status: "running", UpdatedAt: time.Now().Add(-30 * time.Minute)}
+	if isActiveNotIdle(s) {
+		t.Fatal("expected isActiveNotIdle false for session idle 30+ minutes")
+	}
+}
+
+func TestIsActiveNotIdle_CompletedSession(t *testing.T) {
+	s := data.Session{Status: "completed", UpdatedAt: time.Now()}
+	if isActiveNotIdle(s) {
+		t.Fatal("expected isActiveNotIdle false for completed session")
+	}
+}
+
+func TestIsCursorOnCollapsedGroup_TrueWhenCollapsed(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 40)
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Task A", Repository: "owner/repo-a", UpdatedAt: now},
+		{ID: "2", Status: "running", Title: "Task B", Repository: "owner/repo-b", UpdatedAt: now.Add(-time.Hour)},
+	})
+	model.CycleGroupBy() // → repository
+
+	// Cursor starts on first group header which is collapsed
+	if !model.IsCursorOnCollapsedGroup() {
+		t.Fatal("expected IsCursorOnCollapsedGroup true when cursor is on collapsed group")
+	}
+}
+
+func TestIsCursorOnCollapsedGroup_FalseWhenExpanded(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 40)
+	now := time.Now()
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Task A", Repository: "owner/repo-a", UpdatedAt: now},
+		{ID: "2", Status: "running", Title: "Task B", Repository: "owner/repo-b", UpdatedAt: now.Add(-time.Hour)},
+	})
+	model.CycleGroupBy() // → repository
+	model.ToggleGroupExpand()
+
+	if model.IsCursorOnCollapsedGroup() {
+		t.Fatal("expected IsCursorOnCollapsedGroup false when cursor's group is expanded")
+	}
+}
+
+func TestIsCursorOnCollapsedGroup_FalseWhenUngrouped(t *testing.T) {
+	model := newModel()
+	model.SetSize(120, 40)
+	model.SetTasks([]data.Session{
+		{ID: "1", Status: "running", Title: "Task A", Repository: "owner/repo", UpdatedAt: time.Now()},
+	})
+
+	if model.IsCursorOnCollapsedGroup() {
+		t.Fatal("expected IsCursorOnCollapsedGroup false when not grouped")
+	}
+}
+
 func TestToggleGroupExpand(t *testing.T) {
 	model := newModel()
 	model.SetSize(120, 40)

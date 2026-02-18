@@ -248,6 +248,54 @@ func TestAnimFrameUpdates(t *testing.T) {
 	}
 }
 
+func TestSelectedRepo_ReturnsCorrectRepoAtCursor(t *testing.T) {
+	m := newTestModel()
+	now := time.Now()
+	m.SetSessions([]data.Session{
+		{ID: "1", Status: "running", Title: "Task A", Repository: "owner/repo-a", UpdatedAt: now},
+		{ID: "2", Status: "running", Title: "Task B", Repository: "owner/repo-b", UpdatedAt: now.Add(-time.Hour)},
+	})
+	m.MoveCursor(1)
+	got := m.SelectedRepo()
+	if got != "owner/repo-b" {
+		t.Fatalf("expected 'owner/repo-b', got %q", got)
+	}
+}
+
+func TestSelectedRepo_EmptyOnEmptyModel(t *testing.T) {
+	m := newTestModel()
+	m.SetSessions(nil)
+	if got := m.SelectedRepo(); got != "" {
+		t.Fatalf("expected empty string on empty model, got %q", got)
+	}
+}
+
+func TestView_ContainsReposSection(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(100, 30)
+	now := time.Now()
+	m.SetSessions([]data.Session{
+		{ID: "1", Status: "running", Title: "Task", Repository: "owner/repo", UpdatedAt: now},
+	})
+	view := m.View()
+	if !strings.Contains(view, "Repos") {
+		t.Fatal("expected 'Repos' section header in view")
+	}
+}
+
+func TestView_AttentionSectionWithNeedsInput(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(100, 30)
+	now := time.Now()
+	m.SetSessions([]data.Session{
+		{ID: "1", Status: "needs-input", Title: "Waiting task", Repository: "owner/repo", Source: data.SourceAgentTask, UpdatedAt: now},
+	})
+	view := m.View()
+	if !strings.Contains(view, "Needs your attention") {
+		t.Fatal("expected 'Needs your attention' section when needs-input session exists")
+	}
+}
+
 func TestSetSize(t *testing.T) {
 	m := newTestModel()
 	m.SetSize(120, 40)

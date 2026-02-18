@@ -376,3 +376,24 @@ func TestFetchPRDiff_CommandError(t *testing.T) {
 		t.Fatal("expected error when command fails, got none")
 	}
 }
+
+func TestFetchPRForBranch_EmptyRepoAndBranch(t *testing.T) {
+	num, url, err := FetchPRForBranch("", "")
+	if num != 0 || url != "" || err != nil {
+		t.Fatalf("expected (0, \"\", nil) for empty repo/branch, got (%d, %q, %v)", num, url, err)
+	}
+}
+
+func TestFetchPRForBranch_MainBranch(t *testing.T) {
+	num, url, err := FetchPRForBranch("owner/repo", "main")
+	if num != 0 || url != "" || err != nil {
+		t.Fatalf("expected (0, \"\", nil) for main branch, got (%d, %q, %v)", num, url, err)
+	}
+}
+
+func TestFetchPRForBranch_MasterBranch(t *testing.T) {
+	num, url, err := FetchPRForBranch("owner/repo", "master")
+	if num != 0 || url != "" || err != nil {
+		t.Fatalf("expected (0, \"\", nil) for master branch, got (%d, %q, %v)", num, url, err)
+	}
+}

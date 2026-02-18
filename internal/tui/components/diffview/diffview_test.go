@@ -152,6 +152,35 @@ func TestModel_SetDiffs(t *testing.T) {
 	}
 }
 
+func TestModel_SetLoading_ThenView(t *testing.T) {
+	m := New(80, 24)
+	m.SetLoading()
+	view := m.View()
+	if !strings.Contains(view, "Loading diff") {
+		t.Errorf("expected loading state to contain 'Loading diff', got %q", view)
+	}
+}
+
+func TestModel_SetDiffs_ClearsLoading(t *testing.T) {
+	m := New(80, 24)
+	m.SetLoading()
+	m.SetDiffs([]FileDiff{
+		{
+			Path:      "main.go",
+			Additions: 2,
+			Deletions: 1,
+			Patch:     "+new line\n-old line",
+		},
+	})
+	view := m.View()
+	if strings.Contains(view, "Loading diff") {
+		t.Error("expected loading state cleared after SetDiffs")
+	}
+	if !strings.Contains(view, "main.go") {
+		t.Error("expected diff content to show file path after SetDiffs")
+	}
+}
+
 func TestExtractPath(t *testing.T) {
 	tests := []struct {
 		input string

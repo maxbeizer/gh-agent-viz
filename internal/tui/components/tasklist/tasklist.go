@@ -215,11 +215,6 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 	repo := truncate(rowRepository(session), width/2)
 	metaText := fmt.Sprintf("    %s  %s", repo, formatTime(session.UpdatedAt))
 
-	// Show PR indicator for sessions with feature branches
-	if hasPRBranch(session) {
-		metaText += "  🔀"
-	}
-
 	if dur := compactDuration(session); dur != "" {
 		durStr := "⏱ " + dur
 		pad := width - len(metaText) - len(durStr)
@@ -595,7 +590,11 @@ func rowRepository(session data.Session) string {
 	if branch == "" {
 		return repository
 	}
-	return fmt.Sprintf("%s @ %s", repository, branch)
+	base := fmt.Sprintf("%s @ %s", repository, branch)
+	if hasPRBranch(session) {
+		return base + " · PR"
+	}
+	return base
 }
 
 // compactDuration returns a short duration string for the metadata line.

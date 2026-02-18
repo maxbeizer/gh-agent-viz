@@ -16,19 +16,6 @@ Session    data.Session
 LastAction string
 }
 
-// isActiveNotIdle returns true for sessions actively working (not idle 20+ min)
-func isActiveNotIdle(s data.Session) bool {
-status := strings.ToLower(strings.TrimSpace(s.Status))
-isActive := status == "running" || status == "active" || status == "queued" || status == "needs-input"
-if !isActive {
-return false
-}
-if s.UpdatedAt.IsZero() {
-return true
-}
-return time.Since(s.UpdatedAt) < data.AttentionStaleThreshold
-}
-
 // repoSummary holds aggregate counts for a single repository.
 type repoSummary struct {
 Name       string
@@ -112,7 +99,7 @@ case status == "failed":
 m.stats.Failed++
 case status == "completed":
 m.stats.Done++
-case isActiveNotIdle(s):
+case data.SessionIsActiveNotIdle(s):
 m.stats.Active++
 case data.StatusIsActive(s.Status):
 m.stats.Idle++
@@ -144,7 +131,7 @@ case status == "failed":
 r.Failed++
 case status == "completed":
 r.Done++
-case isActiveNotIdle(s):
+case data.SessionIsActiveNotIdle(s):
 r.Active++
 case data.StatusIsActive(s.Status):
 r.Idle++
@@ -286,7 +273,7 @@ totalTokens += s.Telemetry.InputTokens
 }
 }
 if totalTokens > 0 {
-lines = append(lines, fmt.Sprintf("  🪙 %s tokens consumed", formatTokenCount(totalTokens)))
+lines = append(lines, fmt.Sprintf("  🪙 %s tokens consumed", data.FormatTokenCount(totalTokens)))
 }
 lines = append(lines, "")
 
@@ -475,14 +462,4 @@ return "● Working..."
 default:
 return "● Working..."
 }
-}
-
-func formatTokenCount(n int64) string {
-if n >= 1_000_000 {
-return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
-}
-if n >= 1_000 {
-return fmt.Sprintf("%.1fK", float64(n)/1_000)
-}
-return fmt.Sprintf("%d", n)
 }

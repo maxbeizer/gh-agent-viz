@@ -1,6 +1,7 @@
 package data
 
 import (
+	"fmt"
 	"strings"
 	"time"
 )
@@ -93,4 +94,32 @@ func SessionNeedsAttention(session Session) bool {
 func StatusIsActive(status string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(status))
 	return normalized == "running" || normalized == "queued" || normalized == "active" || normalized == "open" || normalized == "in progress"
+}
+
+// SessionIsActiveNotIdle returns true for sessions actively working (not idle 20+ min).
+func SessionIsActiveNotIdle(session Session) bool {
+	if !StatusIsActive(session.Status) && !strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
+		return false
+	}
+	if session.UpdatedAt.IsZero() {
+		return true
+	}
+	return time.Since(session.UpdatedAt) < AttentionStaleThreshold
+}
+
+// IsDefaultBranch returns true for main/master/empty branch names.
+func IsDefaultBranch(branch string) bool {
+	b := strings.ToLower(strings.TrimSpace(branch))
+	return b == "" || b == "main" || b == "master"
+}
+
+// FormatTokenCount formats a token count as a human-readable string (e.g., "2.7M", "11.7K", "437").
+func FormatTokenCount(n int64) string {
+	if n >= 1_000_000 {
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	}
+	if n >= 1_000 {
+		return fmt.Sprintf("%.1fK", float64(n)/1_000)
+	}
+	return fmt.Sprintf("%d", n)
 }

@@ -51,19 +51,6 @@ func statusBelongsToColumn(session data.Session, colStatus string) bool {
 	return false
 }
 
-// isActiveNotIdle returns true for sessions actively working (not idle 20+ min)
-func isActiveNotIdle(session data.Session) bool {
-	s := strings.ToLower(strings.TrimSpace(session.Status))
-	isActive := s == "running" || s == "active" || s == "queued" || s == "needs-input"
-	if !isActive {
-		return false
-	}
-	if session.UpdatedAt.IsZero() {
-		return true
-	}
-	return time.Since(session.UpdatedAt) < data.AttentionStaleThreshold
-}
-
 // Model represents the kanban board state
 type Model struct {
 	columns           []Column
@@ -297,7 +284,7 @@ func (m *Model) renderColumn(col Column, colIdx, width, cardAreaHeight int, focu
 // renderCard renders a single session card.
 func (m *Model) renderCard(session data.Session, width int, selected bool) string {
 	icon := m.statusIcon(session.Status)
-	if m.animStatusIcon != nil && isActiveNotIdle(session) {
+	if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(session) {
 		icon = m.animStatusIcon(session.Status, m.animFrame)
 	}
 

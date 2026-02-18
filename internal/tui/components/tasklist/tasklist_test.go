@@ -768,21 +768,21 @@ func TestHasPRBranch_EmptyRepo(t *testing.T) {
 
 func TestIsActiveNotIdle_RecentlyUpdatedRunning(t *testing.T) {
 	s := data.Session{Status: "running", UpdatedAt: time.Now().Add(-2 * time.Minute)}
-	if !isActiveNotIdle(s) {
+	if !data.SessionIsActiveNotIdle(s) {
 		t.Fatal("expected isActiveNotIdle true for recently updated running session")
 	}
 }
 
 func TestIsActiveNotIdle_IdleThirtyMinutes(t *testing.T) {
 	s := data.Session{Status: "running", UpdatedAt: time.Now().Add(-30 * time.Minute)}
-	if isActiveNotIdle(s) {
+	if data.SessionIsActiveNotIdle(s) {
 		t.Fatal("expected isActiveNotIdle false for session idle 30+ minutes")
 	}
 }
 
 func TestIsActiveNotIdle_CompletedSession(t *testing.T) {
 	s := data.Session{Status: "completed", UpdatedAt: time.Now()}
-	if isActiveNotIdle(s) {
+	if data.SessionIsActiveNotIdle(s) {
 		t.Fatal("expected isActiveNotIdle false for completed session")
 	}
 }

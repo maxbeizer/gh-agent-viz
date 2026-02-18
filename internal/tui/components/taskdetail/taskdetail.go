@@ -87,9 +87,9 @@ func (m Model) View() string {
 		if t.InputTokens > 0 {
 			details = append(details,
 				fmt.Sprintf("🪙 Tokens: %s in, %s out, %s cached (%d calls)",
-					formatTokenCount(t.InputTokens),
-					formatTokenCount(t.OutputTokens),
-					formatTokenCount(t.CachedTokens),
+					data.FormatTokenCount(t.InputTokens),
+					data.FormatTokenCount(t.OutputTokens),
+					data.FormatTokenCount(t.CachedTokens),
 					t.ModelCalls))
 			if t.Model != "" {
 				details = append(details, fmt.Sprintf("🤖 Model: %s", t.Model))
@@ -198,9 +198,9 @@ func (m Model) ViewSplit() string {
 		if t.InputTokens > 0 {
 			details = append(details,
 				fmt.Sprintf("🪙 Tokens: %s in, %s out, %s cached (%d calls)",
-					formatTokenCount(t.InputTokens),
-					formatTokenCount(t.OutputTokens),
-					formatTokenCount(t.CachedTokens),
+					data.FormatTokenCount(t.InputTokens),
+					data.FormatTokenCount(t.OutputTokens),
+					data.FormatTokenCount(t.CachedTokens),
 					t.ModelCalls))
 			if t.Model != "" {
 				details = append(details, fmt.Sprintf("🤖 Model: %s", t.Model))
@@ -322,12 +322,3 @@ func timelineWidth(availableWidth int) int {
 	return w
 }
 
-func formatTokenCount(n int64) string {
-	if n >= 1_000_000 {
-		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
-	}
-	if n >= 1_000 {
-		return fmt.Sprintf("%.1fK", float64(n)/1_000)
-	}
-	return fmt.Sprintf("%d", n)
-}

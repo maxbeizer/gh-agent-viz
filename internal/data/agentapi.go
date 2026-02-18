@@ -234,8 +234,7 @@ func FetchPRForBranch(repo, branch string) (int, string, error) {
 		return 0, "", nil
 	}
 	// Default branches won't have PRs
-	b := strings.ToLower(strings.TrimSpace(branch))
-	if b == "main" || b == "master" {
+	if IsDefaultBranch(branch) {
 		return 0, "", nil
 	}
 	output, err := runGH("pr", "list", "-R", repo, "--head", branch, "--state", "all", "--json", "number,url", "--limit", "1")

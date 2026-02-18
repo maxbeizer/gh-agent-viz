@@ -261,7 +261,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case errMsg:
-		m.ctx.Error = msg.err
+		// Show errors as toasts — they auto-dismiss and don't disrupt the view
+		m.toast.Push("⚠️", "Error", msg.err.Error())
 		return m, nil
 	}
 
@@ -338,19 +339,8 @@ func (m Model) View() string {
 		mainView = m.diffView.View()
 	}
 
-	debugBanner := ""
 	if m.ctx.Debug {
-		debugBanner = fmt.Sprintf("DEBUG ON • command logs: %s\n", data.DebugLogPath())
-	}
-
-	if m.ctx.Error != nil {
-		errorText := fmt.Sprintf("Error: %v", m.ctx.Error)
-		if m.ctx.Debug {
-			errorText = fmt.Sprintf("%s\nInspect debug log for command output.", errorText)
-		}
-		mainView = fmt.Sprintf("%s%s\nPress 'r' to retry or Tab/Shift+Tab to change filter\n\n%s", debugBanner, errorText, mainView)
-	} else if debugBanner != "" {
-		mainView = debugBanner + mainView
+		mainView = fmt.Sprintf("DEBUG ON • command logs: %s\n", data.DebugLogPath()) + mainView
 	}
 
 	result := headerView + mainView + footerView

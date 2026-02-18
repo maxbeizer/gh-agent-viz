@@ -390,13 +390,13 @@ func newSolarizedLightTheme() *Theme {
 	}
 }
 
-// StatusIcon returns the appropriate emoji icon for a given status
+// StatusIcon returns the appropriate icon for a given status, with color.
 func StatusIcon(status string) string {
 	switch status {
 	case "running":
-		return "●"
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render("●")
 	case "queued":
-		return "○"
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("222")).Render("○")
 	case "needs-input":
 		return "🧑"
 	case "completed":

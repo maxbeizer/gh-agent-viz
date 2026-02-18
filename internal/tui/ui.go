@@ -708,6 +708,9 @@ func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mission.MoveCursor(1)
 	case "k", "up":
 		m.mission.MoveCursor(-1)
+	case "enter":
+		// Return to list view (enter feels natural to "drill in")
+		m.viewMode = ViewModeList
 	case "r":
 		return m, m.fetchTasks
 	}

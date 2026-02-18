@@ -15,6 +15,19 @@ type SessionCard struct {
 	LastAction string
 }
 
+// isActiveNotIdle returns true for sessions actively working (not idle 20+ min)
+func isActiveNotIdle(s data.Session) bool {
+	status := strings.ToLower(strings.TrimSpace(s.Status))
+	isActive := status == "running" || status == "active" || status == "queued" || status == "needs-input"
+	if !isActive {
+		return false
+	}
+	if s.UpdatedAt.IsZero() {
+		return true
+	}
+	return time.Since(s.UpdatedAt) < data.AttentionStaleThreshold
+}
+
 // Model represents the mission control dashboard state.
 type Model struct {
 	cards          []SessionCard
@@ -169,7 +182,7 @@ func (m *Model) renderCard(card SessionCard, selected bool) string {
 	w := m.cardWidth()
 
 	icon := m.statusIcon(s.Status)
-	if m.animStatusIcon != nil {
+	if m.animStatusIcon != nil && isActiveNotIdle(s) {
 		icon = m.animStatusIcon(s.Status, m.animFrame)
 	}
 

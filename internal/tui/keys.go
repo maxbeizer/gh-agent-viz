@@ -24,6 +24,8 @@ type Keybindings struct {
 	ToggleMission  key.Binding
 	ShowDiff       key.Binding
 	ShowHelp       key.Binding
+	OpenRepo       key.Binding
+	FileIssue      key.Binding
 }
 
 // NewKeybindings creates the default key bindings for the TUI
@@ -108,6 +110,14 @@ func NewKeybindings() Keybindings {
 		ShowHelp: key.NewBinding(
 			key.WithKeys("?"),
 			key.WithHelp("?", "help"),
+		),
+		OpenRepo: key.NewBinding(
+			key.WithKeys("!"),
+			key.WithHelp("!", "repo"),
+		),
+		FileIssue: key.NewBinding(
+			key.WithKeys("@"),
+			key.WithHelp("@", "file issue"),
 		),
 	}
 }

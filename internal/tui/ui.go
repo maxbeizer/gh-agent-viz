@@ -504,6 +504,10 @@ return m, m.fetchConversation(session.ID)
 		m.viewMode = ViewModeMission
 		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
+	case "!":
+		return m, m.openSourceRepo()
+	case "@":
+		return m, m.openFileIssue()
 	}
 	return m, nil
 }
@@ -942,6 +946,26 @@ func (m Model) fetchConversation(sessionID string) tea.Cmd {
 		}
 
 		return conversationLoadedMsg{messages: messages}
+	}
+}
+
+func (m Model) openSourceRepo() tea.Cmd {
+	return func() tea.Msg {
+		_, err := data.RunGH("repo", "view", "maxbeizer/gh-agent-viz", "--web")
+		if err != nil {
+			return errMsg{fmt.Errorf("failed to open repo: %w", err)}
+		}
+		return nil
+	}
+}
+
+func (m Model) openFileIssue() tea.Cmd {
+	return func() tea.Msg {
+		_, err := data.RunGH("issue", "create", "-R", "maxbeizer/gh-agent-viz", "--web")
+		if err != nil {
+			return errMsg{fmt.Errorf("failed to open issue form: %w", err)}
+		}
+		return nil
 	}
 }
 

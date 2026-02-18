@@ -278,6 +278,16 @@ if barWidth > 0 && m.stats.Total > 0 {
 bar := m.renderBar(barWidth)
 lines = append(lines, "  "+bar)
 }
+// Total token usage across all sessions
+totalTokens := int64(0)
+for _, s := range m.sessions {
+if s.Telemetry != nil {
+totalTokens += s.Telemetry.InputTokens
+}
+}
+if totalTokens > 0 {
+lines = append(lines, fmt.Sprintf("  🪙 %s tokens consumed", formatTokenCount(totalTokens)))
+}
 lines = append(lines, "")
 
 // ── Repos with activity ──
@@ -465,4 +475,14 @@ return "● Working..."
 default:
 return "● Working..."
 }
+}
+
+func formatTokenCount(n int64) string {
+if n >= 1_000_000 {
+return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+}
+if n >= 1_000 {
+return fmt.Sprintf("%.1fK", float64(n)/1_000)
+}
+return fmt.Sprintf("%d", n)
 }

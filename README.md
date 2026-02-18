@@ -23,6 +23,11 @@ An interactive terminal UI for visualizing GitHub Copilot coding agent sessions.
 - 🔗 **Dependency graph** — related session visualization
 - 🎨 **Color themes** — catppuccin-mocha, dracula, tokyo-night presets
 - 📡 **Live log tailing** — real-time log streaming with follow mode
+- 💬 **Conversation view** — styled chat bubbles for session dialogue
+- 🔧 **Tool timeline** — chronological trace of agent actions
+- 📊 **Mission control** — fleet summary dashboard
+- 🔍 **Diff view** — colored PR diffs in the TUI
+- ❓ **Help overlay** — `?` shows all keybindings
 
 See [docs/UI_FEATURES.md](docs/UI_FEATURES.md) for a comprehensive guide to all visual features.
 
@@ -103,8 +108,15 @@ When enabled, the UI also shows a persistent debug banner with the log path.
 | `a` | Jump to attention tab |
 | `g` | Cycle group-by mode |
 | `space` | Expand/collapse group |
+| `c` | Conversation view |
+| `t` | Tool timeline |
+| `d` | Diff view (list/detail); page down (in logs) |
+| `M` | Toggle mission control |
+| `?` | Toggle help overlay |
+| `!` | Open gh-agent-viz repo in browser |
+| `@` | File a new issue in browser |
 | `f` | Toggle follow mode (in logs) |
-| `d` / `u` | Page down/up (in logs) |
+| `u` | Page up (in logs) |
 | `g` / `G` | Top/bottom (in logs) |
 | `q` | Quit |
 
@@ -157,7 +169,7 @@ refreshInterval: 30
 # Default status filter: all, attention, active, completed, failed (default: all)
 defaultFilter: all
 
-# Color theme: default, catppuccin-mocha, dracula, tokyo-night
+# Color theme: default, catppuccin-mocha, dracula, tokyo-night, solarized-light
 theme: catppuccin-mocha
 ```
 
@@ -169,7 +181,7 @@ theme: catppuccin-mocha
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Fast fixes for common issues
 - **[Debug Mode](docs/DEBUG_MODE.md)** - Capture actionable diagnostics
 - **[Developer Workflow](docs/DEVELOPER_WORKFLOW.md)** - Makefile commands for build/test/smoke
-- **[UI Features](docs/UI_FEATURES.md)** - Kanban, toasts, timeline, dependency graph, themes, live tailing
+- **[UI Features](docs/UI_FEATURES.md)** - Kanban, toasts, timeline, dependency graph, themes, live tailing, conversation view, tool timeline, diff view, mission control, help overlay
 - **[Architecture Decisions](docs/DECISIONS.md)** - Technical design rationale and patterns
 
 ## Requirements

@@ -122,6 +122,16 @@ func TestNewThemeFromConfig_UnknownFallsBackToDefault(t *testing.T) {
 	}
 }
 
+func TestNewThemeFromConfig_SolarizedLight(t *testing.T) {
+	theme := NewThemeFromConfig("solarized-light")
+	if theme == nil {
+		t.Fatal("expected non-nil theme for solarized-light")
+	}
+	if theme.ThemeName() != "solarized-light" {
+		t.Errorf("expected theme name 'solarized-light', got %q", theme.ThemeName())
+	}
+}
+
 func TestAnimatedStatusIcon_Running(t *testing.T) {
 	// All frames should contain the steady dot
 	icon := AnimatedStatusIcon("running", 0)

@@ -103,6 +103,7 @@ gh-agent-viz supports multiple color themes to match your terminal aesthetic.
 | `catppuccin-mocha` | Warm pastel theme from the Catppuccin palette |
 | `dracula` | Dark theme with vibrant accents |
 | `tokyo-night` | Cool-toned dark theme inspired by Tokyo Night |
+| `solarized-light` | Light theme using the Solarized Light palette |
 
 ### Configuration
 
@@ -178,3 +179,114 @@ Only two statuses trigger the ATTENTION tab:
 Idle running sessions (e.g., an agent that finished responding and is waiting for your next message) show up under RUNNING with a `💤 idle` badge. This is a known limitation — the data source doesn't distinguish "agent actively working" from "agent waiting for the user to continue." See [#121](https://github.com/maxbeizer/gh-agent-viz/issues/121) for discussion.
 
 Follow mode is only available for sessions with status `running`. For completed or failed sessions, the log viewer shows the full static log.
+
+## Conversation View
+
+Press `c` to open the conversation view from the session list, detail view, or log view. This renders the session's dialogue as styled chat bubbles.
+
+### Layout
+
+- **User messages** are left-aligned.
+- **Agent messages** are right-aligned.
+- **Tool executions** are shown inline between messages.
+
+### Requirements
+
+Conversation view only works for **local-copilot sessions** that have event logs on disk (`~/.copilot/session-state/`). Remote agent-task sessions do not expose conversation-level data.
+
+### Navigation
+
+| Key | Action |
+|-----|--------|
+| `j` / `↓` | Scroll down |
+| `k` / `↑` | Scroll up |
+| `d` | Page down |
+| `u` | Page up |
+| `g` | Jump to top |
+| `G` | Jump to bottom |
+| `esc` | Return to previous view |
+
+## Tool Timeline
+
+Press `t` to open the tool timeline from the session list or detail view. This shows a chronological trace of every tool execution in the session.
+
+### Icons
+
+| Icon | Tool type |
+|------|-----------|
+| 🔧 | bash |
+| ✏️ | edit |
+| 📄 | view |
+| 🔍 | search |
+| 📤 | git |
+| 🧪 | test |
+| ⚙️ | other |
+
+### Requirements
+
+Tool timeline is only available for **local-copilot sessions** with event logs.
+
+## Diff View
+
+Press `d` to open the PR diff from the session list or detail view. The diff is rendered with syntax-aware coloring directly in the TUI.
+
+### Color coding
+
+- **Green** — added lines
+- **Red** — deleted lines
+- **Cyan** — hunk headers (`@@` lines)
+
+### PR discovery
+
+For local sessions, diff view discovers the associated PR by looking up the session's branch name. This works even for **merged PRs**. While the diff is loading, the UI shows `🔄 Loading diff...`.
+
+## Mission Control
+
+Press `M` to toggle the mission control dashboard. This provides a high-level fleet overview across all monitored repositories.
+
+### Sections
+
+- **Fleet summary** — aggregate session counts (active, idle, done, failed) with a proportional bar chart.
+- **Per-repo breakdown** — active/idle/done/failed counts for each repository.
+- **Needs your attention** — surfaces sessions with `needs-input` or `failed` status for quick triage.
+
+### Navigation
+
+| Key | Action |
+|-----|--------|
+| `j` / `↓` | Move to next repo |
+| `k` / `↑` | Move to previous repo |
+| `M` | Return to session list |
+
+## Help Overlay
+
+Press `?` to toggle a full keybinding reference overlay. The overlay works in all view modes.
+
+### Sections
+
+The help overlay organizes shortcuts by category:
+
+- **Navigation** — movement and selection
+- **Actions** — open PR, resume session, dismiss, refresh
+- **Views** — logs, conversation, diff, kanban, mission control
+- **Groups** — group-by mode, expand/collapse
+- **Log View** — follow mode, scrolling
+- **Meta** — repo link, file issue, quit
+
+## Meta Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `!` | Open the gh-agent-viz repository in your browser |
+| `@` | File a new issue against gh-agent-viz in your browser |
+
+## PR Integration for Local Sessions
+
+Local Copilot CLI sessions on feature branches can automatically discover their associated pull request.
+
+### How it works
+
+- Press `o` to open the PR in your browser. The PR is discovered by looking up the session's branch name via the GitHub API.
+- Sessions on feature branches show a `PR` tag in the meta line of the session card.
+- **Main/master branches are skipped** — PR discovery only runs for feature branches.
+- Works for both **open and merged** pull requests.

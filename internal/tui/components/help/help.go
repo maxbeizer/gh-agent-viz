@@ -87,6 +87,11 @@ func (m Model) View() string {
 		formatKey("g/G", "top/bottom") + "\n" +
 		formatKey("f", "toggle follow")
 
+	// Meta section
+	meta := sectionStyle.Render("Meta") + "\n" +
+		formatKey("!", "view source repo") + "\n" +
+		formatKey("@", "file an issue")
+
 	// Layout: two columns for Navigation+Actions, Views+Groups
 	colWidth := 28
 	col := func(content string) string {
@@ -95,8 +100,9 @@ func (m Model) View() string {
 
 	topRow := lipgloss.JoinHorizontal(lipgloss.Top, col(nav), col(actions))
 	midRow := lipgloss.JoinHorizontal(lipgloss.Top, col(views), col(groups))
+	botRow := lipgloss.JoinHorizontal(lipgloss.Top, col(logView), col(meta))
 
-	body := strings.Join([]string{topRow, midRow, logView}, "\n\n")
+	body := strings.Join([]string{topRow, midRow, botRow}, "\n\n")
 
 	closeHint := dimStyle.Render("Press ? or esc to close")
 	body += "\n\n" + lipgloss.NewStyle().Width(colWidth*2).Align(lipgloss.Center).Render(closeHint)

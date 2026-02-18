@@ -493,6 +493,21 @@ return m, m.fetchConversation(session.ID)
 		return m, m.openSourceRepo()
 	case "@":
 		return m, m.openFileIssue()
+	case "d":
+		session := m.taskList.SelectedTask()
+		if session != nil && canShowDiff(session) {
+			m.viewMode = ViewModeDiff
+			return m, m.fetchPRDiff(session)
+		} else if session != nil {
+			m.toast.Push("⚠️", session.Title, "no PR — session is on "+session.Branch)
+		}
+	case "t":
+		session := m.taskList.SelectedTask()
+		if session != nil && session.Source == data.SourceLocalCopilot && session.HasLog {
+			m.viewMode = ViewModeToolTimeline
+			m.toolTimeline.SetSize(m.ctx.Width-4, m.ctx.Height-8)
+			return m, m.fetchToolTimeline(session.ID)
+		}
 	}
 	return m, nil
 }

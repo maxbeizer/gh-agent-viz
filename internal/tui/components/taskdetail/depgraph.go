@@ -147,7 +147,7 @@ func sessionLabel(s *data.Session) string {
 // e.g., "feature/auth-bug" → "feature/auth", "fix/login-flow" → "fix/login"
 func branchGroupPrefix(branch string) string {
 	branch = strings.TrimSpace(branch)
-	if branch == "" || branch == "main" || branch == "master" {
+	if data.IsDefaultBranch(branch) {
 		return ""
 	}
 

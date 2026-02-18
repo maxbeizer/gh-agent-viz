@@ -89,6 +89,15 @@ docs/
 - If a REST API appears in the future, switch to using `go-gh` REST client (`gh.DefaultRESTClient()`) directly
 - Changes that affect data handling, telemetry, or external integrations must update `docs/SECURITY.md`
 
+## Shared Helpers (internal/data/session.go)
+
+When working with session data across components, use these shared functions instead of reimplementing:
+- `data.SessionNeedsAttention(s)` — true for needs-input/failed only
+- `data.SessionIsActiveNotIdle(s)` — true for active sessions updated within 20min
+- `data.StatusIsActive(status)` — true for running/queued/active/open/in-progress
+- `data.IsDefaultBranch(branch)` — true for main/master/empty
+- `data.FormatTokenCount(n)` — "2.7M", "11.7K", "437"
+
 ## Testing
 
 - When writing tests, use Go's standard `testing` package

@@ -173,7 +173,7 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 
 	// Only animate icon for sessions that are actively working (not idle)
 	icon := m.statusIcon(session.Status)
-	if m.animStatusIcon != nil && isActiveNotIdle(session) {
+	if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(session) {
 		icon = m.animStatusIcon(session.Status, m.animFrame)
 	}
 
@@ -456,17 +456,6 @@ func isActiveStatus(status string) bool {
 	return data.StatusIsActive(status) || strings.EqualFold(strings.TrimSpace(status), "needs-input")
 }
 
-// isActiveNotIdle returns true for sessions that are actively working (not idle 20+ min)
-func isActiveNotIdle(session data.Session) bool {
-	if !isActiveStatus(session.Status) {
-		return false
-	}
-	if session.UpdatedAt.IsZero() {
-		return true
-	}
-	return time.Since(session.UpdatedAt) < data.AttentionStaleThreshold
-}
-
 func sessionBadge(session data.Session, duplicateCount int) string {
 	if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
 		badge := "🧑 waiting on you"
@@ -636,8 +625,7 @@ func sessionHasLinkedPR(session data.Session) bool {
 
 // hasPRBranch returns true if the session is on a feature branch (not main/master)
 func hasPRBranch(session data.Session) bool {
-	branch := strings.ToLower(strings.TrimSpace(session.Branch))
-	if branch == "" || branch == "main" || branch == "master" {
+	if data.IsDefaultBranch(session.Branch) {
 		return false
 	}
 	return strings.TrimSpace(session.Repository) != ""

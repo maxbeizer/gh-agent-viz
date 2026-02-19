@@ -81,13 +81,15 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, m.fetchTaskLog(session.ID, session.Repository)
 		}
-case "c":
-session := m.taskList.SelectedTask()
-if session != nil && session.Source == data.SourceLocalCopilot && session.HasLog {
-m.viewMode = ViewModeLog
-m.showConversation = true
-return m, m.fetchConversation(session.ID)
-}
+	case "c":
+		session := m.taskList.SelectedTask()
+		if session != nil && session.Source == data.SourceLocalCopilot && session.HasLog {
+			m.viewMode = ViewModeLog
+			m.showConversation = true
+			return m, m.fetchConversation(session.ID)
+		} else if session != nil {
+			m.toast.Push("ℹ️", "Conversation", "only available for local Copilot sessions")
+		}
 	case "o":
 		session := m.taskList.SelectedTask()
 		if session != nil {
@@ -154,6 +156,8 @@ return m, m.fetchConversation(session.ID)
 			m.viewMode = ViewModeToolTimeline
 			m.toolTimeline.SetSize(m.ctx.Width-4, m.ctx.Height-8)
 			return m, m.fetchToolTimeline(session.ID)
+		} else if session != nil {
+			m.toast.Push("ℹ️", "Tool Timeline", "only available for local Copilot sessions")
 		}
 	}
 	return m, nil
@@ -175,13 +179,15 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, m.fetchTaskLog(session.ID, session.Repository)
 		}
-case "c":
-session := m.taskList.SelectedTask()
-if session != nil && session.Source == data.SourceLocalCopilot && session.HasLog {
-m.viewMode = ViewModeLog
-m.showConversation = true
-return m, m.fetchConversation(session.ID)
-}
+	case "c":
+		session := m.taskList.SelectedTask()
+		if session != nil && session.Source == data.SourceLocalCopilot && session.HasLog {
+			m.viewMode = ViewModeLog
+			m.showConversation = true
+			return m, m.fetchConversation(session.ID)
+		} else if session != nil {
+			m.toast.Push("ℹ️", "Conversation", "only available for local Copilot sessions")
+		}
 	case "o":
 		session := m.taskList.SelectedTask()
 		if session != nil {
@@ -198,6 +204,8 @@ return m, m.fetchConversation(session.ID)
 			m.viewMode = ViewModeToolTimeline
 			m.toolTimeline.SetSize(m.ctx.Width-4, m.ctx.Height-8)
 			return m, m.fetchToolTimeline(session.ID)
+		} else if session != nil {
+			m.toast.Push("ℹ️", "Tool Timeline", "only available for local Copilot sessions")
 		}
 	case "d":
 		session := m.taskList.SelectedTask()

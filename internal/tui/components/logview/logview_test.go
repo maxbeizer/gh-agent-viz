@@ -195,8 +195,8 @@ func TestView_EmptyContent(t *testing.T) {
 	m := New(lipgloss.NewStyle(), 80, 24)
 	m.SetContent("")
 	view := m.View()
-	if !strings.Contains(view, "No logs available") {
-		t.Errorf("expected 'No logs available' for empty content, got: %s", view)
+	if !strings.Contains(view, "No log content available") {
+		t.Errorf("expected 'No log content available' for empty content, got: %s", view)
 	}
 }
 

@@ -70,7 +70,7 @@ func (m Model) View() string {
 			Padding(1, 2).
 			Width(m.width - 4)
 		title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("99")).Render("Tool Timeline")
-		return boxStyle.Render(title + "\n\nNo tool executions recorded.")
+		return boxStyle.Render(title + "\n\nNo tool executions recorded for this session.")
 	}
 
 	return m.viewport.View()

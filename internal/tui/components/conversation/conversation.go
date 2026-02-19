@@ -73,7 +73,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 // View renders the conversation.
 func (m Model) View() string {
 	if !m.ready || len(m.messages) == 0 {
-		return lipgloss.NewStyle().Faint(true).Render("No conversation messages")
+		return lipgloss.NewStyle().Faint(true).Render("No conversation events found for this session.")
 	}
 	return m.viewport.View()
 }

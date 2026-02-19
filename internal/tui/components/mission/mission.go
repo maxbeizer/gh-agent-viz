@@ -223,7 +223,7 @@ return m.repos[m.cursor].Name
 // View renders the summary dashboard.
 func (m *Model) View() string {
 if len(m.sessions) == 0 {
-return m.titleStyle.Render("  No sessions to display")
+return m.titleStyle.Render("  No sessions found — run gh agent-viz --demo to explore")
 }
 
 w := m.width - 4

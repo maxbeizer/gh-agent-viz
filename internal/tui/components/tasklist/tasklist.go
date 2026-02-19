@@ -101,16 +101,15 @@ func (m Model) View() string {
 
 	if len(m.sessions) == 0 {
 		emptyArt := `
-    ╭──────────────────────────────╮
-    │                              │
-    │   ✨ All quiet out here      │
-    │                              │
-    │   No sessions match this     │
-    │   filter. Press 'r' to       │
-    │   refresh or tab to try      │
-    │   another filter.            │
-    │                              │
-    ╰──────────────────────────────╯`
+    ╭───────────────────────────────────────╮
+    │                                       │
+    │   ✨ All quiet on the agent front     │
+    │                                       │
+    │   No sessions found. Try              │
+    │   'gh agent-viz --demo' to explore,   │
+    │   or press 'r' to refresh.            │
+    │                                       │
+    ╰───────────────────────────────────────╯`
 		return m.titleStyle.Render(emptyArt)
 	}
 

@@ -104,7 +104,7 @@ func TestViewEmptyAndLoadingStates(t *testing.T) {
 
 	// After data arrives, loading is false — show empty state
 	model.loading = false
-	if got := model.View(); !strings.Contains(got, "All quiet out here") {
+	if got := model.View(); !strings.Contains(got, "All quiet on the agent front") {
 		t.Fatalf("expected empty state, got: %s", got)
 	}
 }
@@ -225,7 +225,7 @@ func TestView_ImprovedEmptyState(t *testing.T) {
 	model.loading = false
 
 	view := model.View()
-	if !strings.Contains(view, "All quiet out here") {
+	if !strings.Contains(view, "All quiet on the agent front") {
 		t.Error("expected whimsical empty state message")
 	}
 	if !strings.Contains(view, "refresh") {

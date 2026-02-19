@@ -104,3 +104,13 @@ When working with session data across components, use these shared functions ins
 - For TUI components, test the Model's Update function with specific messages and verify state changes
 - For the data layer, mock `exec.Command` output to test parsing without requiring `gh` to be installed
 - Add regression tests for parser hardening, malformed input handling, and error propagation paths
+
+## Testing Guidelines
+
+- Tests must be deterministic — no flaky tests
+- Avoid `time.Now()` or `time.Since()` in test assertions (use fixed timestamps)
+- Avoid filesystem access in unit tests (use temp dirs or mock data)
+- Pure function tests are preferred (input → output, no side effects)
+- Use `testing.T.TempDir()` when filesystem access is unavoidable
+- Mock `exec.Command` via the `execCommand` variable for CLI tests
+- Don't test Bubble Tea Update/View wiring directly — test component logic instead

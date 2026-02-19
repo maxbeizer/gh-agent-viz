@@ -196,6 +196,121 @@ func TestAttentionReason_CompletedSession(t *testing.T) {
 	}
 }
 
+func TestDetailValue(t *testing.T) {
+	tests := []struct {
+		value    string
+		fallback string
+		want     string
+	}{
+		{"hello", "default", "hello"},
+		{"", "default", "default"},
+		{"   ", "default", "default"},
+		{"  trimmed  ", "default", "trimmed"},
+	}
+
+	for _, tt := range tests {
+		got := detailValue(tt.value, tt.fallback)
+		if got != tt.want {
+			t.Errorf("detailValue(%q, %q) = %q, want %q", tt.value, tt.fallback, got, tt.want)
+		}
+	}
+}
+
+func TestDetailTitle(t *testing.T) {
+	tests := []struct {
+		title string
+		want  string
+	}{
+		{"My Session", "My Session"},
+		{"", "Untitled Session"},
+		{"   ", "Untitled Session"},
+	}
+
+	for _, tt := range tests {
+		got := detailTitle(tt.title)
+		if got != tt.want {
+			t.Errorf("detailTitle(%q) = %q, want %q", tt.title, got, tt.want)
+		}
+	}
+}
+
+func TestDetailTimestamp(t *testing.T) {
+	tests := []struct {
+		name string
+		ts   time.Time
+		want string
+	}{
+		{"zero time", time.Time{}, "not recorded"},
+		{"specific time", time.Date(2025, 3, 14, 15, 9, 26, 0, time.UTC), "2025-03-14 15:09:26"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := detailTimestamp(tt.ts)
+			if got != tt.want {
+				t.Errorf("detailTimestamp() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTimelineWidth(t *testing.T) {
+	tests := []struct {
+		available int
+		want      int
+	}{
+		{0, 24},    // default
+		{-1, 24},   // negative → default
+		{30, 8},    // small → minimum 8
+		{50, 22},   // mid
+		{100, 48},  // large → capped at 48
+		{200, 48},  // very large → capped at 48
+	}
+
+	for _, tt := range tests {
+		got := timelineWidth(tt.available)
+		if got != tt.want {
+			t.Errorf("timelineWidth(%d) = %d, want %d", tt.available, got, tt.want)
+		}
+	}
+}
+
+func TestSectionDivider(t *testing.T) {
+	// Zero or negative width should use default (40)
+	result := sectionDivider(0)
+	if result == "" {
+		t.Fatal("expected non-empty divider")
+	}
+
+	// Positive width produces output
+	result2 := sectionDivider(20)
+	if result2 == "" {
+		t.Fatal("expected non-empty divider for width 20")
+	}
+}
+
+func TestFormatDuration_EdgeCases(t *testing.T) {
+	tests := []struct {
+		d    time.Duration
+		want string
+	}{
+		{0, "0s"},
+		{1 * time.Second, "1s"},
+		{59 * time.Second, "59s"},
+		{1 * time.Minute, "1m"},
+		{1*time.Hour + 0*time.Minute, "1h"},
+		{24 * time.Hour, "1d"},
+		{49*time.Hour + 30*time.Minute, "2d 1h"},
+	}
+
+	for _, tt := range tests {
+		got := formatDuration(tt.d)
+		if got != tt.want {
+			t.Errorf("formatDuration(%v) = %q, want %q", tt.d, got, tt.want)
+		}
+	}
+}
+
 func TestView_ShowsAttentionReason(t *testing.T) {
 	model := New(
 		lipgloss.NewStyle(),

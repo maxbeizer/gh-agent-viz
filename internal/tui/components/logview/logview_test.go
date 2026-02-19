@@ -190,3 +190,36 @@ func TestView_NotLive_NoIndicator(t *testing.T) {
 		t.Errorf("expected no indicator for non-live session, got: %s", view)
 	}
 }
+
+func TestView_EmptyContent(t *testing.T) {
+	m := New(lipgloss.NewStyle(), 80, 24)
+	m.SetContent("")
+	view := m.View()
+	if !strings.Contains(view, "No logs available") {
+		t.Errorf("expected 'No logs available' for empty content, got: %s", view)
+	}
+}
+
+func TestNew_Defaults(t *testing.T) {
+	m := New(lipgloss.NewStyle(), 80, 24)
+	if m.ready {
+		t.Error("expected ready to be false on new model")
+	}
+	if m.followMode {
+		t.Error("expected followMode to be false on new model")
+	}
+	if m.liveSession {
+		t.Error("expected liveSession to be false on new model")
+	}
+	if m.rawContent != "" {
+		t.Error("expected rawContent to be empty on new model")
+	}
+}
+
+func TestLineCount_AfterSetContent(t *testing.T) {
+	m := New(lipgloss.NewStyle(), 80, 24)
+	m.SetContent("line1\nline2\nline3")
+	if m.lineCount < 1 {
+		t.Errorf("expected lineCount >= 1 after SetContent, got %d", m.lineCount)
+	}
+}

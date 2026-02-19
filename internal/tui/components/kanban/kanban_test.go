@@ -206,7 +206,7 @@ func TestView_EmptyColumnsShowPlaceholder(t *testing.T) {
 	})
 
 	view := m.View()
-	if !strings.Contains(view, "(no sessions)") {
+	if !strings.Contains(view, "nothing active") && !strings.Contains(view, "all agents busy") && !strings.Contains(view, "no completed sessions") {
 		t.Error("expected placeholder text for empty columns")
 	}
 }

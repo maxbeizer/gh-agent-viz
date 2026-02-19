@@ -16,7 +16,7 @@ func TestSetMessages_Empty(t *testing.T) {
 	m := New(80, 24)
 	m.SetMessages(nil)
 	view := m.View()
-	if !strings.Contains(view, "No conversation messages") {
+	if !strings.Contains(view, "No conversation events found for this session") {
 		t.Errorf("expected empty state message, got %q", view)
 	}
 }

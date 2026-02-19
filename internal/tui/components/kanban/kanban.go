@@ -234,10 +234,19 @@ func (m *Model) renderColumn(col Column, colIdx, width, cardAreaHeight int, focu
 	// Build card lines
 	var cardLines []string
 	if len(col.Sessions) == 0 {
+		hint := "(no sessions)"
+		switch col.Status {
+		case "in-progress":
+			hint = "nothing active"
+		case "idle":
+			hint = "all agents busy"
+		case "done":
+			hint = "no completed sessions"
+		}
 		placeholder := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
 			Italic(true).
-			Render("(no sessions)")
+			Render(hint)
 		cardLines = append(cardLines, placeholder)
 	} else {
 		for rowIdx, session := range col.Sessions {

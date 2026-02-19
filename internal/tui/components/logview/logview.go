@@ -49,6 +49,10 @@ func (m Model) View() string {
 		return "Loading logs..."
 	}
 
+	if m.rawContent == "" && !m.liveSession {
+		return "No log content available. Press esc to go back."
+	}
+
 	if m.content == "" {
 		return m.titleStyle.Render("No logs available")
 	}

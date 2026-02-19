@@ -62,10 +62,11 @@ type Model struct {
 	animFrame    int
 	toast        toast.Model
 	prevSessions map[string]string // session ID → previous status
+	demo         bool
 }
 
 // NewModel creates a new TUI model
-func NewModel(repo string, debug bool) Model {
+func NewModel(repo string, debug bool, demo bool) Model {
 	ctx := NewProgramContext()
 	ctx.Debug = debug
 	cfg, err := config.Load("")
@@ -130,6 +131,7 @@ func NewModel(repo string, debug bool) Model {
 		repo:        repo,
 		refreshInt:  time.Duration(refreshSeconds) * time.Second,
 		toast:       toast.New(),
+		demo:        demo,
 	}
 }
 

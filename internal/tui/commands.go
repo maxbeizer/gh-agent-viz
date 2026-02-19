@@ -56,40 +56,49 @@ type conversationLoadedMsg struct {
 
 // fetchTasks fetches the list of sessions (both agent tasks and local sessions)
 func (m Model) fetchTasks() tea.Msg {
-	sessions, err := data.FetchAllSessions(m.repo)
-	if err != nil {
-		return errMsg{err}
-	}
+	var sessions []data.Session
 
-	// Exclude dismissed sessions before computing anything
-	dismissedIDs := map[string]struct{}{}
-	if m.dismissedStore != nil {
-		dismissedIDs = m.dismissedStore.IDs()
-	}
-	visible := make([]data.Session, 0, len(sessions))
-	for _, session := range sessions {
-		if _, dismissed := dismissedIDs[session.ID]; !dismissed {
-			visible = append(visible, session)
+	if m.demo {
+		sessions = data.DemoSessions()
+	} else {
+		var err error
+		sessions, err = data.FetchAllSessions(m.repo)
+		if err != nil {
+			return errMsg{err}
 		}
-	}
-	sessions = visible
 
-	// Enrich sessions with token usage from CLI logs
-	tokenUsage, _ := data.FetchTokenUsage()
-	for i := range sessions {
-		if usage, ok := tokenUsage[sessions[i].ID]; ok {
-			if sessions[i].Telemetry == nil {
-				sessions[i].Telemetry = &data.SessionTelemetry{}
+		// Exclude dismissed sessions before computing anything
+		dismissedIDs := map[string]struct{}{}
+		if m.dismissedStore != nil {
+			dismissedIDs = m.dismissedStore.IDs()
+		}
+		visible := make([]data.Session, 0, len(sessions))
+		for _, session := range sessions {
+			if _, dismissed := dismissedIDs[session.ID]; !dismissed {
+				visible = append(visible, session)
 			}
-			sessions[i].Telemetry.Model = usage.Model
-			sessions[i].Telemetry.InputTokens = usage.InputTokens
-			sessions[i].Telemetry.OutputTokens = usage.OutputTokens
-			sessions[i].Telemetry.CachedTokens = usage.CachedTokens
-			sessions[i].Telemetry.ModelCalls = usage.Calls
+		}
+		sessions = visible
+
+		// Enrich sessions with token usage from CLI logs
+		tokenUsage, _ := data.FetchTokenUsage()
+		for i := range sessions {
+			if usage, ok := tokenUsage[sessions[i].ID]; ok {
+				if sessions[i].Telemetry == nil {
+					sessions[i].Telemetry = &data.SessionTelemetry{}
+				}
+				sessions[i].Telemetry.Model = usage.Model
+				sessions[i].Telemetry.InputTokens = usage.InputTokens
+				sessions[i].Telemetry.OutputTokens = usage.OutputTokens
+				sessions[i].Telemetry.CachedTokens = usage.CachedTokens
+				sessions[i].Telemetry.ModelCalls = usage.Calls
+			}
 		}
 	}
 
 	// Compute counts across all visible (non-dismissed) sessions
+	allSessions := make([]data.Session, len(sessions))
+	copy(allSessions, sessions)
 	counts := FilterCounts{All: len(sessions)}
 	for _, session := range sessions {
 		if data.SessionNeedsAttention(session) {
@@ -121,12 +130,21 @@ func (m Model) fetchTasks() tea.Msg {
 		sessions = filtered
 	}
 
-	return tasksLoadedMsg{sessions, visible, counts}
+	return tasksLoadedMsg{sessions, allSessions, counts}
 }
 
 // fetchTaskDetail fetches detailed information for a session
 func (m Model) fetchTaskDetail(id string, repo string) tea.Cmd {
 	return func() tea.Msg {
+		if m.demo {
+			// In demo mode, find the session from demo data directly
+			for _, s := range data.DemoSessions() {
+				if s.ID == id {
+					return taskDetailLoadedMsg{&s}
+				}
+			}
+			return errMsg{fmt.Errorf("demo session not found")}
+		}
 		// For now, we only support detail view for agent-task sessions
 		// Local sessions don't have a detail API yet
 		task, err := data.FetchAgentTaskDetail(id, repo)
@@ -260,6 +278,10 @@ func (m Model) openTaskPR(session *data.Session) tea.Cmd {
 	return func() tea.Msg {
 		if session == nil {
 			return errMsg{fmt.Errorf("no session selected")}
+		}
+
+		if m.demo {
+			return errMsg{fmt.Errorf("demo mode — PR not available")}
 		}
 
 		// If we already have PR info, use it

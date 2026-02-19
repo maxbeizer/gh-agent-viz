@@ -119,3 +119,102 @@ func TestMalformedLinesSkipped(t *testing.T) {
 		t.Errorf("expected input 1000, got %d", s.InputTokens)
 	}
 }
+
+func TestProcessJSONBlock(t *testing.T) {
+	tests := []struct {
+		name      string
+		json      string
+		sessionID string
+		wantCalls int
+		wantInput int64
+	}{
+		{
+			"valid block",
+			`{"model":"gpt-4.1","usage":{"completion_tokens":100,"prompt_tokens":500,"prompt_tokens_details":{"cached_tokens":200},"total_tokens":600}}`,
+			"session-1",
+			1, 500,
+		},
+		{
+			"zero total_tokens is skipped",
+			`{"model":"gpt-4.1","usage":{"completion_tokens":0,"prompt_tokens":0,"prompt_tokens_details":{"cached_tokens":0},"total_tokens":0}}`,
+			"session-2",
+			0, 0,
+		},
+		{
+			"invalid JSON is skipped",
+			`{not valid json}`,
+			"session-3",
+			0, 0,
+		},
+		{
+			"empty session ID uses _unknown",
+			`{"model":"gpt-4.1","usage":{"completion_tokens":50,"prompt_tokens":100,"prompt_tokens_details":{"cached_tokens":0},"total_tokens":150}}`,
+			"",
+			1, 100,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := map[string]*TokenUsage{}
+			processJSONBlock(tt.json, tt.sessionID, result)
+
+			totalCalls := 0
+			var totalInput int64
+			for _, u := range result {
+				totalCalls += u.Calls
+				totalInput += u.InputTokens
+			}
+			if totalCalls != tt.wantCalls {
+				t.Errorf("expected %d calls, got %d", tt.wantCalls, totalCalls)
+			}
+			if totalInput != tt.wantInput {
+				t.Errorf("expected input tokens %d, got %d", tt.wantInput, totalInput)
+			}
+		})
+	}
+}
+
+func TestProcessJSONBlock_AccumulatesUsage(t *testing.T) {
+	result := map[string]*TokenUsage{}
+	processJSONBlock(
+		`{"model":"gpt-4.1","usage":{"completion_tokens":100,"prompt_tokens":500,"prompt_tokens_details":{"cached_tokens":200},"total_tokens":600}}`,
+		"session-1", result,
+	)
+	processJSONBlock(
+		`{"model":"gpt-4.1","usage":{"completion_tokens":50,"prompt_tokens":300,"prompt_tokens_details":{"cached_tokens":100},"total_tokens":350}}`,
+		"session-1", result,
+	)
+
+	usage := result["session-1"]
+	if usage == nil {
+		t.Fatal("expected session-1 in result")
+	}
+	if usage.Calls != 2 {
+		t.Errorf("expected 2 calls, got %d", usage.Calls)
+	}
+	if usage.InputTokens != 800 {
+		t.Errorf("expected 800 input tokens, got %d", usage.InputTokens)
+	}
+	if usage.OutputTokens != 150 {
+		t.Errorf("expected 150 output tokens, got %d", usage.OutputTokens)
+	}
+	if usage.CachedTokens != 300 {
+		t.Errorf("expected 300 cached tokens, got %d", usage.CachedTokens)
+	}
+}
+
+func TestProcessJSONBlock_ModelSuffix(t *testing.T) {
+	result := map[string]*TokenUsage{}
+	processJSONBlock(
+		`{"model":"provider:gpt-4.1","usage":{"completion_tokens":10,"prompt_tokens":20,"total_tokens":30}}`,
+		"session-1", result,
+	)
+	usage := result["session-1"]
+	if usage == nil {
+		t.Fatal("expected session-1 in result")
+	}
+	if usage.Model != "gpt-4.1" {
+		t.Errorf("expected model stripped to 'gpt-4.1', got %q", usage.Model)
+	}
+}

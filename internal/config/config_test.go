@@ -207,3 +207,78 @@ func TestLoad_AnimationsFalse(t *testing.T) {
 		t.Error("expected animations disabled from config file")
 	}
 }
+
+func TestAsciiHeaderEnabled_DefaultTrue(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.AsciiHeaderEnabled() {
+		t.Error("expected ascii header enabled by default")
+	}
+}
+
+func TestAsciiHeaderEnabled_ExplicitTrue(t *testing.T) {
+	b := true
+	cfg := &Config{AsciiHeader: &b}
+	if !cfg.AsciiHeaderEnabled() {
+		t.Error("expected ascii header enabled when explicitly true")
+	}
+}
+
+func TestAsciiHeaderEnabled_ExplicitFalse(t *testing.T) {
+	b := false
+	cfg := &Config{AsciiHeader: &b}
+	if cfg.AsciiHeaderEnabled() {
+		t.Error("expected ascii header disabled when explicitly false")
+	}
+}
+
+func TestLoad_AsciiHeaderFalse(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "ascii-config.yml")
+
+	configContent := "asciiHeader: false\n"
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	if cfg.AsciiHeaderEnabled() {
+		t.Error("expected ascii header disabled from config file")
+	}
+}
+
+func TestLoad_ThemeField(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "theme-config.yml")
+
+	configContent := "theme: dark\n"
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	if cfg.Theme != "dark" {
+		t.Errorf("expected theme 'dark', got %q", cfg.Theme)
+	}
+}
+
+func TestDefaultConfig_FieldValues(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if cfg.Animations != nil {
+		t.Error("expected Animations to be nil by default")
+	}
+	if cfg.AsciiHeader != nil {
+		t.Error("expected AsciiHeader to be nil by default")
+	}
+	if cfg.Theme != "" {
+		t.Errorf("expected empty Theme by default, got %q", cfg.Theme)
+	}
+}

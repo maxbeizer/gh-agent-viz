@@ -644,6 +644,176 @@ func TestFetchSessionEvents_MissingSession(t *testing.T) {
 	}
 }
 
+func TestParseAnyTime(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		ok    bool
+	}{
+		{"RFC3339", "2025-06-15T10:30:00Z", true},
+		{"RFC3339Nano", "2025-06-15T10:30:00.123456789Z", true},
+		{"RFC3339 with offset", "2025-06-15T10:30:00+05:00", true},
+		{"empty string", "", false},
+		{"garbage", "not-a-time", false},
+		{"date only", "2025-06-15", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, got := parseAnyTime(tt.input)
+			if got != tt.ok {
+				t.Errorf("parseAnyTime(%q) ok = %v, want %v", tt.input, got, tt.ok)
+			}
+		})
+	}
+}
+
+func TestParseSessionTime(t *testing.T) {
+	tests := []struct {
+		name     string
+		primary  string
+		fallback string
+		isZero   bool
+	}{
+		{"valid primary", "2025-06-15T10:00:00Z", "", false},
+		{"valid fallback", "", "2025-06-15T11:00:00Z", false},
+		{"primary preferred over fallback", "2025-06-15T10:00:00Z", "2025-06-15T11:00:00Z", false},
+		{"both empty", "", "", true},
+		{"invalid primary uses fallback", "garbage", "2025-06-15T11:00:00Z", false},
+		{"both invalid", "garbage", "also garbage", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseSessionTime(tt.primary, tt.fallback)
+			if result.IsZero() != tt.isZero {
+				t.Errorf("parseSessionTime(%q, %q).IsZero() = %v, want %v", tt.primary, tt.fallback, result.IsZero(), tt.isZero)
+			}
+		})
+	}
+
+	// Verify primary is preferred when both are valid
+	result := parseSessionTime("2025-06-15T10:00:00Z", "2025-06-15T11:00:00Z")
+	if result.Hour() != 10 {
+		t.Errorf("expected primary time (hour=10), got hour=%d", result.Hour())
+	}
+}
+
+func TestNeedsHumanInput(t *testing.T) {
+	tests := []struct {
+		name      string
+		workspace LocalSessionWorkspace
+		want      bool
+	}{
+		{"awaiting_user_input flag", LocalSessionWorkspace{AwaitingUserInput: true}, true},
+		{"needs_human_input flag", LocalSessionWorkspace{NeedsHumanInput: true}, true},
+		{"waiting_for_user flag", LocalSessionWorkspace{WaitingForUser: true}, true},
+		{"no flags no history", LocalSessionWorkspace{}, false},
+		{
+			"assistant asking question",
+			LocalSessionWorkspace{
+				ConversationHistory: []map[string]interface{}{
+					{"role": "assistant", "content": "Which option do you prefer?"},
+				},
+			},
+			true,
+		},
+		{
+			"assistant pattern: please choose",
+			LocalSessionWorkspace{
+				ConversationHistory: []map[string]interface{}{
+					{"role": "assistant", "content": "Please choose one of the following"},
+				},
+			},
+			true,
+		},
+		{
+			"assistant no question",
+			LocalSessionWorkspace{
+				ConversationHistory: []map[string]interface{}{
+					{"role": "assistant", "content": "I have completed the task."},
+				},
+			},
+			false,
+		},
+		{
+			"last message from user",
+			LocalSessionWorkspace{
+				ConversationHistory: []map[string]interface{}{
+					{"role": "user", "content": "What should I do?"},
+				},
+			},
+			false,
+		},
+		{
+			"empty assistant content",
+			LocalSessionWorkspace{
+				ConversationHistory: []map[string]interface{}{
+					{"role": "assistant", "content": ""},
+				},
+			},
+			false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := needsHumanInput(tt.workspace)
+			if got != tt.want {
+				t.Errorf("needsHumanInput() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsLocallyActiveStatus(t *testing.T) {
+	tests := []struct {
+		status string
+		want   bool
+	}{
+		{"running", true},
+		{"queued", true},
+		{"needs-input", true},
+		{"Running", true},
+		{"  QUEUED  ", true},
+		{"completed", false},
+		{"failed", false},
+		{"unknown", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("status=%q", tt.status), func(t *testing.T) {
+			got := isLocallyActiveStatus(tt.status)
+			if got != tt.want {
+				t.Errorf("isLocallyActiveStatus(%q) = %v, want %v", tt.status, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatEventTimestamp(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"RFC3339Nano", "2025-06-15T10:30:45.123Z", "10:30:45"},
+		{"RFC3339", "2025-06-15T10:30:45Z", "10:30:45"},
+		{"invalid returns raw", "not-a-timestamp", "not-a-timestamp"},
+		{"empty returns empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatEventTimestamp(tt.input)
+			if got != tt.want {
+				t.Errorf("formatEventTimestamp(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFetchSessionEvents_ParsesEvents(t *testing.T) {
 	// We can't easily mock the home dir for FetchSessionEvents without
 	// modifying its signature, so test the underlying parsing logic

@@ -272,7 +272,7 @@ func TestView_CardShowsAttentionBadges(t *testing.T) {
 	})
 
 	view := model.View()
-	if !strings.Contains(view, "🧑 waiting on you") {
+	if !strings.Contains(view, "✋ waiting on you") {
 		t.Fatalf("expected needs-input badge, got: %s", view)
 	}
 	if !strings.Contains(view, "💤 idle ~30m") {

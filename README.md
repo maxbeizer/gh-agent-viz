@@ -12,7 +12,7 @@ An interactive terminal UI for visualizing GitHub Copilot coding agent sessions.
 - 📝 **Log Viewer** - Scrollable, searchable agent task logs
 - 💻 **Local Sessions** - Automatically ingests local Copilot CLI sessions from `~/.copilot/session-state/`
 - 🎨 **Status Indicators** - Color-coded status icons (running, queued, completed, failed)
-- 🧑 **Input Needed Detection** - Highlights sessions that appear blocked waiting for human input
+- ✋ **Input Needed Detection** - Highlights sessions that appear blocked waiting for human input
 - 🚦 **Action Reasons** - Every card includes an explicit `Needs your action:` reason (`waiting on your input`, `run failed`, `running but quiet`, or `no action needed`)
 - 🧭 **Action-First Ordering** - Sessions needing input/failure/quiet checks surface first, while older quiet duplicates are de-emphasized with a `↺ quiet duplicate` badge
 - ⚡ **Quick Actions** - Contextual hints only show actions available for the highlighted session

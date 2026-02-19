@@ -1,6 +1,6 @@
 # Getting Started
 
-If the board feels confusing at first, start here.
+If the interface feels confusing at first, start here.
 
 ## 1) Launch with focus
 
@@ -8,17 +8,11 @@ If the board feels confusing at first, start here.
 gh agent-viz --repo owner/repo
 ```
 
-Starting with one repo makes the board much easier to read.
+Starting with one repo makes the session list much easier to read.
 
 ## 2) What you are looking at
 
-The main screen has a **Sessions at a Glance strip**, a **3-column board**, and a **Session Summary** panel for the highlighted row.
-
-Columns:
-
-- **Running** = active or queued sessions
-- **Done** = completed sessions
-- **Failed** = sessions that need attention
+The main screen shows a **session list** with a **preview pane** for the highlighted row. Each row displays status, title, repository, and timing information for quick scanning.
 
 Each row is labeled for fast scanning:
 
@@ -55,7 +49,6 @@ To reduce noise:
 
 ## 4) Core controls (minimum set)
 
-- `h` / `→`: switch columns
 - `j` / `k`: move selection
 - `enter`: open details
 - `l`: open logs (remote rows)
@@ -63,6 +56,8 @@ To reduce noise:
 - `s`: resume active local session
 - `tab` / `shift+tab`: change filter forward/backward
 - `a`: toggle needs-action view
+- `p`: toggle preview pane
+- `?`: show all keyboard shortcuts
 - `q`: quit
 
 ## 5) First useful workflow

@@ -254,9 +254,16 @@ func (m Model) fetchConversation(sessionID string) tea.Cmd {
 	}
 }
 
-func (m Model) openSourceRepo() tea.Cmd {
+func (m Model) openSessionRepo() tea.Cmd {
+	session := m.taskList.SelectedTask()
+	if session == nil || session.Repository == "" {
+		return func() tea.Msg {
+			return errMsg{fmt.Errorf("no session or repository selected")}
+		}
+	}
+	repo := session.Repository
 	return func() tea.Msg {
-		_, err := data.RunGH("repo", "view", "maxbeizer/gh-agent-viz", "--web")
+		_, err := data.RunGH("repo", "view", repo, "--web")
 		if err != nil {
 			return errMsg{fmt.Errorf("failed to open repo: %w", err)}
 		}

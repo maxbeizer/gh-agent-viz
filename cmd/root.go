@@ -48,6 +48,9 @@ func Execute() {
 }
 
 func init() {
+	// Version (GoReleaser injects the real version at build time)
+	rootCmd.Version = "dev"
+
 	// Add flags
 	rootCmd.Flags().StringVarP(&repoFlag, "repo", "R", "", "Scope to a specific repository (format: owner/repo)")
 	rootCmd.Flags().BoolVar(&debugFlag, "debug", false, "Enable debug diagnostics and write command logs to ~/.gh-agent-viz-debug.log")

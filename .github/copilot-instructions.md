@@ -57,6 +57,13 @@ internal/
       logview/               # Scrollable log viewer
       header/                # Header bar with title and filter tabs
       footer/                # Footer with keybinding hints
+      kanban/                # Kanban board view (In Progress/Idle/Done)
+      mission/               # Mission control summary dashboard
+      conversation/          # Styled chat bubble view
+      tooltimeline/          # Tool execution timeline
+      diffview/              # PR diff viewer
+      toast/                 # Transient notification toasts
+      help/                  # Keybinding help overlay
 docs/
   DECISIONS.md               # Architecture decision log
 ```
@@ -69,6 +76,7 @@ docs/
   - `gh agent-task view <id> --log` — shows the event log
   - `gh agent-task view <id> --log --follow` — streams live logs
 - **Important**: The `--json` flag support and exact output schema for these commands needs verification. The data structs in `internal/data/agentapi.go` are best-guess and may need adjustment based on actual CLI output.
+- Token usage is parsed from local Copilot CLI logs in `~/.copilot/logs/` to enrich sessions with model and token count data
 - Auth is handled automatically by `go-gh` picking up the user's `gh auth` token
 
 ## Coding Conventions

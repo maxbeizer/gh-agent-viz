@@ -89,8 +89,8 @@ func (m Model) View() string {
 
 	// Meta section
 	meta := sectionStyle.Render("Meta") + "\n" +
-		formatKey("!", "view source repo") + "\n" +
-		formatKey("@", "file an issue")
+		formatKey("!", "open session repo") + "\n" +
+		formatKey("@", "file tool issue")
 
 	// Layout: two columns for Navigation+Actions, Views+Groups
 	colWidth := 28

@@ -113,11 +113,11 @@ func NewKeybindings() Keybindings {
 		),
 		OpenRepo: key.NewBinding(
 			key.WithKeys("!"),
-			key.WithHelp("!", "repo"),
+			key.WithHelp("!", "open repo"),
 		),
 		FileIssue: key.NewBinding(
 			key.WithKeys("@"),
-			key.WithHelp("@", "file issue"),
+			key.WithHelp("@", "file tool issue"),
 		),
 	}
 }

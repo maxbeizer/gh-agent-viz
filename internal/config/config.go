@@ -92,5 +92,5 @@ func Save(cfg *Config, path string) error {
 	}
 
 	// Write file
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }

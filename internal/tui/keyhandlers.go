@@ -136,7 +136,7 @@ return m, m.fetchConversation(session.ID)
 		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
 	case "!":
-		return m, m.openSourceRepo()
+		return m, m.openSessionRepo()
 	case "@":
 		return m, m.openFileIssue()
 	case "d":

@@ -2,6 +2,8 @@
 
 An interactive terminal UI for visualizing GitHub Copilot coding agent sessions. Built as a `gh` CLI extension.
 
+> **Tip:** Run `gh agent-viz --demo` to explore the UI with sample data.
+
 ## Features
 
 - 📊 **Interactive TUI** - Browse agent sessions with keyboard navigation

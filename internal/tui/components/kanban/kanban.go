@@ -180,18 +180,7 @@ func (m *Model) RowCursor() int {
 
 // ColumnWidth computes the width for each column based on non-empty column count.
 func (m *Model) ColumnWidth() int {
-	nonEmpty := 0
-	for _, col := range m.columns {
-		if len(col.Sessions) > 0 {
-			nonEmpty++
-		}
-	}
 	count := len(m.columns)
-	if nonEmpty > 0 {
-		count = nonEmpty
-	}
-	// Always show all columns, but size based on visible count
-	count = len(m.columns)
 	if count == 0 {
 		return m.width
 	}

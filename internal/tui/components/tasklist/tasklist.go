@@ -645,13 +645,6 @@ func (m *Model) SetAnimFrame(frame int) {
 	m.animFrame = frame
 }
 
-// currentStatusIcon returns the animated icon if available, otherwise the static icon.
-func (m Model) currentStatusIcon(status string) string {
-	if m.animStatusIcon != nil {
-		return m.animStatusIcon(status, m.animFrame)
-	}
-	return m.statusIcon(status)
-}
 
 func (m Model) pageSize() int {
 	// Use full height (minus minimal chrome)

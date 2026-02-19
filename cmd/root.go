@@ -16,7 +16,9 @@ var (
 	demoFlag  bool
 )
 
-// rootCmd represents the base command
+// Version is set by goreleaser at build time.
+var Version = "dev"
+
 var rootCmd = &cobra.Command{
 	Use:   "gh-agent-viz",
 	Short: "Interactive terminal UI for visualizing GitHub Copilot agent sessions",
@@ -49,7 +51,7 @@ func Execute() {
 
 func init() {
 	// Version (GoReleaser injects the real version at build time)
-	rootCmd.Version = "dev"
+	rootCmd.Version = Version
 
 	// Add flags
 	rootCmd.Flags().StringVarP(&repoFlag, "repo", "R", "", "Scope to a specific repository (format: owner/repo)")

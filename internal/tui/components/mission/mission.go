@@ -292,10 +292,6 @@ lines = append(lines, "")
 lines = append(lines, "  "+sectionHead.Render("Needs your attention"))
 lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
 for _, item := range m.attention {
-title := item.Session.Title
-if len(title) > 30 {
-title = title[:27] + "..."
-}
 repo := item.Session.Repository
 if repo == "" {
 repo = "local"

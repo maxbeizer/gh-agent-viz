@@ -458,7 +458,7 @@ func isActiveStatus(status string) bool {
 
 func sessionBadge(session data.Session, duplicateCount int) string {
 	if strings.EqualFold(strings.TrimSpace(session.Status), "needs-input") {
-		badge := "🧑 waiting on you"
+		badge := "✋ waiting on you"
 		if duplicateCount > 0 {
 			badge += fmt.Sprintf(" (+%d older)", duplicateCount)
 		}

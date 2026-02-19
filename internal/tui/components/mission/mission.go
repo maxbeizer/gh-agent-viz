@@ -156,13 +156,13 @@ m.attention = nil
 for _, s := range m.sessions {
 status := strings.ToLower(strings.TrimSpace(s.Status))
 if status == "needs-input" {
-reason := "🧑 Waiting for input"
+reason := "✋ Waiting for input"
 if s.Source == data.SourceLocalCopilot {
 if msg := data.FetchLastAssistantMessage(s.ID); msg != "" {
 if len(msg) > 60 {
 msg = msg[:57] + "..."
 }
-reason = "🧑 \"" + msg + "\""
+reason = "✋ \"" + msg + "\""
 }
 }
 m.attention = append(m.attention, attentionItem{Session: s, Reason: reason})
@@ -246,7 +246,7 @@ if m.stats.Idle > 0 {
 summaryParts = append(summaryParts, fmt.Sprintf("💤 %d idle", m.stats.Idle))
 }
 if m.stats.NeedsInput > 0 {
-summaryParts = append(summaryParts, fmt.Sprintf("🧑 %d waiting on you", m.stats.NeedsInput))
+summaryParts = append(summaryParts, fmt.Sprintf("✋ %d waiting on you", m.stats.NeedsInput))
 }
 if m.stats.Done > 0 {
 summaryParts = append(summaryParts, fmt.Sprintf("✅ %d done", m.stats.Done))
@@ -369,7 +369,7 @@ if r.Idle > 0 {
 counts = append(counts, fmt.Sprintf("💤 %d idle", r.Idle))
 }
 if r.NeedsInput > 0 {
-counts = append(counts, fmt.Sprintf("🧑 %d", r.NeedsInput))
+counts = append(counts, fmt.Sprintf("✋ %d", r.NeedsInput))
 }
 if r.Done > 0 {
 counts = append(counts, fmt.Sprintf("✅ %d done", r.Done))
@@ -451,7 +451,7 @@ truncated = truncated[:77] + "..."
 return "❓ \"" + truncated + "\""
 }
 }
-return "🧑 Waiting for input"
+return "✋ Waiting for input"
 case "running":
 if s.Source == data.SourceLocalCopilot {
 if action := data.FetchLastSessionAction(s); action != "" {

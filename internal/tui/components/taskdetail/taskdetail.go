@@ -247,7 +247,7 @@ func attentionReason(session *data.Session) string {
 	}
 	status := strings.ToLower(strings.TrimSpace(session.Status))
 	if status == "needs-input" {
-		return "🧑 This session is waiting for your input to continue."
+		return "✋ This session is waiting for your input to continue."
 	}
 	if status == "failed" {
 		return "🚨 This session has failed. Press 'l' to check logs."

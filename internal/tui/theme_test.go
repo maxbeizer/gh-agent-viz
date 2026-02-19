@@ -23,7 +23,7 @@ func TestStatusIcon_Queued(t *testing.T) {
 
 func TestStatusIcon_NeedsInput(t *testing.T) {
 	icon := StatusIcon("needs-input")
-	expected := "🧑"
+	expected := "✋"
 	if icon != expected {
 		t.Errorf("expected icon '%s' for needs-input status, got '%s'", expected, icon)
 	}
@@ -172,7 +172,7 @@ func TestAnimatedStatusIcon_StaticForOtherStatuses(t *testing.T) {
 	}{
 		{"completed", "✅"},
 		{"failed", "❌"},
-		{"needs-input", "🧑"},
+		{"needs-input", "✋"},
 		{"unknown", "⚪"},
 	}
 	for _, tt := range tests {

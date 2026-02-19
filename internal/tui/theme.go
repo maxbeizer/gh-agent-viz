@@ -398,7 +398,7 @@ func StatusIcon(status string) string {
 	case "queued":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("222")).Render("○")
 	case "needs-input":
-		return "🧑"
+		return "✋"
 	case "completed":
 		return "✅"
 	case "failed":

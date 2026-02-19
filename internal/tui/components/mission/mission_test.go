@@ -20,7 +20,7 @@ func plainIcon(status string) string {
 	case "failed":
 		return "❌"
 	case "needs-input":
-		return "🧑"
+		return "✋"
 	default:
 		return "⚪"
 	}
@@ -213,7 +213,7 @@ func TestDeriveLastAction_Running(t *testing.T) {
 func TestDeriveLastAction_NeedsInput(t *testing.T) {
 	s := data.Session{Status: "needs-input", Source: data.SourceAgentTask}
 	action := DeriveLastAction(s)
-	if action != "🧑 Waiting for input" {
+	if action != "✋ Waiting for input" {
 		t.Fatalf("expected needs-input action, got %q", action)
 	}
 }

@@ -16,7 +16,7 @@ func newTestModel() Model {
 		case "running":
 			return "🟢"
 		case "needs-input":
-			return "🧑"
+			return "✋"
 		case "completed":
 			return "✅"
 		case "failed":

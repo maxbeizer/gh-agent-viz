@@ -2,9 +2,9 @@
 title: gh-agent-viz Docs
 ---
 
-# gh-agent-viz: Quick Docs
+# gh-agent-viz
 
-Welcome to your Copilot **mission control** in the terminal.
+Your Copilot agent **mission control** in the terminal.
 
 ## Start here
 
@@ -16,30 +16,37 @@ Welcome to your Copilot **mission control** in the terminal.
    ```bash
    gh agent-viz
    ```
-3. **Navigate**
-    - `h` / `→` switch columns (Running / Done / Failed)
-    - `j` / `k` move selection
-    - `enter` details, `l` logs, `o` open PR, `s` resume local session
-4. **Understand the screen quickly**
-   - [Getting Started](GETTING_STARTED.md)
+3. **Explore with demo data**
+   ```bash
+   gh agent-viz --demo
+   ```
+4. **Key shortcuts** — press `?` for the full keybinding reference
 
-## Product usage guides
+## Guides
 
-- [Getting Started](GETTING_STARTED.md) - what the board means and how to read rows
-- [Operator Guide](OPERATOR_GUIDE.md) - daily workflows and keybindings
-- [Troubleshooting](TROUBLESHOOTING.md) - fastest fixes for common errors
-- [Debug Mode](DEBUG_MODE.md) - how to capture actionable diagnostics
-- [Local Sessions](LOCAL_SESSIONS.md) - how local Copilot sessions are detected
-- [Security](SECURITY.md) - safety expectations and controls
+- [Getting Started](GETTING_STARTED.md) — what the board means and how to read it
+- [UI Features](UI_FEATURES.md) — all views, themes, and visualizations
+- [Operator Guide](OPERATOR_GUIDE.md) — daily workflows
+- [Troubleshooting](TROUBLESHOOTING.md) — common issues and fixes
+- [Debug Mode](DEBUG_MODE.md) — capturing diagnostics
+- [Local Sessions](LOCAL_SESSIONS.md) — how local Copilot sessions are detected
+- [Security](SECURITY.md) — safety expectations and controls
 
-## Developer experience
+## Views
 
-- [Developer Workflow](DEVELOPER_WORKFLOW.md) - one-command build/test/smoke flow
+| Key | View | What it shows |
+|-----|------|--------------|
+| _(default)_ | **Session list** | All sessions with status, badges, PR indicators |
+| `enter` | **Detail** | Full session info, timeline, token usage, attention reason |
+| `K` | **Kanban** | Sessions in columns: In Progress / Idle / Done |
+| `M` | **Mission Control** | Fleet summary dashboard with per-repo breakdown |
+| `l` | **Logs** | Raw markdown session log with live tailing |
+| `c` | **Conversation** | Styled chat bubbles for session dialogue |
+| `t` | **Tool Timeline** | Chronological trace of agent tool executions |
+| `d` | **Diff** | Colored PR diff (green/red) |
+| `?` | **Help** | Full keybinding reference |
 
-## Product references
+## Developer docs
 
-- [ATC strategy](ATC_STRATEGY.md)
-- [Product brief](PRODUCT_BRIEF.md)
-- [Product plan](PRODUCT_PLAN.md)
-- [CLI ↔ analytics contract](CLI_ANALYTICS_CONTRACT.md)
-- [Test scenarios](TEST_SCENARIOS.md)
+- [Developer Workflow](DEVELOPER_WORKFLOW.md) — build, test, and smoke flow
+- [Decisions](DECISIONS.md) — architecture decision log

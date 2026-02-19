@@ -144,39 +144,6 @@ func (m *Model) updateFooterHints() {
 	}
 }
 
-func canShowLogs(session *data.Session) bool {
-	if session == nil || strings.TrimSpace(session.ID) == "" {
-		return false
-	}
-	if session.Source == data.SourceAgentTask {
-		return true
-	}
-	// Local sessions can show logs if they have an events.jsonl file
-	return session.HasLog
-}
-
-func canOpenPR(session *data.Session) bool {
-	if session == nil {
-		return false
-	}
-	// Has explicit PR info
-	if strings.TrimSpace(session.PRURL) != "" {
-		return true
-	}
-	if session.PRNumber > 0 && strings.TrimSpace(session.Repository) != "" {
-		return true
-	}
-	// Can discover PR by branch lookup
-	return strings.TrimSpace(session.Repository) != "" && strings.TrimSpace(session.Branch) != ""
-}
-
-func canResumeLocalSession(session *data.Session) bool {
-	if session == nil || session.Source != data.SourceLocalCopilot || strings.TrimSpace(session.ID) == "" {
-		return false
-	}
-	status := strings.ToLower(strings.TrimSpace(session.Status))
-	return status == "running" || status == "queued" || status == "needs-input"
-}
 
 // canShowDiff returns true when the session has a PR or can discover one
 func canShowDiff(session *data.Session) bool {

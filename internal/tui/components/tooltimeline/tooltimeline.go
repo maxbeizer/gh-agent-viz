@@ -97,11 +97,6 @@ func (m *Model) renderTimeline() string {
 	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	iconStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("75"))
 
-	innerWidth := m.width - 8
-	if innerWidth < 20 {
-		innerWidth = 20
-	}
-
 	var lines []string
 	var prevTime string
 	for _, ev := range m.events {

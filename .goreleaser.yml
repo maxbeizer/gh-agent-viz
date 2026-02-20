@@ -4,6 +4,8 @@ builds:
   - id: gh-agent-viz
     main: ./gh-agent-viz.go
     binary: gh-agent-viz
+    env:
+      - CGO_ENABLED=0
     ldflags:
       - -s -w -X github.com/maxbeizer/gh-agent-viz/cmd.Version={{.Version}}
     goos:
@@ -16,11 +18,9 @@ builds:
 
 archives:
   - id: default
-    format: tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
-    format_overrides:
-      - goos: windows
-        format: zip
+    formats:
+      - binary
+    name_template: "{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}-{{ .Arch }}"
 
 checksum:
   name_template: "checksums.txt"

@@ -19,6 +19,21 @@ type tasksLoadedMsg struct {
 	counts      FilterCounts
 }
 
+// Phase 1: local sessions loaded (fast, filesystem only)
+type localSessionsLoadedMsg struct {
+	sessions []data.Session
+}
+
+// Phase 2: agent tasks loaded (API call)
+type agentTasksLoadedMsg struct {
+	sessions []data.Session
+}
+
+// Phase 3: token usage enrichment (log parsing)
+type tokenUsageLoadedMsg struct {
+	usage map[string]*data.TokenUsage
+}
+
 type taskDetailLoadedMsg struct {
 	task *data.Session
 }
@@ -131,6 +146,41 @@ func (m Model) fetchTasks() tea.Msg {
 	}
 
 	return tasksLoadedMsg{sessions, allSessions, counts}
+}
+
+// fetchLocalSessions loads local sessions quickly (filesystem only)
+func (m Model) fetchLocalSessions() tea.Msg {
+	if m.demo {
+		sessions := data.DemoSessions()
+		return localSessionsLoadedMsg{sessions}
+	}
+	sessions, _ := data.FetchLocalSessions()
+	return localSessionsLoadedMsg{sessions}
+}
+
+// fetchAgentTasks loads remote agent tasks (API call)
+func (m Model) fetchAgentTasks() tea.Msg {
+	if m.demo {
+		return agentTasksLoadedMsg{nil} // demo already loaded everything
+	}
+	tasks, err := data.FetchAgentTasks(m.repo)
+	if err != nil {
+		return agentTasksLoadedMsg{nil} // non-fatal
+	}
+	sessions := make([]data.Session, len(tasks))
+	for i, t := range tasks {
+		sessions[i] = data.FromAgentTask(t)
+	}
+	return agentTasksLoadedMsg{sessions}
+}
+
+// fetchTokenUsage parses log files for token data (deferred)
+func (m Model) fetchTokenUsage() tea.Msg {
+	if m.demo {
+		return tokenUsageLoadedMsg{nil}
+	}
+	usage, _ := data.FetchTokenUsage()
+	return tokenUsageLoadedMsg{usage}
 }
 
 // fetchTaskDetail fetches detailed information for a session

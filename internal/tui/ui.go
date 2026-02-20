@@ -63,6 +63,8 @@ type Model struct {
 	toast        toast.Model
 	prevSessions map[string]string // session ID → previous status
 	demo         bool
+	allSessions  []data.Session // accumulated across load phases
+	initialLoadDone bool       // true after all initial load phases complete
 }
 
 // NewModel creates a new TUI model
@@ -138,8 +140,8 @@ func NewModel(repo string, debug bool, demo bool) Model {
 // Init initializes the Bubble Tea program
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
-		m.fetchTasks,
-		m.refreshCmd(),
+		m.fetchLocalSessions,  // Phase 1: fast, shows content immediately
+		m.fetchAgentTasks,     // Phase 2: runs concurrently, returns when API responds
 		tea.EnterAltScreen,
 	}
 	if m.ctx.Config.AnimationsEnabled() {
@@ -167,6 +169,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
+
+	case localSessionsLoadedMsg:
+		// Phase 1: show local sessions immediately
+		m.mergeSessions(msg.sessions)
+		// Kick off token usage loading after first render
+		return m, m.fetchTokenUsage
+
+	case agentTasksLoadedMsg:
+		// Phase 2: merge agent tasks into existing sessions
+		if msg.sessions != nil {
+			m.mergeSessions(msg.sessions)
+		}
+		return m, nil
+
+	case tokenUsageLoadedMsg:
+		// Phase 3: enrich sessions with token data
+		if msg.usage != nil {
+			m.enrichTokenUsage(msg.usage)
+		}
+		// Initial load complete — snapshot prevSessions and start refresh timer
+		if !m.initialLoadDone {
+			m.initialLoadDone = true
+			m.prevSessions = make(map[string]string, len(m.allSessions))
+			for _, s := range m.allSessions {
+				m.prevSessions[s.ID] = s.Status
+			}
+		}
+		return m, m.refreshCmd()
 
 	case tasksLoadedMsg:
 		m.ctx.Error = nil

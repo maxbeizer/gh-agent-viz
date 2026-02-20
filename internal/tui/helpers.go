@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
 )
 
 // cycleFilter cycles through status filters by delta (+1 forward, -1 backward)
@@ -177,4 +178,124 @@ func (m Model) logPollTick() tea.Cmd {
 	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
 		return logPollTickMsg{}
 	})
+}
+
+// mergeSessions adds new sessions to the model, deduplicating by ID,
+// then recomputes counts and applies the current filter.
+func (m *Model) mergeSessions(newSessions []data.Session) {
+	// Build set of existing IDs
+	existing := map[string]struct{}{}
+	for _, s := range m.allSessions {
+		existing[s.ID] = struct{}{}
+	}
+
+	// Add non-duplicate sessions
+	for _, s := range newSessions {
+		if _, ok := existing[s.ID]; !ok {
+			m.allSessions = append(m.allSessions, s)
+			existing[s.ID] = struct{}{}
+		}
+	}
+
+	// Filter dismissed
+	dismissedIDs := map[string]struct{}{}
+	if m.dismissedStore != nil {
+		dismissedIDs = m.dismissedStore.IDs()
+	}
+	visible := make([]data.Session, 0, len(m.allSessions))
+	for _, s := range m.allSessions {
+		if _, dismissed := dismissedIDs[s.ID]; !dismissed {
+			visible = append(visible, s)
+		}
+	}
+
+	m.recomputeAndDisplay(visible)
+}
+
+// enrichTokenUsage applies token usage data to accumulated sessions and re-displays.
+func (m *Model) enrichTokenUsage(usage map[string]*data.TokenUsage) {
+	for i := range m.allSessions {
+		if u, ok := usage[m.allSessions[i].ID]; ok {
+			if m.allSessions[i].Telemetry == nil {
+				m.allSessions[i].Telemetry = &data.SessionTelemetry{}
+			}
+			m.allSessions[i].Telemetry.Model = u.Model
+			m.allSessions[i].Telemetry.InputTokens = u.InputTokens
+			m.allSessions[i].Telemetry.OutputTokens = u.OutputTokens
+			m.allSessions[i].Telemetry.CachedTokens = u.CachedTokens
+			m.allSessions[i].Telemetry.ModelCalls = u.Calls
+		}
+	}
+
+	// Re-display with enriched data
+	dismissedIDs := map[string]struct{}{}
+	if m.dismissedStore != nil {
+		dismissedIDs = m.dismissedStore.IDs()
+	}
+	visible := make([]data.Session, 0, len(m.allSessions))
+	for _, s := range m.allSessions {
+		if _, dismissed := dismissedIDs[s.ID]; !dismissed {
+			visible = append(visible, s)
+		}
+	}
+	m.recomputeAndDisplay(visible)
+}
+
+// recomputeAndDisplay recomputes filter counts from visible sessions,
+// applies the current status filter, picks smart defaults on first load,
+// and updates all display components.
+func (m *Model) recomputeAndDisplay(visible []data.Session) {
+	// Compute counts
+	counts := FilterCounts{All: len(visible)}
+	for _, session := range visible {
+		if data.SessionNeedsAttention(session) {
+			counts.Attention++
+		}
+		if data.StatusIsActive(session.Status) || strings.EqualFold(session.Status, "needs-input") {
+			counts.Active++
+		}
+		if strings.EqualFold(session.Status, "completed") {
+			counts.Completed++
+		}
+		if strings.EqualFold(session.Status, "failed") {
+			counts.Failed++
+		}
+	}
+	m.ctx.Counts = counts
+	m.ctx.Error = nil
+
+	m.header.SetCounts(header.FilterCounts{
+		All:       counts.All,
+		Attention: counts.Attention,
+		Active:    counts.Active,
+		Completed: counts.Completed,
+		Failed:    counts.Failed,
+	})
+
+	// On first render, pick the best default tab
+	if !m.initialLoadDone {
+		m.ctx.StatusFilter = smartDefaultFilter(counts)
+	}
+
+	// Apply status filter
+	filtered := visible
+	if m.ctx.StatusFilter != "all" {
+		filtered = []data.Session{}
+		for _, session := range visible {
+			if m.ctx.StatusFilter == "attention" && data.SessionNeedsAttention(session) {
+				filtered = append(filtered, session)
+			} else if m.ctx.StatusFilter == "active" && (data.StatusIsActive(session.Status) || strings.EqualFold(session.Status, "needs-input")) {
+				filtered = append(filtered, session)
+			} else if strings.EqualFold(session.Status, m.ctx.StatusFilter) {
+				filtered = append(filtered, session)
+			}
+		}
+	}
+
+	// Update display components
+	m.taskList.SetLoading(false)
+	m.taskList.SetTasks(filtered)
+	m.taskDetail.SetAllSessions(visible)
+	m.kanban.SetSessions(visible)
+	m.mission.SetSessions(visible)
 }

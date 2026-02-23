@@ -19,7 +19,7 @@ builds:
 archives:
   - id: default
     formats:
-      - binary
+      - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}-{{ .Arch }}"
 
 checksum:

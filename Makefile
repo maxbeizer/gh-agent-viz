@@ -1,4 +1,5 @@
 .PHONY: help check-go-version build run install-local relink-local test test-race coverage smoke ci lint fmt tidy clean
+.DEFAULT_GOAL := help
 
 BINARY ?= bin/gh-agent-viz
 GO ?= go

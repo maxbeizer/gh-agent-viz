@@ -475,6 +475,57 @@ last_activity: "2026-02-15T04:30:00Z"
 	}
 }
 
+func TestFetchLocalSessions_EventsJSONLMtimeRefinesUpdatedAt(t *testing.T) {
+	tmpDir := t.TempDir()
+	sessionDir := filepath.Join(tmpDir, ".copilot", "session-state", "session-active")
+
+	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+		t.Fatalf("failed to create session dir: %v", err)
+	}
+
+	// workspace.yaml with updated_at set 2 hours ago (would appear idle)
+	staleTime := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339)
+	workspace := fmt.Sprintf(`session_id: "session-active"
+title: "Active session"
+updated_at: "%s"
+`, staleTime)
+	if err := os.WriteFile(filepath.Join(sessionDir, "workspace.yaml"), []byte(workspace), 0644); err != nil {
+		t.Fatalf("failed to write workspace file: %v", err)
+	}
+
+	// events.jsonl written just now — proves the session is actively working
+	if err := os.WriteFile(filepath.Join(sessionDir, "events.jsonl"), []byte(`{"type":"tool.execution_start"}`+"\n"), 0644); err != nil {
+		t.Fatalf("failed to write events file: %v", err)
+	}
+
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", originalHome)
+
+	sessions, err := FetchLocalSessions()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+
+	s := sessions[0]
+	if s.Status != "running" {
+		t.Errorf("expected status 'running', got %q", s.Status)
+	}
+	// UpdatedAt should be recent (events.jsonl mtime), not 2 hours stale
+	if time.Since(s.UpdatedAt) > 1*time.Minute {
+		t.Errorf("UpdatedAt should be recent (from events.jsonl mtime), got %v ago", time.Since(s.UpdatedAt))
+	}
+	if !SessionIsActiveNotIdle(s) {
+		t.Error("session should be active-not-idle since events.jsonl was just written")
+	}
+	if s.HasLog != true {
+		t.Error("session should have HasLog=true")
+	}
+}
+
 func TestTruncateTitle(t *testing.T) {
 	tests := []struct {
 		name     string

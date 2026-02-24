@@ -65,10 +65,18 @@ func FetchLocalSessions() ([]Session, error) {
 			continue
 		}
 
-		// Check for events.jsonl to mark log availability
+		// Check for events.jsonl to mark log availability and refine UpdatedAt.
+		// workspace.yaml's updated_at is written once and not continuously
+		// updated, so the file mtime of events.jsonl (which is appended to
+		// during active work) is a better indicator of recent activity.
 		eventsFile := filepath.Join(sessionDir, entry.Name(), "events.jsonl")
 		if info, err := os.Stat(eventsFile); err == nil && info.Size() > 0 {
 			session.HasLog = true
+			if mtime := info.ModTime(); mtime.After(session.UpdatedAt) {
+				session.UpdatedAt = mtime
+				// Re-derive status with the corrected activity time
+				session.Status = DeriveLocalSessionStatus(session.Status, session.UpdatedAt)
+			}
 		}
 
 		sessions = append(sessions, session)

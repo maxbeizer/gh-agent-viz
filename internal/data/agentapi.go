@@ -213,10 +213,31 @@ func normalizeStatus(status string) string {
 	}
 }
 
+// maxRetries is the maximum number of retry attempts for gh CLI commands.
+const maxRetries = 3
+
 func runGH(args ...string) ([]byte, error) {
-	output, err := execCommand("gh", args...).CombinedOutput()
-	if debugEnabled {
-		logDebugEntry(args, output, err)
+	var output []byte
+	var err error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		output, err = execCommand("gh", args...).CombinedOutput()
+		if debugEnabled {
+			logDebugEntry(args, output, err)
+		}
+		if err == nil {
+			return output, nil
+		}
+		// Don't retry on known non-transient errors
+		outStr := string(output)
+		if strings.Contains(outStr, "unknown flag") ||
+			strings.Contains(outStr, "not found") ||
+			strings.Contains(outStr, "session ID is required") {
+			return output, err
+		}
+		if attempt < maxRetries {
+			backoff := time.Duration(1<<uint(attempt)) * 100 * time.Millisecond // 100ms, 200ms, 400ms
+			time.Sleep(backoff)
+		}
 	}
 	return output, err
 }

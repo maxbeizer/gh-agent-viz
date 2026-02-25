@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
@@ -102,6 +104,13 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "x":
 		m.taskList.DismissSelected()
+	case "X":
+		count := m.taskList.DismissCompleted()
+		if count > 0 {
+			m.toast.Push("🧹", "Dismissed", fmt.Sprintf("%d completed session(s) cleared", count))
+		} else {
+			m.toast.Push("ℹ️", "Nothing to dismiss", "no completed sessions found")
+		}
 	case "r":
 		return m, m.fetchTasks
 	case "p":

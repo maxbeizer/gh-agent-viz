@@ -405,6 +405,38 @@ func (m *Model) DismissSelected() {
 	}
 }
 
+// DismissCompleted removes all completed sessions from view and returns the count dismissed.
+func (m *Model) DismissCompleted() int {
+	count := 0
+	for _, s := range m.sessions {
+		if strings.EqualFold(strings.TrimSpace(s.Status), "completed") && s.ID != "" {
+			m.dismissedIDs[s.ID] = struct{}{}
+			if m.dismissedStore != nil {
+				m.dismissedStore.Add(s.ID)
+			}
+			count++
+		}
+	}
+	if count == 0 {
+		return 0
+	}
+	// Rebuild session list without dismissed
+	newSessions := make([]data.Session, 0, len(m.sessions)-count)
+	for _, s := range m.sessions {
+		if _, dismissed := m.dismissedIDs[s.ID]; !dismissed {
+			newSessions = append(newSessions, s)
+		}
+	}
+	m.sessions = newSessions
+	if m.rowCursor >= len(m.sessions) {
+		m.rowCursor = len(m.sessions) - 1
+	}
+	if m.rowCursor < 0 {
+		m.rowCursor = 0
+	}
+	return count
+}
+
 // SelectedTask returns the currently selected session
 func (m Model) SelectedTask() *data.Session {
 	if len(m.sessions) == 0 {

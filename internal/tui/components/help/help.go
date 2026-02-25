@@ -63,6 +63,7 @@ func (m Model) View() string {
 		formatKey("o", "open PR") + "\n" +
 		formatKey("s", "resume session") + "\n" +
 		formatKey("x", "dismiss") + "\n" +
+		formatKey("X", "dismiss all done") + "\n" +
 		formatKey("r", "refresh") + "\n" +
 		formatKey("p", "toggle preview")
 

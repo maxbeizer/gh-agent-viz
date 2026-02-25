@@ -56,6 +56,8 @@ type animationTickMsg struct{}
 
 type logPollTickMsg struct{}
 
+type resizeDebouncedMsg struct{}
+
 type logPollResultMsg struct {
 	log string
 	err error

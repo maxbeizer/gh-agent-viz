@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"strings"
 	"time"
 
@@ -9,6 +12,17 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
 )
+
+// sessionFingerprint returns a hash summarising session IDs, statuses, and
+// update timestamps so callers can cheaply detect whether a refresh actually
+// changed anything.
+func sessionFingerprint(sessions []data.Session) string {
+	h := sha256.New()
+	for _, s := range sessions {
+		fmt.Fprintf(h, "%s|%s|%d\n", s.ID, s.Status, s.UpdatedAt.Unix())
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
 
 // cycleFilter cycles through status filters by delta (+1 forward, -1 backward)
 func (m *Model) cycleFilter(delta int) {
@@ -162,6 +176,22 @@ func isSessionRunning(session *data.Session) bool {
 	return session != nil && data.StatusIsActive(session.Status)
 }
 
+// visibleSessions returns allSessions minus dismissed ones. Used to push
+// fresh data to components when the user switches views.
+func (m Model) visibleSessions() []data.Session {
+	dismissedIDs := map[string]struct{}{}
+	if m.dismissedStore != nil {
+		dismissedIDs = m.dismissedStore.IDs()
+	}
+	visible := make([]data.Session, 0, len(m.allSessions))
+	for _, s := range m.allSessions {
+		if _, dismissed := dismissedIDs[s.ID]; !dismissed {
+			visible = append(visible, s)
+		}
+	}
+	return visible
+}
+
 func (m Model) refreshCmd() tea.Cmd {
 	return tea.Tick(m.refreshInt, func(time.Time) tea.Msg {
 		return refreshTickMsg{}
@@ -246,8 +276,16 @@ func (m *Model) enrichTokenUsage(usage map[string]*data.TokenUsage) {
 
 // recomputeAndDisplay recomputes filter counts from visible sessions,
 // applies the current status filter, picks smart defaults on first load,
-// and updates all display components.
+// and updates all display components. Skips component updates when the
+// session data has not changed (fingerprint match).
 func (m *Model) recomputeAndDisplay(visible []data.Session) {
+	// Fast-path: skip when data and active filter haven't changed
+	fp := sessionFingerprint(visible) + "|" + m.ctx.StatusFilter
+	unchanged := m.lastFingerprint == fp && m.initialLoadDone
+	if !unchanged {
+		m.lastFingerprint = fp
+	}
+
 	// Compute counts
 	counts := FilterCounts{All: len(visible)}
 	for _, session := range visible {
@@ -280,6 +318,12 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 		m.ctx.StatusFilter = smartDefaultFilter(counts)
 	}
 
+	// If data is unchanged, counts/header are still fresh — skip the
+	// expensive per-component SetTasks / SetSessions calls.
+	if unchanged {
+		return
+	}
+
 	// Apply status filter
 	filtered := visible
 	if m.ctx.StatusFilter != "all" {
@@ -295,10 +339,17 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 		}
 	}
 
-	// Update display components
+	// Update display components — only push data to the active view to avoid
+	// wasted work on invisible components. They'll receive fresh data when
+	// the user switches to them.
 	m.taskList.SetLoading(false)
 	m.taskList.SetTasks(filtered)
-	m.taskDetail.SetAllSessions(visible)
-	m.kanban.SetSessions(visible)
-	m.mission.SetSessions(visible)
+	switch m.viewMode {
+	case ViewModeKanban:
+		m.kanban.SetSessions(visible)
+	case ViewModeMission:
+		m.mission.SetSessions(visible)
+	default:
+		m.taskDetail.SetAllSessions(visible)
+	}
 }

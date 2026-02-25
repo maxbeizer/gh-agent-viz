@@ -65,6 +65,7 @@ type Model struct {
 	demo         bool
 	allSessions  []data.Session // accumulated across load phases
 	initialLoadDone bool       // true after all initial load phases complete
+	lastFingerprint string     // hash of session data; used to skip no-op refreshes
 }
 
 // NewModel creates a new TUI model
@@ -157,14 +158,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ctx.Width = msg.Width
 		m.ctx.Height = msg.Height
 		m.header.SetSize(msg.Width, msg.Height)
-		m.logView.SetSize(msg.Width-4, msg.Height-8)
-		m.toolTimeline.SetSize(msg.Width-4, msg.Height-8)
-		m.conversationView.SetSize(msg.Width-4, msg.Height-8)
-		m.diffView.SetSize(msg.Width-4, msg.Height-8)
 		m.help.SetSize(msg.Width, msg.Height)
-		m.mission.SetSize(msg.Width, msg.Height-4)
 		m.updateSplitLayout()
 		m.ready = true
+		// Debounce heavy component resizes (logview, diffview, etc.)
+		// so rapid resize events don't each trigger a full re-render.
+		return m, tea.Tick(
+			50*time.Millisecond,
+			func(time.Time) tea.Msg { return resizeDebouncedMsg{} },
+		)
+
+	case resizeDebouncedMsg:
+		m.logView.SetSize(m.ctx.Width-4, m.ctx.Height-8)
+		m.toolTimeline.SetSize(m.ctx.Width-4, m.ctx.Height-8)
+		m.conversationView.SetSize(m.ctx.Width-4, m.ctx.Height-8)
+		m.diffView.SetSize(m.ctx.Width-4, m.ctx.Height-8)
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -210,9 +220,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		m.taskList.SetLoading(false)
 		m.taskList.SetTasks(msg.tasks)
-		m.taskDetail.SetAllSessions(msg.allSessions)
-		m.kanban.SetSessions(msg.allSessions)
-		m.mission.SetSessions(msg.allSessions)
+		// Only push to the active secondary view
+		switch m.viewMode {
+		case ViewModeKanban:
+			m.kanban.SetSessions(msg.allSessions)
+		case ViewModeMission:
+			m.mission.SetSessions(msg.allSessions)
+		default:
+			m.taskDetail.SetAllSessions(msg.allSessions)
+		}
 
 		// Detect status changes and push toasts (skip first load)
 		if m.prevSessions != nil {

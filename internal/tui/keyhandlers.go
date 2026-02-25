@@ -140,10 +140,12 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "K":
 		m.viewMode = ViewModeKanban
+		m.kanban.SetSessions(m.visibleSessions())
 		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
 	case "M":
 		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
 		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
 	case "!":

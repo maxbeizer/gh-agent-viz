@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -38,9 +39,48 @@ type responseBlock struct {
 
 var sessionFlushRe = regexp.MustCompile(`Flushed \d+ events to session ([0-9a-fA-F-]{36})`)
 
+var (
+	tokenUsageCache     map[string]*TokenUsage
+	tokenUsageCacheTime time.Time
+	tokenUsageCacheTTL  = 60 * time.Second
+	tokenUsageCacheMu   sync.Mutex
+)
+
 // FetchTokenUsage parses recent Copilot CLI log files and returns per-session
-// token usage. Only files modified in the last 7 days are parsed.
+// token usage. Results are cached for 60 seconds.
 func FetchTokenUsage() (map[string]*TokenUsage, error) {
+	tokenUsageCacheMu.Lock()
+	defer tokenUsageCacheMu.Unlock()
+
+	if tokenUsageCache != nil && time.Since(tokenUsageCacheTime) < tokenUsageCacheTTL {
+		// Return a copy so callers can safely mutate without corrupting the cache.
+		out := make(map[string]*TokenUsage, len(tokenUsageCache))
+		for k, v := range tokenUsageCache {
+			dup := *v
+			out[k] = &dup
+		}
+		return out, nil
+	}
+
+	usage, err := fetchTokenUsageUncached()
+	if err != nil {
+		return nil, err
+	}
+	tokenUsageCache = usage
+	tokenUsageCacheTime = time.Now()
+	return usage, nil
+}
+
+// ResetTokenUsageCache clears the token usage cache, forcing the next
+// FetchTokenUsage call to re-parse log files. Exported for testing.
+func ResetTokenUsageCache() {
+	tokenUsageCacheMu.Lock()
+	defer tokenUsageCacheMu.Unlock()
+	tokenUsageCache = nil
+	tokenUsageCacheTime = time.Time{}
+}
+
+func fetchTokenUsageUncached() (map[string]*TokenUsage, error) {
 	return fetchTokenUsageFromDir(defaultLogDir())
 }
 

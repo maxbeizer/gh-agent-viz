@@ -386,6 +386,7 @@ updated_at: %q
 }
 
 func TestFetchLocalSessions_NoDirectory(t *testing.T) {
+	ResetLocalSessionCache()
 	// Override home dir to a temp location without .copilot
 	tmpDir := t.TempDir()
 	originalHome := os.Getenv("HOME")
@@ -403,6 +404,7 @@ func TestFetchLocalSessions_NoDirectory(t *testing.T) {
 }
 
 func TestFetchLocalSessions_WithSessions(t *testing.T) {
+	ResetLocalSessionCache()
 	tmpDir := t.TempDir()
 	sessionDir := filepath.Join(tmpDir, ".copilot", "session-state")
 
@@ -476,6 +478,7 @@ last_activity: "2026-02-15T04:30:00Z"
 }
 
 func TestFetchLocalSessions_EventsJSONLMtimeRefinesUpdatedAt(t *testing.T) {
+	ResetLocalSessionCache()
 	tmpDir := t.TempDir()
 	sessionDir := filepath.Join(tmpDir, ".copilot", "session-state", "session-active")
 

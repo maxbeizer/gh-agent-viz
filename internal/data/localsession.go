@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -31,8 +32,46 @@ type LocalSessionWorkspace struct {
 	ConversationHistory []map[string]interface{} `yaml:"conversation_history"`
 }
 
+var (
+	localSessionCache     []Session
+	localSessionCacheTime time.Time
+	localSessionCacheTTL  = 15 * time.Second
+	localSessionCacheMu   sync.Mutex
+)
+
+// ResetLocalSessionCache clears the local session cache, forcing the next
+// FetchLocalSessions call to re-read from disk. Exported for testing.
+func ResetLocalSessionCache() {
+	localSessionCacheMu.Lock()
+	defer localSessionCacheMu.Unlock()
+	localSessionCache = nil
+	localSessionCacheTime = time.Time{}
+}
+
 // FetchLocalSessions retrieves local Copilot CLI sessions from ~/.copilot/session-state/
+// Results are cached for 15 seconds.
 func FetchLocalSessions() ([]Session, error) {
+	localSessionCacheMu.Lock()
+	defer localSessionCacheMu.Unlock()
+
+	if localSessionCache != nil && time.Since(localSessionCacheTime) < localSessionCacheTTL {
+		// Return a copy so callers can safely mutate without corrupting the cache.
+		out := make([]Session, len(localSessionCache))
+		copy(out, localSessionCache)
+		return out, nil
+	}
+
+	sessions, err := fetchLocalSessionsUncached()
+	if err != nil {
+		return nil, err
+	}
+	localSessionCache = sessions
+	localSessionCacheTime = time.Now()
+	return sessions, nil
+}
+
+// fetchLocalSessionsUncached retrieves local Copilot CLI sessions from ~/.copilot/session-state/
+func fetchLocalSessionsUncached() ([]Session, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)

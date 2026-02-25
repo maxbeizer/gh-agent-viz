@@ -9,16 +9,36 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// maxLogBytes caps the raw log content retained in memory.
+// Content beyond this limit is truncated from the beginning.
+const maxLogBytes = 2 * 1024 * 1024 // 2 MB
+
+// truncateLog keeps the tail of content when it exceeds maxLogBytes.
+func truncateLog(content string) string {
+	if len(content) <= maxLogBytes {
+		return content
+	}
+	// Find the first newline after the cut point to avoid splitting a line
+	cut := len(content) - maxLogBytes
+	if idx := strings.Index(content[cut:], "\n"); idx >= 0 {
+		cut += idx + 1
+	}
+	return "... (truncated) ...\n" + content[cut:]
+}
+
 // Model represents the log view component state
 type Model struct {
-	titleStyle  lipgloss.Style
-	viewport    viewport.Model
-	rawContent  string // Original unrendered content
-	content     string // Rendered content currently displayed
-	lineCount   int    // Cache line count for performance
-	ready       bool
-	followMode  bool // whether auto-scroll is active
-	liveSession bool // whether the session is running (enables LIVE indicator)
+	titleStyle     lipgloss.Style
+	viewport       viewport.Model
+	rawContent     string // Original unrendered content (may be truncated)
+	rawLen         int    // Length of original content before truncation
+	content        string // Rendered content currently displayed
+	lineCount      int    // Cache line count for performance
+	ready          bool
+	followMode     bool // whether auto-scroll is active
+	liveSession    bool // whether the session is running (enables LIVE indicator)
+	cachedRenderer *glamour.TermRenderer // reusable renderer
+	cachedWidth    int                    // width the renderer was built for
 }
 
 // New creates a new log view model
@@ -72,8 +92,10 @@ func (m Model) View() string {
 
 // SetContent updates the log content
 func (m *Model) SetContent(content string) {
+	m.rawLen = len(content)
+	content = truncateLog(content)
 	m.rawContent = content
-	rendered := renderMarkdown(content, m.viewport.Width)
+	rendered := m.renderWithCache(content)
 	m.content = rendered
 	m.lineCount = len(strings.Split(rendered, "\n"))
 	m.viewport.SetContent(rendered)
@@ -85,7 +107,7 @@ func (m *Model) SetSize(width, height int) {
 	m.viewport.Width = width
 	m.viewport.Height = height
 	if m.rawContent != "" {
-		rendered := renderMarkdown(m.rawContent, width)
+		rendered := m.renderWithCache(m.rawContent)
 		m.content = rendered
 		m.lineCount = len(strings.Split(rendered, "\n"))
 		m.viewport.SetContent(rendered)
@@ -106,6 +128,31 @@ func renderMarkdown(content string, width int) string {
 		return content
 	}
 	rendered, err := renderer.Render(content)
+	if err != nil {
+		return content
+	}
+	return strings.TrimRight(rendered, "\n")
+}
+
+// renderWithCache renders markdown using a cached glamour renderer,
+// re-creating it only when the viewport width changes.
+func (m *Model) renderWithCache(content string) string {
+	width := m.viewport.Width
+	if width <= 0 {
+		width = 80
+	}
+	if m.cachedRenderer == nil || m.cachedWidth != width {
+		r, err := glamour.NewTermRenderer(
+			glamour.WithAutoStyle(),
+			glamour.WithWordWrap(width),
+		)
+		if err != nil {
+			return content
+		}
+		m.cachedRenderer = r
+		m.cachedWidth = width
+	}
+	rendered, err := m.cachedRenderer.Render(content)
 	if err != nil {
 		return content
 	}
@@ -177,12 +224,15 @@ func (m Model) IsLive() bool {
 }
 
 // AppendOrReplace updates log content if the new content is longer than the
-// current content (poll-and-replace strategy). When followMode is true it
-// auto-scrolls to the bottom.
+// current raw content (poll-and-replace strategy). The comparison uses the
+// incoming content length before truncation so that growing logs are always
+// accepted even after the buffer has been capped.
+// When followMode is true it auto-scrolls to the bottom.
 func (m *Model) AppendOrReplace(content string) {
-	if len(content) <= len(m.rawContent) {
+	if len(content) <= m.rawLen {
 		return
 	}
+	m.rawLen = len(content)
 	m.SetContent(content)
 	if m.followMode {
 		m.viewport.GotoBottom()

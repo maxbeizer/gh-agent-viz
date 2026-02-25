@@ -180,20 +180,23 @@ func (m Model) logPollTick() tea.Cmd {
 	})
 }
 
-// mergeSessions adds new sessions to the model, deduplicating by ID,
-// then recomputes counts and applies the current filter.
+// mergeSessions merges new sessions into the model by updating existing
+// entries in-place and appending truly new ones, then recomputes counts
+// and applies the current filter.
 func (m *Model) mergeSessions(newSessions []data.Session) {
-	// Build set of existing IDs
-	existing := map[string]struct{}{}
-	for _, s := range m.allSessions {
-		existing[s.ID] = struct{}{}
+	// Build index of existing sessions by ID
+	existingIdx := map[string]int{}
+	for i, s := range m.allSessions {
+		existingIdx[s.ID] = i
 	}
 
-	// Add non-duplicate sessions
+	// Update existing, append new
 	for _, s := range newSessions {
-		if _, ok := existing[s.ID]; !ok {
+		if idx, ok := existingIdx[s.ID]; ok {
+			m.allSessions[idx] = s // update in place
+		} else {
 			m.allSessions = append(m.allSessions, s)
-			existing[s.ID] = struct{}{}
+			existingIdx[s.ID] = len(m.allSessions) - 1
 		}
 	}
 

@@ -26,6 +26,7 @@ type Keybindings struct {
 	ShowHelp       key.Binding
 	OpenRepo       key.Binding
 	FileIssue      key.Binding
+	MassDismiss    key.Binding
 }
 
 // NewKeybindings creates the default key bindings for the TUI
@@ -118,6 +119,10 @@ func NewKeybindings() Keybindings {
 		FileIssue: key.NewBinding(
 			key.WithKeys("@"),
 			key.WithHelp("@", "file tool issue"),
+		),
+		MassDismiss: key.NewBinding(
+			key.WithKeys("X"),
+			key.WithHelp("X", "dismiss done"),
 		),
 	}
 }

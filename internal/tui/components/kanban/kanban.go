@@ -103,30 +103,16 @@ func (m *Model) SetSessions(sessions []data.Session) {
 			}
 		}
 	}
-	// Cap Done column to most recent 10, show total in title
-	for i := range cols {
-		if cols[i].Status == "done" && len(cols[i].Sessions) > 10 {
-			total := len(cols[i].Sessions)
-			cols[i].Sessions = cols[i].Sessions[:10]
-			cols[i].Title = fmt.Sprintf("DONE (%d total)", total)
-		}
-	}
 	m.columns = cols
 	m.clampCursors()
 }
 
-// MoveColumn moves the column cursor by delta (negative = left, positive = right).
+// MoveColumn moves the column cursor by delta, wrapping around.
 func (m *Model) MoveColumn(delta int) {
 	if len(m.columns) == 0 {
 		return
 	}
-	m.colCursor += delta
-	if m.colCursor < 0 {
-		m.colCursor = 0
-	}
-	if m.colCursor >= len(m.columns) {
-		m.colCursor = len(m.columns) - 1
-	}
+	m.colCursor = (m.colCursor + delta + len(m.columns)) % len(m.columns)
 	// Clamp row cursor to new column
 	m.clampRowCursor()
 }

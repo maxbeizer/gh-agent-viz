@@ -64,7 +64,7 @@ func TestSetSessions_DistributesIntoColumns(t *testing.T) {
 	}
 }
 
-func TestMoveColumn_ClampsAtBounds(t *testing.T) {
+func TestMoveColumn_WrapsAround(t *testing.T) {
 	m := newTestModel()
 	m.SetSessions(testSessions())
 
@@ -72,19 +72,16 @@ func TestMoveColumn_ClampsAtBounds(t *testing.T) {
 		t.Fatalf("expected initial column cursor 0, got %d", m.ColCursor())
 	}
 
+	// Wraps backward from 0 to last column
 	m.MoveColumn(-1)
-	if m.ColCursor() != 0 {
-		t.Errorf("expected column cursor clamped at 0, got %d", m.ColCursor())
-	}
-
-	m.MoveColumn(1)
-	if m.ColCursor() != 1 {
-		t.Errorf("expected column cursor 1, got %d", m.ColCursor())
-	}
-
-	m.MoveColumn(10)
 	if m.ColCursor() != 2 {
-		t.Errorf("expected column cursor clamped at 2, got %d", m.ColCursor())
+		t.Errorf("expected column cursor wrapped to 2, got %d", m.ColCursor())
+	}
+
+	// Wraps forward from last to 0
+	m.MoveColumn(1)
+	if m.ColCursor() != 0 {
+		t.Errorf("expected column cursor wrapped to 0, got %d", m.ColCursor())
 	}
 }
 

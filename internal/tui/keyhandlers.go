@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -417,7 +418,17 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.fetchTaskDetail(session.ID, session.Repository)
 		}
 	case "X":
-		count := m.taskList.DismissCompleted()
+		// Dismiss completed/failed sessions from all sessions
+		count := 0
+		if m.dismissedStore != nil {
+			for _, s := range m.allSessions {
+				status := strings.ToLower(strings.TrimSpace(s.Status))
+				if status == "completed" || status == "failed" {
+					m.dismissedStore.Add(s.ID)
+					count++
+				}
+			}
+		}
 		if count > 0 {
 			m.toast.Push("🧹", "Dismissed", fmt.Sprintf("%d completed session(s) cleared", count))
 			m.kanban.SetSessions(m.visibleSessions())

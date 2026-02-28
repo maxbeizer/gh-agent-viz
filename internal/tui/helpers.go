@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/statsbar"
 )
 
 // sessionFingerprint returns a hash summarising session IDs, statuses, and
@@ -316,6 +317,21 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 		Active:    counts.Active,
 		Completed: counts.Completed,
 		Failed:    counts.Failed,
+	})
+
+	// Update stats bar with aggregate metrics
+	totalTokens := int64(0)
+	for _, session := range visible {
+		if session.Telemetry != nil {
+			totalTokens += session.Telemetry.InputTokens
+		}
+	}
+	m.statsBar.SetCounts(statsbar.Counts{
+		Active:      counts.Active,
+		Attention:   counts.Attention,
+		Warning:     counts.Warning,
+		Completed:   counts.Completed,
+		TotalTokens: totalTokens,
 	})
 
 	// On first render, pick the best default tab

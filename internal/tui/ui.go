@@ -21,6 +21,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/tasklist"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/toast"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/tooltimeline"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/statsbar"
 )
 
 // ViewMode represents the current view mode
@@ -53,6 +54,7 @@ type Model struct {
 	conversationView conversation.Model
 	mission        mission.Model
 	dismissedStore *data.DismissedStore
+	statsBar       statsbar.Model
 	viewMode       ViewMode
 	showConversation bool // true when conversation bubble view is active in log mode
 	showPreview  bool
@@ -128,6 +130,7 @@ func NewModel(repo string, debug bool, demo bool) Model {
 		conversationView: conversation.New(80, 20),
 		mission:        mission.New(theme.Title, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
 		dismissedStore: dismissedStore,
+		statsBar:       statsbar.New(),
 		viewMode:    ViewModeList,
 		showPreview: false,
 		ready:       false,
@@ -159,6 +162,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ctx.Height = msg.Height
 		m.header.SetSize(msg.Width, msg.Height)
 		m.help.SetSize(msg.Width, msg.Height)
+		m.statsBar.SetWidth(msg.Width)
 		m.updateSplitLayout()
 		m.ready = true
 		// Debounce heavy component resizes (logview, diffview, etc.)
@@ -352,6 +356,7 @@ func (m Model) View() string {
 	m.updateFooterHints()
 
 	headerView := m.header.View()
+	statsBarView := m.statsBar.View()
 	footerView := m.footer.View()
 
 	var mainView string
@@ -396,7 +401,7 @@ func (m Model) View() string {
 		toastView = "\n" + m.toast.View()
 	}
 
-	result := headerView + mainView + toastView + footerView
+	result := headerView + statsBarView + "\n" + mainView + toastView + footerView
 
 	// Overlay help panel when visible
 	if m.help.Visible() {

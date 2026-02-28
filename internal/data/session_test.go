@@ -205,13 +205,8 @@ func TestSessionAttentionLevel(t *testing.T) {
 			want:    AttentionUrgent,
 		},
 		{
-			name:    "running idle 5h is warning",
+			name:    "running idle 5h is none (no idle warnings)",
 			session: Session{Status: "running", UpdatedAt: time.Now().Add(-5 * time.Hour)},
-			want:    AttentionWarning,
-		},
-		{
-			name:    "running idle 3h is none (below 4h threshold)",
-			session: Session{Status: "running", UpdatedAt: time.Now().Add(-3 * time.Hour)},
 			want:    AttentionNone,
 		},
 		{
@@ -220,9 +215,9 @@ func TestSessionAttentionLevel(t *testing.T) {
 			want:    AttentionNone,
 		},
 		{
-			name:    "queued 45min is warning",
+			name:    "queued 45min is none (no queued warnings)",
 			session: Session{Status: "queued", CreatedAt: time.Now().Add(-45 * time.Minute)},
-			want:    AttentionWarning,
+			want:    AttentionNone,
 		},
 		{
 			name:    "queued 5min is none",
@@ -235,12 +230,7 @@ func TestSessionAttentionLevel(t *testing.T) {
 			want:    AttentionNone,
 		},
 		{
-			name:    "active idle exactly 4h is warning",
-			session: Session{Status: "active", UpdatedAt: time.Now().Add(-IdleWarningThreshold)},
-			want:    AttentionWarning,
-		},
-		{
-			name:    "running idle 25h is abandoned not warning",
+			name:    "running idle 25h is none",
 			session: Session{Status: "running", UpdatedAt: time.Now().Add(-25 * time.Hour)},
 			want:    AttentionNone,
 		},
@@ -261,9 +251,9 @@ func TestSessionNeedsAnyAttention(t *testing.T) {
 	if !SessionNeedsAnyAttention(Session{Status: "failed"}) {
 		t.Fatal("failed should need any attention")
 	}
-	// Warning → true
-	if !SessionNeedsAnyAttention(Session{Status: "running", UpdatedAt: time.Now().Add(-5 * time.Hour)}) {
-		t.Fatal("idle running should need any attention")
+	// Warning → no longer triggers (idle warnings removed)
+	if SessionNeedsAnyAttention(Session{Status: "running", UpdatedAt: time.Now().Add(-5 * time.Hour)}) {
+		t.Fatal("idle running should not need attention")
 	}
 	// None → false
 	if SessionNeedsAnyAttention(Session{Status: "completed"}) {

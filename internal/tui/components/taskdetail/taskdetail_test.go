@@ -163,17 +163,14 @@ func TestAttentionReason_Idle_NoLongerAttention(t *testing.T) {
 	}
 }
 
-func TestAttentionReason_Stale_ShowsWarning(t *testing.T) {
+func TestAttentionReason_Stale_NoWarning(t *testing.T) {
 	s := &data.Session{
 		Status:    "running",
 		UpdatedAt: time.Now().Add(-5 * time.Hour),
 	}
 	got := attentionReason(s)
-	if got == "" {
-		t.Fatalf("stale running sessions should show warning, got empty string")
-	}
-	if !strings.Contains(got, "🟡") {
-		t.Fatalf("expected warning indicator 🟡, got %q", got)
+	if got != "" {
+		t.Fatalf("stale running sessions should not show attention, got %q", got)
 	}
 }
 

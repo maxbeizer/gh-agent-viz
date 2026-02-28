@@ -123,24 +123,6 @@ func SessionAttentionLevel(session Session) AttentionLevel {
 		return AttentionUrgent
 	}
 
-	// Warning: running but idle too long (possibly stuck)
-	// Sessions idle >24h are likely abandoned, not stuck — skip them
-	if StatusIsActive(session.Status) && status != "queued" {
-		if !session.UpdatedAt.IsZero() {
-			idle := time.Since(session.UpdatedAt)
-			if idle >= IdleWarningThreshold && idle < AttentionStaleMax {
-				return AttentionWarning
-			}
-		}
-	}
-
-	// Warning: queued too long
-	if status == "queued" {
-		if !session.CreatedAt.IsZero() && time.Since(session.CreatedAt) >= QueuedWarningThreshold {
-			return AttentionWarning
-		}
-	}
-
 	return AttentionNone
 }
 

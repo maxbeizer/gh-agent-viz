@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/maxbeizer/gh-agent-viz/internal/data/capi"
 )
 
 // TestHelperProcess mocks the gh CLI command for testing
@@ -155,7 +157,18 @@ func createMockExecCommand(testScenario string) func(string, ...string) *exec.Cm
 	}
 }
 
+// disableCAPI returns a cleanup function. While active, CAPI calls fail
+// immediately so the CLI fallback path is exercised.
+func disableCAPI() func() {
+	orig := newCAPIClient
+	newCAPIClient = func() (*capi.Client, error) {
+		return nil, fmt.Errorf("capi disabled in test")
+	}
+	return func() { newCAPIClient = orig }
+}
+
 func TestFetchAgentTasks_ValidJSON(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 
@@ -186,6 +199,7 @@ func TestFetchAgentTasks_ValidJSON(t *testing.T) {
 }
 
 func TestFetchAgentTasks_EmptyList(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 
@@ -202,6 +216,7 @@ func TestFetchAgentTasks_EmptyList(t *testing.T) {
 }
 
 func TestFetchAgentTasks_InvalidJSON(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 
@@ -214,6 +229,7 @@ func TestFetchAgentTasks_InvalidJSON(t *testing.T) {
 }
 
 func TestFetchAgentTasks_CommandError(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 
@@ -226,6 +242,7 @@ func TestFetchAgentTasks_CommandError(t *testing.T) {
 }
 
 func TestFetchAgentTasks_RepoScoping(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 
@@ -246,6 +263,7 @@ func TestFetchAgentTasks_RepoScoping(t *testing.T) {
 }
 
 func TestFetchAgentTasks_NoRepoScoping(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 
@@ -266,6 +284,7 @@ func TestFetchAgentTasks_NoRepoScoping(t *testing.T) {
 }
 
 func TestFetchAgentTaskDetail_ValidData(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 
@@ -291,6 +310,7 @@ func TestFetchAgentTaskDetail_ValidData(t *testing.T) {
 }
 
 func TestFetchAgentTaskDetail_CommandError(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 
@@ -303,6 +323,7 @@ func TestFetchAgentTaskDetail_CommandError(t *testing.T) {
 }
 
 func TestFetchAgentTaskLog_ValidData(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 
@@ -323,6 +344,7 @@ func TestFetchAgentTaskLog_ValidData(t *testing.T) {
 }
 
 func TestFetchAgentTaskLog_CommandError(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 
@@ -335,6 +357,7 @@ func TestFetchAgentTaskLog_CommandError(t *testing.T) {
 }
 
 func TestFetchPRDiff_ValidData(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 
@@ -366,6 +389,7 @@ func TestFetchPRDiff_InvalidInputs(t *testing.T) {
 }
 
 func TestFetchPRDiff_CommandError(t *testing.T) {
+	defer disableCAPI()()
 	originalExecCommand := execCommand
 	defer func() { execCommand = originalExecCommand }()
 

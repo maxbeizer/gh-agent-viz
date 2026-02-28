@@ -70,21 +70,24 @@ For interactive visualization, a **`gh` CLI extension** is the correct approach 
 - Powerful flag and subcommand support
 - Auto-generated help documentation
 
-### Data Source: Shell Out to `gh agent-task`
+### Data Source: Direct Copilot API with CLI Fallback
 
-**Decision:** Fetch data by executing `gh agent-task` commands with the `--json` flag.
+**Decision:** Fetch data primarily via direct HTTP calls to the Copilot API (`api.githubcopilot.com`), falling back to `gh agent-task` CLI commands if CAPI auth fails.
 
-**Available Commands:**
+**Primary — Copilot API (CAPI):**
+- Direct HTTP to `api.githubcopilot.com` using the user's `gh auth` OAuth token (Bearer `gho_` prefix)
+- Required headers: `Copilot-Integration-Id: copilot-4-cli`, `X-GitHub-Api-Version: 2026-01-09`
+- Implemented in `internal/data/capi/` (client.go, types.go, sessions.go)
+
+**Fallback — CLI:**
 - `gh agent-task list` - Lists recent agent sessions with status, repo, and timestamps
 - `gh agent-task view <id> --log` - Shows event log for a session
 - `gh agent-task view <id> --log --follow` - Streams live logs
 
 **Rationale:**
-- No dedicated REST API endpoint exists yet for agent sessions
-- `gh` CLI provides the only programmatic access
+- Direct CAPI provides structured JSON with all API fields available, faster responses, and no text parsing
+- CLI fallback ensures the tool still works if the user's token lacks CAPI scopes
 - Authentication is free via `go-gh` library (picks up user's `gh auth` token)
-- JSON output is structured and parseable
-- Forward compatible - when/if a REST API appears, we can switch to `go-gh` REST client
 
 ### Distribution: `gh extension install`
 
@@ -147,7 +150,7 @@ gh agent-viz --repo owner/repo
 
 ### Direct REST API Calls
 
-**Why not:** No dedicated REST API endpoint exists for agent sessions yet.
+**Why not (standalone):** The Copilot API is now the primary data source (see above), but a CLI fallback is retained for auth-edge cases.
 
 **When it makes sense:** Future enhancement when GitHub provides a proper API endpoint.
 
@@ -155,10 +158,7 @@ gh agent-viz --repo owner/repo
 
 ### When a REST API Becomes Available
 
-If/when GitHub adds a dedicated REST API endpoint for agent sessions, we should:
-1. Switch from shelling out to using `go-gh` REST client directly
-2. Gain better error handling and structured responses
-3. Potentially get real-time updates via webhooks or polling
+The primary data path now uses the Copilot API (`api.githubcopilot.com`) directly. If GitHub introduces a separate dedicated REST API endpoint for agent sessions, we should evaluate migrating to it for broader compatibility.
 
 ### Live Log Streaming
 
@@ -173,7 +173,7 @@ We could create a plugin that provides:
 - MCP tool wrapper around the same data layer
 - Conversational queries alongside the TUI
 - Example: "What agent sessions are currently running?"
-- Would use the same underlying `gh agent-task` commands
+- Would use the same underlying CAPI client or `gh agent-task` commands
 
 ### Configuration Enhancements
 
@@ -193,7 +193,8 @@ gh-agent-viz/
 │   └── root.go              # Cobra root command
 ├── internal/
 │   ├── data/
-│   │   └── agentapi.go      # Data fetching layer
+│   │   ├── agentapi.go      # Data fetching layer (orchestrates CAPI + CLI fallback)
+│   │   └── capi/            # Direct Copilot API client
 │   ├── config/
 │   │   └── config.go        # Configuration parsing
 │   └── tui/
@@ -216,9 +217,14 @@ gh-agent-viz/
 
 ## Key Patterns from gh-dash
 
-### Data Fetching via Shell Commands
+### Data Fetching via Copilot API (Primary) with CLI Fallback
 
 ```go
+// Primary: direct CAPI call (internal/data/capi/)
+client := capi.NewClient(token)
+sessions, err := client.ListSessions(ctx)
+
+// Fallback: shell out to gh agent-task
 cmd := exec.Command("gh", "agent-task", "list", "--json")
 output, err := cmd.Output()
 ```

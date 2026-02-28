@@ -18,13 +18,15 @@ This project is a terminal-side control surface for Copilot workflows. Security 
 ## Threat Surface
 
 - Parsing local session metadata (`~/.copilot/session-state`)
-- Running shell commands (`gh agent-task`, `gh pr`, `gh copilot`)
+- Direct HTTP calls to the Copilot API (`api.githubcopilot.com`) using Bearer token auth
+- Running shell commands (`gh agent-task`, `gh pr`, `gh copilot`) as CLI fallback
 - Rendering user-controlled text in TUI
 - Future telemetry/analytics integrations
 
 ## Required Engineering Practices
 
-- Use `exec.Command` with argument arrays; avoid command string interpolation.
+- Use `exec.Command` with argument arrays in CLI fallback paths; avoid command string interpolation.
+- CAPI Bearer tokens (`gho_` prefix) must never be logged, printed, or persisted; they are used only in-memory for HTTP requests.
 - Validate IDs/URLs before using them for actions such as resume/open.
 - Handle malformed files and command failures without panics.
 - Keep actionable errors user-facing and avoid leaking sensitive payloads.

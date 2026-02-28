@@ -205,9 +205,14 @@ func TestSessionAttentionLevel(t *testing.T) {
 			want:    AttentionUrgent,
 		},
 		{
-			name:    "running idle 3h is warning",
-			session: Session{Status: "running", UpdatedAt: time.Now().Add(-3 * time.Hour)},
+			name:    "running idle 5h is warning",
+			session: Session{Status: "running", UpdatedAt: time.Now().Add(-5 * time.Hour)},
 			want:    AttentionWarning,
+		},
+		{
+			name:    "running idle 3h is none (below 4h threshold)",
+			session: Session{Status: "running", UpdatedAt: time.Now().Add(-3 * time.Hour)},
+			want:    AttentionNone,
 		},
 		{
 			name:    "running idle 5min is none",
@@ -230,7 +235,7 @@ func TestSessionAttentionLevel(t *testing.T) {
 			want:    AttentionNone,
 		},
 		{
-			name:    "active idle exactly 2h is warning",
+			name:    "active idle exactly 4h is warning",
 			session: Session{Status: "active", UpdatedAt: time.Now().Add(-IdleWarningThreshold)},
 			want:    AttentionWarning,
 		},
@@ -252,7 +257,7 @@ func TestSessionNeedsAnyAttention(t *testing.T) {
 		t.Fatal("failed should need any attention")
 	}
 	// Warning → true
-	if !SessionNeedsAnyAttention(Session{Status: "running", UpdatedAt: time.Now().Add(-3 * time.Hour)}) {
+	if !SessionNeedsAnyAttention(Session{Status: "running", UpdatedAt: time.Now().Add(-5 * time.Hour)}) {
 		t.Fatal("idle running should need any attention")
 	}
 	// None → false

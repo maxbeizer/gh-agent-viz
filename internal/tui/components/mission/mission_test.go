@@ -158,8 +158,8 @@ func TestViewRendersSummary(t *testing.T) {
 		t.Fatal("expected repo owner/docs in view")
 	}
 	// Should show aggregate stats
-	if !strings.Contains(view, "in progress") {
-		t.Fatal("expected 'in progress' in summary")
+	if !strings.Contains(view, "active") {
+		t.Fatal("expected 'active' in summary")
 	}
 	if !strings.Contains(view, "done") {
 		t.Fatal("expected 'done' in summary")
@@ -291,8 +291,8 @@ func TestView_AttentionSectionWithNeedsInput(t *testing.T) {
 		{ID: "1", Status: "needs-input", Title: "Waiting task", Repository: "owner/repo", Source: data.SourceAgentTask, UpdatedAt: now},
 	})
 	view := m.View()
-	if !strings.Contains(view, "Needs your attention") {
-		t.Fatal("expected 'Needs your attention' section when needs-input session exists")
+	if !strings.Contains(view, "Attention") {
+		t.Fatal("expected 'Attention' section when needs-input session exists")
 	}
 }
 

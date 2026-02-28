@@ -108,7 +108,7 @@ func (l AttentionLevel) String() string {
 
 // IdleWarningThreshold is how long a running session can be idle before
 // it's considered a warning (possibly stuck).
-const IdleWarningThreshold = 2 * time.Hour
+const IdleWarningThreshold = 4 * time.Hour
 
 // QueuedWarningThreshold is how long a queued session can wait before
 // it's considered a warning.

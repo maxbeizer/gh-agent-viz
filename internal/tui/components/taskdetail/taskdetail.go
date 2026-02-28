@@ -258,7 +258,7 @@ func attentionReason(session *data.Session) string {
 		if status == "queued" {
 			return "🟡 This session has been queued for a while — it may need investigation."
 		}
-		return "🟡 This session has been idle for 2+ hours — it may be stuck."
+		return "🟡 This session has been idle for 4+ hours — it may be stuck."
 	default:
 		return ""
 	}

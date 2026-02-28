@@ -159,7 +159,6 @@ func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		m.fetchLocalSessions,  // Phase 1: fast, shows content immediately
 		m.fetchAgentTasks,     // Phase 2: runs concurrently, returns when API responds
-		tea.EnterAltScreen,
 	}
 	if m.ctx.Config.AnimationsEnabled() {
 		cmds = append(cmds, m.animationTickCmd())

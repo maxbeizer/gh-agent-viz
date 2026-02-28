@@ -365,7 +365,7 @@ func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "K":
-		m.viewMode = ViewModeList
+		m.viewMode = ViewModeMission
 	case "h", "left":
 		m.kanban.MoveColumn(-1)
 	case "l", "right":
@@ -386,6 +386,14 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.viewMode = ViewModeDetail
 			return m, m.fetchTaskDetail(session.ID, session.Repository)
 		}
+	case "tab":
+		m.cycleFilter(1)
+		m.kanban.SetSessions(m.visibleSessions())
+		return m, nil
+	case "shift+tab", "backtab":
+		m.cycleFilter(-1)
+		m.kanban.SetSessions(m.visibleSessions())
+		return m, nil
 	case "r":
 		return m, m.fetchTasks
 	}
@@ -412,15 +420,28 @@ func (m Model) handleToolTimelineKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleMissionKeys handles keys in mission control view mode
 func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "M":
+	case "esc":
 		m.viewMode = ViewModeList
+		m.taskList.SetTasks(m.visibleSessions())
 	case "j", "down":
 		m.mission.MoveCursor(1)
 	case "k", "up":
 		m.mission.MoveCursor(-1)
 	case "enter":
-		// Return to list view (enter feels natural to "drill in")
 		m.viewMode = ViewModeList
+		m.taskList.SetTasks(m.visibleSessions())
+	case "K":
+		m.viewMode = ViewModeKanban
+		m.kanban.SetSessions(m.visibleSessions())
+		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
+	case "tab":
+		m.cycleFilter(1)
+		m.mission.SetSessions(m.visibleSessions())
+		return m, nil
+	case "shift+tab", "backtab":
+		m.cycleFilter(-1)
+		m.mission.SetSessions(m.visibleSessions())
+		return m, nil
 	case "r":
 		return m, m.fetchTasks
 	}

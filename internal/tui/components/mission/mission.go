@@ -176,7 +176,7 @@ reason = "🔴 Failed"
 case level == data.AttentionWarning && status == "queued":
 reason = "🟡 Queued too long"
 case level == data.AttentionWarning:
-reason = "🟡 Possibly stuck (idle 2h+)"
+reason = "🟡 Possibly stuck (idle 4h+)"
 default:
 reason = "🟡 Needs review"
 }
@@ -246,25 +246,25 @@ return m.viewSingleColumn()
 return m.viewMultiPane()
 }
 
-// panelBorder returns a bordered style for dashboard panels.
-func panelBorder(title string, width, height int, focused bool) lipgloss.Style {
+// renderPanel returns a bordered panel with a title header line above the box.
+func renderPanel(title string, content string, width, height int) string {
 borderColor := lipgloss.AdaptiveColor{Light: "249", Dark: "240"}
 titleColor := lipgloss.AdaptiveColor{Light: "24", Dark: "75"}
-if focused {
-borderColor = lipgloss.AdaptiveColor{Light: "30", Dark: "73"}
-}
-return lipgloss.NewStyle().
+
+titleRendered := lipgloss.NewStyle().
+Bold(true).
+Foreground(titleColor).
+Render(" " + title)
+
+box := lipgloss.NewStyle().
 Border(lipgloss.RoundedBorder()).
 BorderForeground(borderColor).
-BorderTop(true).
-BorderBottom(true).
-BorderLeft(true).
-BorderRight(true).
 Width(width - 2).
 Height(height).
 Padding(0, 1).
-BorderTop(true).
-SetString(lipgloss.NewStyle().Bold(true).Foreground(titleColor).Render(" " + title + " "))
+Render(content)
+
+return titleRendered + "\n" + box
 }
 
 // viewMultiPane renders the btop-style 2-column dashboard.
@@ -304,8 +304,7 @@ fleetLines = append(fleetLines, m.renderBar(barWidth))
 }
 fleetHeight := len(fleetLines)
 if fleetHeight < 2 { fleetHeight = 2 }
-fleetPanel := panelBorder("Fleet", leftWidth, fleetHeight, false).
-Render(strings.Join(fleetLines, "\n"))
+fleetPanel := renderPanel("Fleet", strings.Join(fleetLines, "\n"), leftWidth, fleetHeight)
 
 // Attention panel
 var attnLines []string
@@ -331,8 +330,7 @@ maxAttn := availHeight / 3
 if attnHeight > maxAttn { attnHeight = maxAttn; attnLines = attnLines[:maxAttn] }
 if attnHeight < 1 { attnHeight = 1 }
 attnTitle := fmt.Sprintf("Attention (%d)", len(m.attention))
-attnPanel := panelBorder(attnTitle, leftWidth, attnHeight, false).
-Render(strings.Join(attnLines, "\n"))
+attnPanel := renderPanel(attnTitle, strings.Join(attnLines, "\n"), leftWidth, attnHeight)
 
 // Repos panel
 var repoLines []string
@@ -345,8 +343,7 @@ maxRepo := availHeight - fleetHeight - attnHeight - 10
 if maxRepo < 3 { maxRepo = 3 }
 if repoHeight > maxRepo { repoHeight = maxRepo; repoLines = repoLines[:maxRepo] }
 if repoHeight < 1 { repoHeight = 1 }
-repoPanel := panelBorder("Repos", leftWidth, repoHeight, false).
-Render(strings.Join(repoLines, "\n"))
+repoPanel := renderPanel("Repos", strings.Join(repoLines, "\n"), leftWidth, repoHeight)
 
 leftCol := lipgloss.JoinVertical(lipgloss.Left, fleetPanel, attnPanel, repoPanel)
 
@@ -381,8 +378,7 @@ activeHeight := len(activeLines)
 maxActive := availHeight / 2
 if activeHeight > maxActive { activeHeight = maxActive; activeLines = activeLines[:maxActive] }
 if activeHeight < 2 { activeHeight = 2 }
-activePanel := panelBorder(fmt.Sprintf("Active (%d)", len(activeSessions)), rightWidth, activeHeight, false).
-Render(strings.Join(activeLines, "\n"))
+activePanel := renderPanel(fmt.Sprintf("Active (%d)", len(activeSessions)), strings.Join(activeLines, "\n"), rightWidth, activeHeight)
 
 // Recent completions panel
 recentDone := m.recentCompletions(8)
@@ -406,8 +402,7 @@ recentLines = append(recentLines, dim.Render("no completions yet"))
 recentHeight := availHeight - activeHeight - 6
 if recentHeight < 2 { recentHeight = 2 }
 if len(recentLines) > recentHeight { recentLines = recentLines[:recentHeight] }
-recentPanel := panelBorder("Recent", rightWidth, recentHeight, false).
-Render(strings.Join(recentLines, "\n"))
+recentPanel := renderPanel("Recent", strings.Join(recentLines, "\n"), rightWidth, recentHeight)
 
 rightCol := lipgloss.JoinVertical(lipgloss.Left, activePanel, recentPanel)
 

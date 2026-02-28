@@ -370,11 +370,11 @@ func (m Model) View() string {
 	// Update footer hints based on current context
 	m.updateFooterHints()
 
-	// Dashboard view: skip tab bar and stats bar (dashboard has its own fleet summary)
-	// Other views: show full chrome
+	// Dashboard view: show banner + stats bar but skip tab bar
+	// Other views: show full chrome with tabs
 	var chrome string
 	if m.viewMode == ViewModeMission {
-		chrome = ""
+		chrome = m.header.ViewBannerOnly() + m.statsBar.View() + "\n"
 	} else {
 		headerView := m.header.View()
 		statsBarView := m.statsBar.View()

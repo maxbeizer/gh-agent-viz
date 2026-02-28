@@ -286,6 +286,18 @@ func (m *Model) renderCard(session data.Session, width int, selected bool) strin
 		icon = m.animStatusIcon(session.Status, m.animFrame)
 	}
 
+	// Attention level indicator
+	level := data.SessionAttentionLevel(session)
+	if level >= data.AttentionWarning {
+		var levelIcon string
+		if level == data.AttentionUrgent {
+			levelIcon = "🔴"
+		} else {
+			levelIcon = "🟡"
+		}
+		icon = levelIcon
+	}
+
 	// First line: icon + title (truncated)
 	titleMaxLen := width - 4 // icon + space + padding
 	if titleMaxLen < 5 {
@@ -308,11 +320,33 @@ func (m *Model) renderCard(session data.Session, width int, selected bool) strin
 	}
 	age := formatAge(session.CreatedAt)
 	line2 := fmt.Sprintf("  %s • %s", repo, age)
+
+	// Third line: tokens + PR status (enriched info)
+	var extras []string
+	if session.Telemetry != nil && session.Telemetry.InputTokens > 0 {
+		extras = append(extras, "🪙 "+data.FormatTokenCount(session.Telemetry.InputTokens))
+	}
+	if session.PRNumber > 0 {
+		prLabel := fmt.Sprintf("PR #%d", session.PRNumber)
+		extras = append(extras, "📤 "+prLabel)
+	}
+	line3 := ""
+	if len(extras) > 0 {
+		line3 = "  " + strings.Join(extras, " • ")
+	}
+
+	// Truncate lines to width
 	if len(line2) > width {
 		line2 = line2[:width]
 	}
+	if len(line3) > width {
+		line3 = line3[:width]
+	}
 
 	cardText := line1 + "\n" + line2
+	if line3 != "" {
+		cardText += "\n" + line3
+	}
 
 	if selected {
 		return m.cardSelectedStyle.Width(width).Render(cardText)

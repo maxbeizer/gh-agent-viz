@@ -4,87 +4,94 @@ Set FontSize 14
 Set Width 1400
 Set Height 800
 Set Theme "Builtin Solarized Dark"
+Set TypingSpeed 50ms
 
+# Launch — lands on the dashboard
 Type "gh agent-viz --demo"
 Enter
-Sleep 3s
+Sleep 4s
 
-# Dashboard is the landing page — browse the panels
-Sleep 1s
+# Navigate Active panel
+Down
+Sleep 600ms
+Down
+Sleep 600ms
 
-# Tab through panels: Active → Recent → Attention → Repos
-Type "	"
-Sleep 1s
-Type "	"
-Sleep 1s
-Type "	"
-Sleep 1s
-Type "j"
+# Tab to Recent panel
+Tab
+Sleep 1.5s
+
+# Tab to Attention panel
+Tab
+Sleep 1.5s
+
+# Tab to Repos panel
+Tab
+Sleep 1.5s
+
+# Navigate repos
+Down
 Sleep 400ms
-Type "j"
+Down
 Sleep 400ms
 
-# Drill into a repo to see its sessions
-Type "enter"
+# Drill into repo → filtered list view
+Enter
 Sleep 2s
 
 # Back to dashboard
-Type "esc"
+Escape
 Sleep 1s
 
-# Tab back to Active panel
-Type "	"
+# Drill into an active session (Active panel is focused after wrap)
+Tab
 Sleep 500ms
-Type "	"
+Tab
 Sleep 500ms
+Enter
+Sleep 2.5s
 
-# Drill into an active session
-Type "enter"
-Sleep 2s
-
-# Check the logs
+# View logs
 Type "l"
-Sleep 2s
+Sleep 2.5s
 
 # Back to dashboard
-Type "esc"
+Escape
 Sleep 1s
 
-# Try the search
+# Fuzzy search
 Type "/"
 Sleep 500ms
-Type "auth"
+Type@100ms "auth"
+Sleep 1.5s
+Escape
 Sleep 1s
-Type "esc"
-Sleep 500ms
 
-# Switch to kanban
+# Kanban view
 Type "K"
 Sleep 2s
 
 # Tab through columns
-Type "	"
-Sleep 800ms
-Type "	"
-Sleep 800ms
-Type "	"
-Sleep 800ms
+Tab
+Sleep 1s
+Tab
+Sleep 1s
 
-# Dismiss completed
+# Dismiss done
 Type "X"
 Sleep 2s
 
 # Back to dashboard
-Type "esc"
-Sleep 1s
+Escape
+Sleep 1.5s
 
-# Take a snapshot
+# Snapshot
 Type "S"
-Sleep 1s
+Sleep 1.5s
 
-# Show help
+# Help overlay
 Type "?"
-Sleep 2s
+Sleep 2.5s
 Type "?"
 Sleep 500ms
 

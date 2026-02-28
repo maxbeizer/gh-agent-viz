@@ -238,147 +238,249 @@ if len(m.sessions) == 0 {
 return m.titleStyle.Render("  No sessions found — run gh agent-viz --demo to explore")
 }
 
-w := m.width - 4
-if w < 40 {
-w = 40
+// Narrow terminals: fall back to single-column layout
+if m.width < 100 {
+return m.viewSingleColumn()
 }
 
+return m.viewMultiPane()
+}
+
+// panelBorder returns a bordered style for dashboard panels.
+func panelBorder(title string, width, height int, focused bool) lipgloss.Style {
+borderColor := lipgloss.AdaptiveColor{Light: "249", Dark: "240"}
+titleColor := lipgloss.AdaptiveColor{Light: "24", Dark: "75"}
+if focused {
+borderColor = lipgloss.AdaptiveColor{Light: "30", Dark: "73"}
+}
+return lipgloss.NewStyle().
+Border(lipgloss.RoundedBorder()).
+BorderForeground(borderColor).
+BorderTop(true).
+BorderBottom(true).
+BorderLeft(true).
+BorderRight(true).
+Width(width - 2).
+Height(height).
+Padding(0, 1).
+BorderTop(true).
+SetString(lipgloss.NewStyle().Bold(true).Foreground(titleColor).Render(" " + title + " "))
+}
+
+// viewMultiPane renders the btop-style 2-column dashboard.
+func (m *Model) viewMultiPane() string {
 dim := lipgloss.NewStyle().Faint(true)
-sectionHead := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
-sessionTitle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
+sessionStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
 
-var lines []string
+totalWidth := m.width - 2
+leftWidth := totalWidth * 55 / 100
+rightWidth := totalWidth - leftWidth
 
-// ── Fleet summary ──
-lines = append(lines, "")
+availHeight := m.height - 6 // header + stats + footer chrome
+if availHeight < 12 { availHeight = 12 }
+
+// ── Build left column content ──
+
+// Fleet panel
+var fleetLines []string
 summaryParts := []string{}
-if m.stats.Active > 0 {
-summaryParts = append(summaryParts, fmt.Sprintf("● %d active", m.stats.Active))
-}
-if m.stats.Idle > 0 {
-summaryParts = append(summaryParts, fmt.Sprintf("💤 %d idle", m.stats.Idle))
-}
-if m.stats.NeedsInput > 0 {
-summaryParts = append(summaryParts, fmt.Sprintf("✋ %d input", m.stats.NeedsInput))
-}
-if m.stats.Done > 0 {
-summaryParts = append(summaryParts, fmt.Sprintf("✅ %d done", m.stats.Done))
-}
-if m.stats.Failed > 0 {
-summaryParts = append(summaryParts, fmt.Sprintf("❌ %d fail", m.stats.Failed))
-}
+if m.stats.Active > 0 { summaryParts = append(summaryParts, fmt.Sprintf("● %d active", m.stats.Active)) }
+if m.stats.Idle > 0 { summaryParts = append(summaryParts, fmt.Sprintf("💤 %d idle", m.stats.Idle)) }
+if m.stats.NeedsInput > 0 { summaryParts = append(summaryParts, fmt.Sprintf("✋ %d input", m.stats.NeedsInput)) }
+if m.stats.Done > 0 { summaryParts = append(summaryParts, fmt.Sprintf("✅ %d done", m.stats.Done)) }
+if m.stats.Failed > 0 { summaryParts = append(summaryParts, fmt.Sprintf("❌ %d fail", m.stats.Failed)) }
 totalTokens := int64(0)
 for _, s := range m.sessions {
-if s.Telemetry != nil {
-totalTokens += s.Telemetry.InputTokens
-}
+if s.Telemetry != nil { totalTokens += s.Telemetry.InputTokens }
 }
 if totalTokens > 0 {
-summaryParts = append(summaryParts, fmt.Sprintf("🪙 %s tokens", data.FormatTokenCount(totalTokens)))
+summaryParts = append(summaryParts, fmt.Sprintf("🪙 %s", data.FormatTokenCount(totalTokens)))
 }
-lines = append(lines, "  "+strings.Join(summaryParts, "  "))
-barWidth := w - 4
-if barWidth > 60 {
-barWidth = 60
-}
+fleetLines = append(fleetLines, strings.Join(summaryParts, "  "))
+barWidth := leftWidth - 6
+if barWidth > 50 { barWidth = 50 }
 if barWidth > 0 && m.stats.Total > 0 {
-lines = append(lines, "  "+m.renderBar(barWidth))
+fleetLines = append(fleetLines, m.renderBar(barWidth))
 }
+fleetHeight := len(fleetLines)
+if fleetHeight < 2 { fleetHeight = 2 }
+fleetPanel := panelBorder("Fleet", leftWidth, fleetHeight, false).
+Render(strings.Join(fleetLines, "\n"))
 
-// ── Active sessions (what's running right now) ──
+// Attention panel
+var attnLines []string
+innerW := leftWidth - 6
+for _, item := range m.attention {
+title := item.Session.Title
+maxT := innerW / 2
+if maxT < 10 { maxT = 10 }
+if len(title) > maxT { title = title[:maxT-1] + "…" }
+repo := shortRepo(item.Session.Repository)
+ago := formatAge(item.Session.UpdatedAt)
+left := fmt.Sprintf("%s %s", item.Reason, sessionStyle.Render(title))
+right := dim.Render(fmt.Sprintf("%s %s", repo, ago))
+pad := innerW - lipgloss.Width(left) - lipgloss.Width(right)
+if pad < 1 { pad = 1 }
+attnLines = append(attnLines, left + strings.Repeat(" ", pad) + right)
+}
+if len(attnLines) == 0 {
+attnLines = append(attnLines, dim.Render("all clear ✨"))
+}
+attnHeight := len(attnLines)
+maxAttn := availHeight / 3
+if attnHeight > maxAttn { attnHeight = maxAttn; attnLines = attnLines[:maxAttn] }
+if attnHeight < 1 { attnHeight = 1 }
+attnTitle := fmt.Sprintf("Attention (%d)", len(m.attention))
+attnPanel := panelBorder(attnTitle, leftWidth, attnHeight, false).
+Render(strings.Join(attnLines, "\n"))
+
+// Repos panel
+var repoLines []string
+for i, r := range m.repos {
+selected := i == m.cursor
+repoLines = append(repoLines, m.renderRepoRow(r, selected, innerW))
+}
+repoHeight := len(repoLines)
+maxRepo := availHeight - fleetHeight - attnHeight - 10
+if maxRepo < 3 { maxRepo = 3 }
+if repoHeight > maxRepo { repoHeight = maxRepo; repoLines = repoLines[:maxRepo] }
+if repoHeight < 1 { repoHeight = 1 }
+repoPanel := panelBorder("Repos", leftWidth, repoHeight, false).
+Render(strings.Join(repoLines, "\n"))
+
+leftCol := lipgloss.JoinVertical(lipgloss.Left, fleetPanel, attnPanel, repoPanel)
+
+// ── Build right column content ──
+
+// Active sessions panel
 activeSessions := m.activeSessions()
-if len(activeSessions) > 0 {
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render("Active now"))
-lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
+var activeLines []string
 for _, s := range activeSessions {
 icon := m.statusIcon(s.Status)
 if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
 icon = m.animStatusIcon(s.Status, m.animFrame)
 }
 title := s.Title
-maxTitle := w / 2
-if maxTitle < 15 { maxTitle = 15 }
-if len(title) > maxTitle { title = title[:maxTitle-1] + "…" }
-
+rInnerW := rightWidth - 6
+maxT := rInnerW / 2
+if maxT < 10 { maxT = 10 }
+if len(title) > maxT { title = title[:maxT-1] + "…" }
 action := DeriveLastAction(s)
-maxAction := w/3
-if len(action) > maxAction { action = action[:maxAction-1] + "…" }
-
-repo := s.Repository
-if repo == "" { repo = "local" }
-if parts := strings.SplitN(repo, "/", 2); len(parts) == 2 { repo = parts[1] }
-
-line := fmt.Sprintf("  %s %s", icon, sessionTitle.Render(title))
-right := dim.Render(fmt.Sprintf("%s  %s", action, repo))
-pad := w - lipgloss.Width(line) - lipgloss.Width(right)
+maxA := rInnerW / 3
+if len(action) > maxA { action = action[:maxA-1] + "…" }
+left := fmt.Sprintf("%s %s", icon, sessionStyle.Render(title))
+right := dim.Render(action)
+pad := rInnerW - lipgloss.Width(left) - lipgloss.Width(right)
 if pad < 1 { pad = 1 }
-lines = append(lines, line + strings.Repeat(" ", pad) + right)
+activeLines = append(activeLines, left + strings.Repeat(" ", pad) + right)
+}
+if len(activeLines) == 0 {
+activeLines = append(activeLines, dim.Render("no active sessions"))
+}
+activeHeight := len(activeLines)
+maxActive := availHeight / 2
+if activeHeight > maxActive { activeHeight = maxActive; activeLines = activeLines[:maxActive] }
+if activeHeight < 2 { activeHeight = 2 }
+activePanel := panelBorder(fmt.Sprintf("Active (%d)", len(activeSessions)), rightWidth, activeHeight, false).
+Render(strings.Join(activeLines, "\n"))
+
+// Recent completions panel
+recentDone := m.recentCompletions(8)
+var recentLines []string
+rInnerW := rightWidth - 6
+for _, s := range recentDone {
+icon := "✅"
+if strings.EqualFold(s.Status, "failed") { icon = "❌" }
+title := s.Title
+maxT := rInnerW - 20
+if maxT < 10 { maxT = 10 }
+if len(title) > maxT { title = title[:maxT-1] + "…" }
+ago := formatAge(s.UpdatedAt)
+pr := ""
+if s.PRNumber > 0 { pr = dim.Render(fmt.Sprintf(" PR #%d", s.PRNumber)) }
+recentLines = append(recentLines, fmt.Sprintf("%s %s%s  %s", icon, title, pr, dim.Render(ago)))
+}
+if len(recentLines) == 0 {
+recentLines = append(recentLines, dim.Render("no completions yet"))
+}
+recentHeight := availHeight - activeHeight - 6
+if recentHeight < 2 { recentHeight = 2 }
+if len(recentLines) > recentHeight { recentLines = recentLines[:recentHeight] }
+recentPanel := panelBorder("Recent", rightWidth, recentHeight, false).
+Render(strings.Join(recentLines, "\n"))
+
+rightCol := lipgloss.JoinVertical(lipgloss.Left, activePanel, recentPanel)
+
+return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol)
+}
+
+// viewSingleColumn renders the fallback single-column layout for narrow terminals.
+func (m *Model) viewSingleColumn() string {
+w := m.width - 4
+if w < 40 { w = 40 }
+
+sectionHead := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
+sessionStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
+
+var lines []string
+lines = append(lines, "")
+
+// Fleet
+summaryParts := []string{}
+if m.stats.Active > 0 { summaryParts = append(summaryParts, fmt.Sprintf("● %d active", m.stats.Active)) }
+if m.stats.Idle > 0 { summaryParts = append(summaryParts, fmt.Sprintf("💤 %d idle", m.stats.Idle)) }
+if m.stats.Done > 0 { summaryParts = append(summaryParts, fmt.Sprintf("✅ %d done", m.stats.Done)) }
+if m.stats.Failed > 0 { summaryParts = append(summaryParts, fmt.Sprintf("❌ %d fail", m.stats.Failed)) }
+lines = append(lines, "  "+strings.Join(summaryParts, "  "))
+barWidth := w - 4
+if barWidth > 50 { barWidth = 50 }
+if barWidth > 0 && m.stats.Total > 0 {
+lines = append(lines, "  "+m.renderBar(barWidth))
+}
+
+// Active
+activeSessions := m.activeSessions()
+if len(activeSessions) > 0 {
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render("Active now"))
+for _, s := range activeSessions {
+icon := m.statusIcon(s.Status)
+if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
+icon = m.animStatusIcon(s.Status, m.animFrame)
+}
+title := s.Title
+if len(title) > w/2 { title = title[:w/2-1] + "…" }
+lines = append(lines, fmt.Sprintf("  %s %s", icon, sessionStyle.Render(title)))
 }
 }
 
-// ── Needs your attention ──
+// Attention
 if len(m.attention) > 0 {
 lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Needs attention (%d)", len(m.attention))))
-lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
+lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Attention (%d)", len(m.attention))))
 for _, item := range m.attention {
 title := item.Session.Title
-maxTitle := w / 3
-if maxTitle < 15 { maxTitle = 15 }
-if len(title) > maxTitle { title = title[:maxTitle-1] + "…" }
-
-repo := item.Session.Repository
-if repo == "" { repo = "local" }
-if parts := strings.SplitN(repo, "/", 2); len(parts) == 2 { repo = parts[1] }
-
-ago := formatAge(item.Session.UpdatedAt)
-left := fmt.Sprintf("  %s %s", item.Reason, sessionTitle.Render(title))
-right := dim.Render(fmt.Sprintf("%s  %s", repo, ago))
-pad := w - lipgloss.Width(left) - lipgloss.Width(right)
-if pad < 1 { pad = 1 }
-lines = append(lines, left + strings.Repeat(" ", pad) + right)
+if len(title) > w/2 { title = title[:w/2-1] + "…" }
+lines = append(lines, fmt.Sprintf("  %s %s", item.Reason, sessionStyle.Render(title)))
 }
 }
 
-// ── Repos ──
+// Repos
 lines = append(lines, "")
 lines = append(lines, "  "+sectionHead.Render("Repos"))
-lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
 for i, r := range m.repos {
 selected := i == m.cursor
 lines = append(lines, m.renderRepoRow(r, selected, w))
 }
 
-// ── Recent completions ──
-recentDone := m.recentCompletions(5)
-if len(recentDone) > 0 {
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render("Recent completions"))
-lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
-for _, s := range recentDone {
-icon := "✅"
-if strings.EqualFold(s.Status, "failed") {
-icon = "❌"
-}
-title := s.Title
-maxTitle := w - 30
-if maxTitle < 10 {
-maxTitle = 10
-}
-if len(title) > maxTitle {
-title = title[:maxTitle-1] + "…"
-}
-ago := formatAge(s.UpdatedAt)
-prInfo := ""
-if s.PRNumber > 0 {
-prInfo = fmt.Sprintf(" PR #%d", s.PRNumber)
-}
-lines = append(lines, fmt.Sprintf("  %s %s%s  %s", icon, title, dim.Render(prInfo), dim.Render(ago)))
-}
+return strings.Join(lines, "\n")
 }
 
-return strings.Join(lines, "\n")
+// shortRepo extracts just the repo name from "owner/repo".
+func shortRepo(repo string) string {
+if repo == "" { return "local" }
+if parts := strings.SplitN(repo, "/", 2); len(parts) == 2 { return parts[1] }
+return repo
 }
 
 func (m *Model) renderBar(width int) string {

@@ -289,18 +289,8 @@ lines = append(lines, fmt.Sprintf("  🪙 %s tokens consumed", data.FormatTokenC
 }
 lines = append(lines, "")
 
-// ── Repos with activity ──
-lines = append(lines, "  "+sectionHead.Render("Repos"))
-lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
-
-for i, r := range m.repos {
-selected := i == m.cursor
-lines = append(lines, m.renderRepoRow(r, selected, w))
-}
-
-// ── Needs your attention ──
+// ── Needs your attention (urgent + warning) ──
 if len(m.attention) > 0 {
-lines = append(lines, "")
 lines = append(lines, "  "+sectionHead.Render("Needs your attention"))
 lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
 for _, item := range m.attention {
@@ -309,8 +299,6 @@ if repo == "" {
 repo = "local"
 }
 ago := formatAge(item.Session.UpdatedAt)
-line := fmt.Sprintf("  %s  %-30s  %s  %s", item.Reason, "", repo, ago)
-// Build it properly
 reasonPart := item.Reason
 if len(reasonPart) > w/2 {
 reasonPart = reasonPart[:w/2-3] + "..."
@@ -320,8 +308,45 @@ pad := w - len(reasonPart) - len(repo) - len(ago) - 6
 if pad < 2 {
 pad = 2
 }
-_ = line // suppress unused
 lines = append(lines, fmt.Sprintf("  %s%s%s", reasonPart, strings.Repeat(" ", pad), right))
+}
+lines = append(lines, "")
+}
+
+// ── Repos with activity ──
+lines = append(lines, "  "+sectionHead.Render("Repos"))
+lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
+
+for i, r := range m.repos {
+selected := i == m.cursor
+lines = append(lines, m.renderRepoRow(r, selected, w))
+}
+
+// ── Recent completions ──
+recentDone := m.recentCompletions(5)
+if len(recentDone) > 0 {
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render("Recent completions"))
+lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
+for _, s := range recentDone {
+icon := "✅"
+if strings.EqualFold(s.Status, "failed") {
+icon = "❌"
+}
+title := s.Title
+maxTitle := w - 30
+if maxTitle < 10 {
+maxTitle = 10
+}
+if len(title) > maxTitle {
+title = title[:maxTitle-1] + "…"
+}
+ago := formatAge(s.UpdatedAt)
+prInfo := ""
+if s.PRNumber > 0 {
+prInfo = fmt.Sprintf(" PR #%d", s.PRNumber)
+}
+lines = append(lines, fmt.Sprintf("  %s %s%s  %s", icon, title, dim.Render(prInfo), dim.Render(ago)))
 }
 }
 
@@ -417,6 +442,25 @@ m.cursor = 0
 if m.cursor >= len(m.repos) {
 m.cursor = len(m.repos) - 1
 }
+}
+
+// recentCompletions returns the most recent n completed/failed sessions.
+func (m *Model) recentCompletions(n int) []data.Session {
+var done []data.Session
+for _, s := range m.sessions {
+status := strings.ToLower(strings.TrimSpace(s.Status))
+if status == "completed" || status == "failed" {
+done = append(done, s)
+}
+}
+// Sort by UpdatedAt descending
+sort.SliceStable(done, func(i, j int) bool {
+return done[i].UpdatedAt.After(done[j].UpdatedAt)
+})
+if len(done) > n {
+done = done[:n]
+}
+return done
 }
 
 func formatAge(t time.Time) string {

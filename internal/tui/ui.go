@@ -114,6 +114,17 @@ func NewModel(repo string, debug bool, demo bool) Model {
 		animIconFunc = AnimatedStatusIcon
 	}
 
+	// Determine default view mode
+	defaultView := ViewModeMission // dashboard-first by default
+	switch ctx.Config.DefaultView {
+	case "table":
+		defaultView = ViewModeList
+	case "kanban":
+		defaultView = ViewModeKanban
+	case "dashboard", "mission", "":
+		defaultView = ViewModeMission
+	}
+
 	return Model{
 		ctx:         ctx,
 		theme:       theme,
@@ -131,7 +142,7 @@ func NewModel(repo string, debug bool, demo bool) Model {
 		mission:        mission.New(theme.Title, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
 		dismissedStore: dismissedStore,
 		statsBar:       statsbar.New(),
-		viewMode:    ViewModeList,
+		viewMode:    defaultView,
 		showPreview: false,
 		ready:       false,
 		repo:        repo,

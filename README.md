@@ -191,7 +191,7 @@ theme: catppuccin-mocha
 ## Requirements
 
 - [GitHub CLI](https://cli.github.com/) (`gh`) installed and authenticated
-- GitHub Copilot CLI with agent-task commands available
+- GitHub Copilot CLI with agent-task commands available (used as fallback data source)
 
 ## Architecture
 
@@ -218,13 +218,13 @@ Security is a core requirement for this project. See [docs/SECURITY.md](docs/SEC
 - **Language**: Go
 - **TUI Framework**: [Bubble Tea](https://github.com/charmbracelet/bubbletea) + [Lip Gloss](https://github.com/charmbracelet/lipgloss) + [Bubbles](https://github.com/charmbracelet/bubbles)
 - **CLI Framework**: [Cobra](https://github.com/spf13/cobra)
-- **Data Source**: `gh agent-task` commands with `--json` output
+- **Data Source**: Copilot API (`api.githubcopilot.com`) with `gh agent-task` CLI fallback
 
 ### Data Sources
 
 gh-agent-viz pulls sessions from two sources:
 
-1. **Remote Agent Tasks**: Via `gh agent-task` CLI commands
+1. **Remote Agent Tasks**: Primarily via direct HTTP to the Copilot API (`api.githubcopilot.com`), with `gh agent-task` CLI as fallback
 2. **Local Copilot Sessions**: From `~/.copilot/session-state/*/workspace.yaml`
 
 Both sources are displayed together in the unified session list. See [docs/LOCAL_SESSIONS.md](docs/LOCAL_SESSIONS.md) for details on local session ingestion.
@@ -236,7 +236,8 @@ gh-agent-viz/
 ├── gh-agent-viz.go          # Entry point
 ├── cmd/                     # Cobra commands
 ├── internal/
-│   ├── data/               # Data fetching (gh agent-task)
+│   ├── data/               # Data fetching (CAPI direct + CLI fallback)
+│   │   └── capi/           # Copilot API client
 │   ├── config/             # Configuration parsing
 │   └── tui/                # Bubble Tea UI components
 │       └── components/     # Header, footer, task list, detail, logs

@@ -4,7 +4,7 @@ This document describes the local Copilot CLI session ingestion feature added to
 
 ## Overview
 
-gh-agent-viz now supports ingesting local Copilot CLI sessions from `~/.copilot/session-state/*/workspace.yaml` in addition to remote agent-task sessions via the `gh agent-task` CLI.
+gh-agent-viz now supports ingesting local Copilot CLI sessions from `~/.copilot/session-state/*/workspace.yaml` in addition to remote agent sessions fetched via the Copilot API (with `gh agent-task` CLI fallback).
 
 ## Architecture
 
@@ -30,7 +30,7 @@ type Session struct {
 ### Session Sources
 
 Two session sources are supported via the `SessionSource` enum:
-- `SourceAgentTask`: GitHub agent-task sessions from `gh agent-task` CLI
+- `SourceAgentTask`: GitHub agent sessions fetched via Copilot API (or `gh agent-task` CLI fallback)
 - `SourceLocalCopilot`: Local Copilot CLI sessions from `~/.copilot/session-state/`
 
 ### Tolerant Parsing
@@ -79,7 +79,7 @@ Fetches all local Copilot CLI sessions from `~/.copilot/session-state/`. Returns
 func FetchAllSessions(repo string) ([]Session, error)
 ```
 
-Fetches both agent-task and local sessions. Filters by repository if specified. This is the recommended API for fetching all available sessions.
+Fetches both agent-task (via CAPI or CLI fallback) and local sessions. Filters by repository if specified. This is the recommended API for fetching all available sessions.
 
 ### Session Conversion
 

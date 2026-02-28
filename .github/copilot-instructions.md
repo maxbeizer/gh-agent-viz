@@ -45,7 +45,8 @@ internal/
   config/
     config.go                # YAML config parser (.gh-agent-viz.yml)
   data/
-    agentapi.go              # Data fetching — shells out to `gh agent-task` commands
+    agentapi.go              # Data fetching — orchestrates CAPI + CLI fallback
+    capi/                    # Direct Copilot API client (client.go, types.go, sessions.go)
   tui/
     ui.go                    # Top-level Bubble Tea Model (Init/Update/View)
     keys.go                  # Centralized key bindings
@@ -70,12 +71,9 @@ docs/
 
 ## Data Source
 
-- The data layer shells out to `gh agent-task` CLI commands:
-  - `gh agent-task list` — lists recent Copilot coding agent sessions
-  - `gh agent-task view <id>` — shows detail for a specific session
-  - `gh agent-task view <id> --log` — shows the event log
-  - `gh agent-task view <id> --log --follow` — streams live logs
-- **Important**: The `--json` flag support and exact output schema for these commands needs verification. The data structs in `internal/data/agentapi.go` are best-guess and may need adjustment based on actual CLI output.
+- The data layer fetches agent sessions via two strategies (with automatic fallback):
+  1. **Primary — Copilot API (CAPI)**: Direct HTTP calls to `api.githubcopilot.com` using the user's `gh auth` OAuth token (Bearer `gho_` prefix). Implemented in `internal/data/capi/`. Required headers: `Copilot-Integration-Id: copilot-4-cli`, `X-GitHub-Api-Version: 2026-01-09`. Returns structured JSON with all API fields available.
+  2. **Fallback — CLI**: Shells out to `gh agent-task` commands (`list`, `view <id>`, `view <id> --log`, `view <id> --log --follow`) if CAPI auth fails.
 - Token usage is parsed from local Copilot CLI logs in `~/.copilot/logs/` to enrich sessions with model and token count data
 - Auth is handled automatically by `go-gh` picking up the user's `gh auth` token
 
@@ -87,14 +85,13 @@ docs/
 - Key bindings are defined centrally in `internal/tui/keys.go`
 - Styles and colors are defined in `internal/tui/theme.go` using Lip Gloss
 - The Bubble Tea pattern: every component implements or contributes to `Init() tea.Cmd`, `Update(msg tea.Msg) (tea.Model, tea.Cmd)`, `View() string`
-- Use `exec.Command("gh", ...)` for shelling out to `gh agent-task` commands
+- Prefer direct CAPI calls (`internal/data/capi/`) for data fetching; use `exec.Command("gh", ...)` only in the CLI fallback path
 - Error handling: return errors up, display them in the TUI rather than crashing
 
 ## Key Constraints
 
 - The Copilot CLI plugin system was evaluated and ruled out — it provides no terminal UI control (only skills, MCP servers, hooks, and custom agents within the conversation model)
-- There is no dedicated REST API for agent sessions yet — data comes from `gh agent-task` CLI commands
-- If a REST API appears in the future, switch to using `go-gh` REST client (`gh.DefaultRESTClient()`) directly
+- The primary data path uses the Copilot API (`api.githubcopilot.com`) directly; the `gh agent-task` CLI is retained as a fallback
 - Changes that affect data handling, telemetry, or external integrations must update `docs/SECURITY.md`
 
 ## Shared Helpers (internal/data/session.go)
@@ -110,7 +107,7 @@ When working with session data across components, use these shared functions ins
 
 - When writing tests, use Go's standard `testing` package
 - For TUI components, test the Model's Update function with specific messages and verify state changes
-- For the data layer, mock `exec.Command` output to test parsing without requiring `gh` to be installed
+- For the data layer, mock CAPI HTTP responses or `exec.Command` output to test parsing without requiring `gh` to be installed
 - Add regression tests for parser hardening, malformed input handling, and error propagation paths
 
 ## Testing Guidelines

@@ -9,29 +9,22 @@ An interactive terminal UI for visualizing GitHub Copilot coding agent sessions.
 
 ## Features
 
-- 📊 **Interactive TUI** - Browse agent sessions with keyboard navigation
-- 📌 **Sessions at a Glance + Session Summary panel** - Fast status counts plus plain-language details/actions for the highlighted row
-- 🔍 **Task Details** - View comprehensive task metadata (status, repo, branch, PR links)
-- 📝 **Log Viewer** - Scrollable, searchable agent task logs
-- 💻 **Local Sessions** - Automatically ingests local Copilot CLI sessions from `~/.copilot/session-state/`
-- 🎨 **Status Indicators** - Color-coded status icons (running, queued, completed, failed)
-- ✋ **Input Needed Detection** - Highlights sessions that appear blocked waiting for human input
-- 🚦 **Action Reasons** - Every card includes an explicit `Needs your action:` reason (`waiting on your input`, `run failed`, `running but quiet`, or `no action needed`)
-- 🧭 **Action-First Ordering** - Sessions needing input/failure/quiet checks surface first, while older quiet duplicates are de-emphasized with a `↺ quiet duplicate` badge
-- ⚡ **Quick Actions** - Contextual hints only show actions available for the highlighted session
-- 🔄 **Resume Sessions** - Jump directly into active Copilot CLI sessions with one keystroke
-- ⌨️ **Vim-style Keys** - j/k navigation, familiar keybindings
-- 🛡️ **Tolerant Parsing** - Gracefully handles malformed session files without crashing
-- 🎯 **Kanban board view** — `K` to toggle status-column layout
-- 🔔 **Toast notifications** — status change alerts overlay
-- 📊 **Session timeline** — Unicode lifecycle bar in detail view
-- 🔗 **Dependency graph** — related session visualization
-- 🎨 **Color themes** — catppuccin-mocha, dracula, tokyo-night presets
-- 📡 **Live log tailing** — real-time log streaming with follow mode
-- 💬 **Conversation view** — styled chat bubbles for session dialogue
-- 🔧 **Tool timeline** — chronological trace of agent actions
-- 📊 **Mission control** — fleet summary dashboard
-- 🔍 **Diff view** — colored PR diffs in the TUI
+- 🎯 **Dashboard-first** — Multi-pane btop-style landing page with Active, Recent, Attention, Fleet, Repos, and Idle panels
+- 📊 **Stats bar** — Always-visible summary of active, idle, done, and token usage
+- 🔍 **Fuzzy search** — Press `/` to filter sessions by title, repo, branch, or status
+- 🖱️ **Mouse support** — Scroll and click to focus panels
+- 🎯 **Kanban board** — `K` to toggle status-column layout with compact cards
+- 📸 **Snapshot debugging** — Press `S` to capture TUI state as JSON, or `--snapshot <path>` on launch
+- 📌 **Session detail** — Comprehensive metadata, timeline, telemetry, and dependency graph
+- 📝 **Log viewer** — Scrollable agent task logs with live tailing
+- 💬 **Conversation view** — Styled chat bubbles for session dialogue
+- 🔧 **Tool timeline** — Chronological trace of agent tool calls
+- 🔍 **Diff view** — Colored PR diffs in the TUI
+- 💻 **Local sessions** — Automatically ingests local Copilot CLI sessions from `~/.copilot/session-state/`
+- 🎨 **Color themes** — catppuccin-mocha, dracula, tokyo-night, solarized-light
+- 🔔 **Toast notifications** — Status change alerts and action confirmations
+- 🔄 **Resume sessions** — Jump directly into active Copilot CLI sessions with one keystroke
+- ⌨️ **Vim-style keys** — j/k navigation, familiar keybindings
 - ❓ **Help overlay** — `?` shows all keybindings
 
 See [docs/UI_FEATURES.md](docs/UI_FEATURES.md) for a comprehensive guide to all visual features.
@@ -97,66 +90,63 @@ When enabled, the UI also shows a persistent debug banner with the log path.
 
 ### Keyboard Shortcuts
 
+#### Dashboard (home)
+
 | Key | Action |
 |-----|--------|
-| `↑` / `↓` / `j` / `k` | Navigate sessions |
+| `j` / `k` | Navigate within focused panel |
+| `tab` / `shift+tab` | Cycle panel focus (Active → Recent → Attention → Repos → Idle) |
+| `enter` | Drill into session detail, or filter by repo |
+| `K` | Switch to kanban view |
+| `/` | Fuzzy search sessions |
+| `S` | Save snapshot to `/tmp/` |
+| `r` | Refresh data |
+| `?` | Toggle help overlay |
+| `q` | Quit |
+
+#### Kanban
+
+| Key | Action |
+|-----|--------|
+| `tab` / `shift+tab` | Cycle columns (wraps around) |
+| `j` / `k` | Navigate cards |
 | `enter` | View session details |
-| `esc` | Go back |
+| `X` | Dismiss all completed sessions |
+| `esc` | Back to dashboard |
+
+#### List View
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Navigate sessions |
+| `enter` | View session details |
 | `l` | View logs |
 | `o` | Open PR in browser |
 | `s` | Resume session |
 | `x` | Dismiss session |
-| `r` | Refresh |
+| `X` | Dismiss all completed |
 | `p` | Toggle preview pane |
-| `K` | Toggle kanban view |
-| `tab` / `shift+tab` | Cycle filter tabs |
-| `a` | Jump to attention tab |
 | `g` | Cycle group-by mode |
-| `space` | Expand/collapse group |
-| `c` | Conversation view |
-| `t` | Tool timeline |
-| `d` | Diff view (list/detail); page down (in logs) |
-| `M` | Toggle mission control |
-| `?` | Toggle help overlay |
-| `!` | Open gh-agent-viz repo in browser |
-| `@` | File a new issue in browser |
-| `f` | Toggle follow mode (in logs) |
-| `u` | Page up (in logs) |
-| `g` / `G` | Top/bottom (in logs) |
-| `q` | Quit |
+| `d` | View PR diff |
+| `esc` | Back to dashboard |
 
-Action hints in the footer are contextual: unavailable actions are hidden for the currently highlighted session.
+#### Detail / Logs
+
+| Key | Action |
+|-----|--------|
+| `l` | View logs (from detail) |
+| `c` | Conversation view (local sessions) |
+| `t` | Tool timeline (local sessions) |
+| `d` | View PR diff |
+| `f` | Toggle follow mode (in logs) |
+| `j` / `k` | Scroll |
+| `esc` | Back to dashboard |
 
 ### Resume Active Sessions
 
 Press `s` on any active **local Copilot CLI session** (status: `running` or `queued`) to resume it directly in your terminal. This executes `gh copilot -- --resume <session-id>` and drops you into the Copilot CLI session.
 
 **Note:** Only active local sessions can be resumed. Attempting to resume a remote agent-task row, or a completed/failed session, shows a clear error message.
-
-### At-a-glance card semantics
-
-Each session card is intentionally labeled for quick triage:
-
-- `Repository:` shows linked repo context (`not available` when missing)
-- `Needs your action:` explains why it needs action now (or confirms `no action needed`)
-- Older repeated quiet sessions are intentionally de-emphasized (`↺ quiet duplicate`) to reduce list noise without hiding rows
-- `Last update:` shows recency using friendly wording like `not recorded` when metadata is missing
-- The **Session Summary** panel mirrors the same plain-language fields for the highlighted row
-
-### Log Viewer Navigation
-
-When viewing logs:
-
-| Key | Action |
-|-----|--------|
-| `j` / `↓` | Scroll down one line |
-| `k` / `↑` | Scroll up one line |
-| `d` | Scroll down half page |
-| `u` | Scroll up half page |
-| `g` | Go to top |
-| `G` | Go to bottom |
-| `f` | Toggle follow mode (live tailing) |
-| `esc` | Return to task list |
 
 ## Configuration
 
@@ -171,8 +161,8 @@ repos:
 # Refresh interval in seconds (default: 30)
 refreshInterval: 30
 
-# Default status filter: all, attention, active, completed, failed (default: all)
-defaultFilter: all
+# Default view on launch: dashboard, table, kanban (default: dashboard)
+defaultView: dashboard
 
 # Color theme: default, catppuccin-mocha, dracula, tokyo-night, solarized-light
 theme: catppuccin-mocha
@@ -238,11 +228,12 @@ gh-agent-viz/
 ├── cmd/                     # Cobra commands
 ├── internal/
 │   ├── data/               # Data fetching (CAPI direct + CLI fallback)
-│   │   └── capi/           # Copilot API client
+│   │   ├── capi/           # Copilot API client
+│   │   └── snapshot.go     # Machine-readable TUI state capture
 │   ├── config/             # Configuration parsing
 │   └── tui/                # Bubble Tea UI components
-│       └── components/     # Header, footer, task list, detail, logs
-└── docs/                   # Architecture decisions
+│       └── components/     # Dashboard, kanban, stats bar, header, footer, etc.
+└── docs/                   # Documentation and architecture decisions
 ```
 
 ## Development

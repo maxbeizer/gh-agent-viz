@@ -103,8 +103,15 @@ func (m *Model) SetSessions(sessions []data.Session) {
 			}
 		}
 	}
+	// Cap Done column to most recent 10, show total in title
+	for i := range cols {
+		if cols[i].Status == "done" && len(cols[i].Sessions) > 10 {
+			total := len(cols[i].Sessions)
+			cols[i].Sessions = cols[i].Sessions[:10]
+			cols[i].Title = fmt.Sprintf("DONE (%d total)", total)
+		}
+	}
 	m.columns = cols
-	// Clamp cursors
 	m.clampCursors()
 }
 
@@ -286,20 +293,13 @@ func (m *Model) renderCard(session data.Session, width int, selected bool) strin
 		icon = m.animStatusIcon(session.Status, m.animFrame)
 	}
 
-	// Attention level indicator
 	level := data.SessionAttentionLevel(session)
-	if level >= data.AttentionWarning {
-		var levelIcon string
-		if level == data.AttentionUrgent {
-			levelIcon = "🔴"
-		} else {
-			levelIcon = "🟡"
-		}
-		icon = levelIcon
+	if level >= data.AttentionUrgent {
+		icon = "🔴"
 	}
 
-	// First line: icon + title (truncated)
-	titleMaxLen := width - 4 // icon + space + padding
+	// Line 1: icon + title
+	titleMaxLen := width - 4
 	if titleMaxLen < 5 {
 		titleMaxLen = 5
 	}
@@ -309,44 +309,27 @@ func (m *Model) renderCard(session data.Session, width int, selected bool) strin
 	}
 	line1 := fmt.Sprintf("%s %s", icon, title)
 
-	// Second line: repo + age
+	// Line 2: compact metadata — repo • age • tokens • PR
 	repo := session.Repository
 	if repo == "" {
 		repo = "local"
 	}
-	// Shorten repo: "owner/repo" → "repo"
 	if parts := strings.SplitN(repo, "/", 2); len(parts) == 2 {
 		repo = parts[1]
 	}
-	age := formatAge(session.CreatedAt)
-	line2 := fmt.Sprintf("  %s • %s", repo, age)
-
-	// Third line: tokens + PR status (enriched info)
-	var extras []string
+	meta := []string{repo, formatAge(session.CreatedAt)}
 	if session.Telemetry != nil && session.Telemetry.InputTokens > 0 {
-		extras = append(extras, "🪙 "+data.FormatTokenCount(session.Telemetry.InputTokens))
+		meta = append(meta, "🪙 "+data.FormatTokenCount(session.Telemetry.InputTokens))
 	}
 	if session.PRNumber > 0 {
-		prLabel := fmt.Sprintf("PR #%d", session.PRNumber)
-		extras = append(extras, "📤 "+prLabel)
+		meta = append(meta, fmt.Sprintf("PR #%d", session.PRNumber))
 	}
-	line3 := ""
-	if len(extras) > 0 {
-		line3 = "  " + strings.Join(extras, " • ")
-	}
-
-	// Truncate lines to width
+	line2 := "  " + strings.Join(meta, " • ")
 	if len(line2) > width {
 		line2 = line2[:width]
 	}
-	if len(line3) > width {
-		line3 = line3[:width]
-	}
 
 	cardText := line1 + "\n" + line2
-	if line3 != "" {
-		cardText += "\n" + line3
-	}
 
 	if selected {
 		return m.cardSelectedStyle.Width(width).Render(cardText)

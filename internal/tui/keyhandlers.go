@@ -396,6 +396,10 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.kanban.MoveColumn(-1)
 	case "l", "right":
 		m.kanban.MoveColumn(1)
+	case "tab":
+		m.kanban.MoveColumn(1)
+	case "shift+tab", "backtab":
+		m.kanban.MoveColumn(-1)
 	case "j", "down":
 		m.kanban.MoveRow(1)
 	case "k", "up":
@@ -411,6 +415,14 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.viewMode = ViewModeDetail
 			return m, m.fetchTaskDetail(session.ID, session.Repository)
+		}
+	case "X":
+		count := m.taskList.DismissCompleted()
+		if count > 0 {
+			m.toast.Push("🧹", "Dismissed", fmt.Sprintf("%d completed session(s) cleared", count))
+			m.kanban.SetSessions(m.visibleSessions())
+		} else {
+			m.toast.Push("ℹ️", "Nothing to dismiss", "no completed sessions found")
 		}
 	case "r":
 		return m, m.fetchTasks

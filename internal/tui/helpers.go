@@ -127,9 +127,10 @@ func (m *Model) updateFooterHints() {
 	case ViewModeKanban:
 		kanbanHints := []key.Binding{
 			m.keys.NavigateBack,
-			key.NewBinding(key.WithKeys("h/l"), key.WithHelp("h/l", "column")),
+			key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "column")),
 			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "card")),
 			m.keys.SelectTask,
+			m.keys.MassDismiss,
 			m.keys.ShowHelp,
 			m.keys.ExitApp,
 		}

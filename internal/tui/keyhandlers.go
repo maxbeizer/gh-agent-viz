@@ -421,6 +421,7 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Dismiss completed/failed sessions from all sessions
 		count := 0
 		if m.dismissedStore != nil {
+			m.toast.Push("🧹", "Sweeping", "clearing the decks...")
 			for _, s := range m.allSessions {
 				status := strings.ToLower(strings.TrimSpace(s.Status))
 				if status == "completed" || status == "failed" {
@@ -430,10 +431,10 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if count > 0 {
-			m.toast.Push("🧹", "Dismissed", fmt.Sprintf("%d completed session(s) cleared", count))
+			m.toast.Push("✨", "Spotless", fmt.Sprintf("%d session(s) swept away", count))
 			m.kanban.SetSessions(m.visibleSessions())
 		} else {
-			m.toast.Push("ℹ️", "Nothing to dismiss", "no completed sessions found")
+			m.toast.Push("🤷", "Already clean", "nothing to dismiss")
 		}
 	case "r":
 		return m, m.fetchTasks

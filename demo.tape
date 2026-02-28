@@ -9,33 +9,80 @@ Type "gh agent-viz --demo"
 Enter
 Sleep 3s
 
-# Navigate through sessions
-Type "j"
-Sleep 400ms
+# Dashboard is the landing page — browse the panels
+Sleep 1s
+
+# Tab through panels: Active → Recent → Attention → Repos
+Type "	"
+Sleep 1s
+Type "	"
+Sleep 1s
+Type "	"
+Sleep 1s
 Type "j"
 Sleep 400ms
 Type "j"
 Sleep 400ms
 
-# Open detail view
+# Drill into a repo to see its sessions
 Type "enter"
 Sleep 2s
 
-# Back and try kanban
+# Back to dashboard
+Type "esc"
+Sleep 1s
+
+# Tab back to Active panel
+Type "	"
+Sleep 500ms
+Type "	"
+Sleep 500ms
+
+# Drill into an active session
+Type "enter"
+Sleep 2s
+
+# Check the logs
+Type "l"
+Sleep 2s
+
+# Back to dashboard
+Type "esc"
+Sleep 1s
+
+# Try the search
+Type "/"
+Sleep 500ms
+Type "auth"
+Sleep 1s
 Type "esc"
 Sleep 500ms
+
+# Switch to kanban
 Type "K"
 Sleep 2s
 
-# Mission control
-Type "esc"
-Sleep 500ms
-Type "M"
+# Tab through columns
+Type "	"
+Sleep 800ms
+Type "	"
+Sleep 800ms
+Type "	"
+Sleep 800ms
+
+# Dismiss completed
+Type "X"
 Sleep 2s
 
-# Back to list, show help
+# Back to dashboard
 Type "esc"
-Sleep 500ms
+Sleep 1s
+
+# Take a snapshot
+Type "S"
+Sleep 1s
+
+# Show help
 Type "?"
 Sleep 2s
 Type "?"

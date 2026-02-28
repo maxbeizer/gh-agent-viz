@@ -82,12 +82,74 @@ func (s Session) ToAgentTask() AgentTask {
 	}
 }
 
+// AttentionLevel represents the graduated urgency of a session.
+type AttentionLevel int
+
+const (
+	AttentionNone    AttentionLevel = iota // No action needed
+	AttentionInfo                          // Informational (e.g., completed with notes)
+	AttentionWarning                       // Warning (e.g., idle too long, queued too long)
+	AttentionUrgent                        // Urgent (e.g., failed, needs-input)
+)
+
+// AttentionLevelString returns a human-readable label for the level.
+func (l AttentionLevel) String() string {
+	switch l {
+	case AttentionUrgent:
+		return "urgent"
+	case AttentionWarning:
+		return "warning"
+	case AttentionInfo:
+		return "info"
+	default:
+		return "none"
+	}
+}
+
+// IdleWarningThreshold is how long a running session can be idle before
+// it's considered a warning (possibly stuck).
+const IdleWarningThreshold = 2 * time.Hour
+
+// QueuedWarningThreshold is how long a queued session can wait before
+// it's considered a warning.
+const QueuedWarningThreshold = 30 * time.Minute
+
+// SessionAttentionLevel returns the graduated attention level for a session.
+func SessionAttentionLevel(session Session) AttentionLevel {
+	status := strings.ToLower(strings.TrimSpace(session.Status))
+
+	// Urgent: explicit failures or blocking on user input
+	if status == "needs-input" || status == "failed" {
+		return AttentionUrgent
+	}
+
+	// Warning: running but idle too long (possibly stuck)
+	if StatusIsActive(session.Status) && status != "queued" {
+		if !session.UpdatedAt.IsZero() && time.Since(session.UpdatedAt) >= IdleWarningThreshold {
+			return AttentionWarning
+		}
+	}
+
+	// Warning: queued too long
+	if status == "queued" {
+		if !session.CreatedAt.IsZero() && time.Since(session.CreatedAt) >= QueuedWarningThreshold {
+			return AttentionWarning
+		}
+	}
+
+	return AttentionNone
+}
+
 // SessionNeedsAttention indicates whether a session requires operator action.
 // Only true for sessions explicitly waiting on user input or that have failed.
-// Idle sessions are informational, not actionable.
+// Preserved as convenience wrapper — equivalent to AttentionLevel == Urgent.
 func SessionNeedsAttention(session Session) bool {
-	status := strings.ToLower(strings.TrimSpace(session.Status))
-	return status == "needs-input" || status == "failed"
+	return SessionAttentionLevel(session) >= AttentionUrgent
+}
+
+// SessionNeedsAnyAttention returns true for sessions at Warning level or above.
+func SessionNeedsAnyAttention(session Session) bool {
+	return SessionAttentionLevel(session) >= AttentionWarning
 }
 
 // StatusIsActive determines if a status string represents an active session.

@@ -154,21 +154,33 @@ return m.repos[i].MostRecent.After(m.repos[j].MostRecent)
 func (m *Model) computeAttention() {
 m.attention = nil
 for _, s := range m.sessions {
+level := data.SessionAttentionLevel(s)
+if level < data.AttentionWarning {
+continue
+}
 status := strings.ToLower(strings.TrimSpace(s.Status))
-if status == "needs-input" {
-reason := "✋ Waiting for input"
+var reason string
+switch {
+case status == "needs-input":
+reason = "🔴 Waiting for input"
 if s.Source == data.SourceLocalCopilot {
 if msg := data.FetchLastAssistantMessage(s.ID); msg != "" {
 if len(msg) > 60 {
 msg = msg[:57] + "..."
 }
-reason = "✋ \"" + msg + "\""
+reason = "🔴 \"" + msg + "\""
 }
+}
+case status == "failed":
+reason = "🔴 Failed"
+case level == data.AttentionWarning && status == "queued":
+reason = "🟡 Queued too long"
+case level == data.AttentionWarning:
+reason = "🟡 Possibly stuck (idle 2h+)"
+default:
+reason = "🟡 Needs review"
 }
 m.attention = append(m.attention, attentionItem{Session: s, Reason: reason})
-} else if status == "failed" {
-m.attention = append(m.attention, attentionItem{Session: s, Reason: "❌ Failed"})
-}
 }
 }
 

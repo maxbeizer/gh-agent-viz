@@ -28,6 +28,7 @@ var taglines = []string{
 type FilterCounts struct {
 	All       int
 	Attention int
+	Warning   int
 	Active    int
 	Completed int
 	Failed    int
@@ -105,7 +106,7 @@ func (m Model) View() string {
 		{"completed", "DONE", m.counts.Completed},
 		{"failed", "FAILED", m.counts.Failed},
 		{"all", "ALL", m.counts.All},
-		{"attention", "ATTENTION", m.counts.Attention},
+		{"attention", "ATTENTION", m.counts.Attention + m.counts.Warning},
 	}
 
 	renderedTabs := make([]string, 0, len(tabs))

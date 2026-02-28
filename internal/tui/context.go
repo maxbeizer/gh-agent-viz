@@ -6,6 +6,7 @@ import "github.com/maxbeizer/gh-agent-viz/internal/config"
 type FilterCounts struct {
 	All       int
 	Attention int
+	Warning   int
 	Active    int
 	Completed int
 	Failed    int

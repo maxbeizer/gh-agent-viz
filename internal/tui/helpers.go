@@ -54,7 +54,7 @@ func smartDefaultFilter(counts FilterCounts) string {
 	if counts.Active > 0 {
 		return "active"
 	}
-	if counts.Attention > 0 {
+	if counts.Attention > 0 || counts.Warning > 0 {
 		return "attention"
 	}
 	return "all"
@@ -289,8 +289,12 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 	// Compute counts
 	counts := FilterCounts{All: len(visible)}
 	for _, session := range visible {
-		if data.SessionNeedsAttention(session) {
+		level := data.SessionAttentionLevel(session)
+		if level >= data.AttentionUrgent {
 			counts.Attention++
+		}
+		if level == data.AttentionWarning {
+			counts.Warning++
 		}
 		if data.StatusIsActive(session.Status) || strings.EqualFold(session.Status, "needs-input") {
 			counts.Active++
@@ -308,6 +312,7 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 	m.header.SetCounts(header.FilterCounts{
 		All:       counts.All,
 		Attention: counts.Attention,
+		Warning:   counts.Warning,
 		Active:    counts.Active,
 		Completed: counts.Completed,
 		Failed:    counts.Failed,
@@ -329,7 +334,7 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 	if m.ctx.StatusFilter != "all" {
 		filtered = []data.Session{}
 		for _, session := range visible {
-			if m.ctx.StatusFilter == "attention" && data.SessionNeedsAttention(session) {
+			if m.ctx.StatusFilter == "attention" && data.SessionNeedsAnyAttention(session) {
 				filtered = append(filtered, session)
 			} else if m.ctx.StatusFilter == "active" && (data.StatusIsActive(session.Status) || strings.EqualFold(session.Status, "needs-input")) {
 				filtered = append(filtered, session)

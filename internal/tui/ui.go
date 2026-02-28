@@ -214,6 +214,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.header.SetCounts(header.FilterCounts{
 			All:       msg.counts.All,
 			Attention: msg.counts.Attention,
+			Warning:   msg.counts.Warning,
 			Active:    msg.counts.Active,
 			Completed: msg.counts.Completed,
 			Failed:    msg.counts.Failed,

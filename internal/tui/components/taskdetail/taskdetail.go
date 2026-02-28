@@ -245,14 +245,23 @@ func attentionReason(session *data.Session) string {
 	if session == nil {
 		return ""
 	}
-	status := strings.ToLower(strings.TrimSpace(session.Status))
-	if status == "needs-input" {
-		return "✋ This session is waiting for your input to continue."
+	level := data.SessionAttentionLevel(*session)
+	switch level {
+	case data.AttentionUrgent:
+		status := strings.ToLower(strings.TrimSpace(session.Status))
+		if status == "needs-input" {
+			return "🔴 This session is waiting for your input to continue."
+		}
+		return "🔴 This session has failed. Press 'l' to check logs."
+	case data.AttentionWarning:
+		status := strings.ToLower(strings.TrimSpace(session.Status))
+		if status == "queued" {
+			return "🟡 This session has been queued for a while — it may need investigation."
+		}
+		return "🟡 This session has been idle for 2+ hours — it may be stuck."
+	default:
+		return ""
 	}
-	if status == "failed" {
-		return "🚨 This session has failed. Press 'l' to check logs."
-	}
-	return ""
 }
 
 func detailValue(value string, fallback string) string {

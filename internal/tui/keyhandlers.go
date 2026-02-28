@@ -11,6 +11,9 @@ import (
 func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// When help overlay is visible, only ? and esc close it; ignore everything else
 	if m.help.Visible() {
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
 		if msg.String() == "?" || msg.Type == tea.KeyEscape {
 			m.help.Toggle()
 		}
@@ -19,6 +22,10 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Search mode: capture text input for filtering
 	if m.searchActive {
+		// ctrl+c always quits, even in search mode
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
 		switch msg.Type {
 		case tea.KeyEscape:
 			m.searchActive = false

@@ -170,19 +170,6 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 		style = m.tableRowSelected
 	}
 
-	// Status-based row tinting (subtle background color)
-	level := data.SessionAttentionLevel(session)
-	if !selected {
-		switch {
-		case level == data.AttentionUrgent:
-			style = style.Background(lipgloss.AdaptiveColor{Light: "224", Dark: "52"})
-		case level == data.AttentionWarning:
-			style = style.Background(lipgloss.AdaptiveColor{Light: "230", Dark: "58"})
-		case data.SessionIsActiveNotIdle(session):
-			style = style.Background(lipgloss.AdaptiveColor{Light: "194", Dark: "22"})
-		}
-	}
-
 	// Only animate icon for sessions that are actively working (not idle)
 	icon := m.statusIcon(session.Status)
 	if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(session) {

@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,11 +10,16 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/maxbeizer/gh-agent-viz/internal/data/capi"
 )
 
 // execCommand is a variable to allow mocking exec.Command in tests.
 var execCommand = exec.Command
 var debugEnabled bool
+
+// newCAPIClient is a constructor variable to allow disabling CAPI in tests.
+var newCAPIClient = func() (*capi.Client, error) { return capi.NewClient() }
 
 const debugLogFileName = ".gh-agent-viz-debug.log"
 
@@ -45,8 +51,64 @@ type AgentTask struct {
 	Source     string    `json:"source"` // "agent-task" or "local"
 }
 
-// FetchAgentTasks retrieves the list of agent tasks, optionally scoped to a repository
+// FetchAgentTasks retrieves the list of agent tasks, optionally scoped to a repository.
+// Tries the Copilot API directly first, falling back to the gh CLI subprocess.
 func FetchAgentTasks(repo string) ([]AgentTask, error) {
+	if tasks, err := fetchAgentTasksViaCAPI(repo); err == nil {
+		return tasks, nil
+	}
+
+	// Fallback to gh CLI subprocess
+	return fetchAgentTasksViaCLI(repo)
+}
+
+// fetchAgentTasksViaCAPI calls the Copilot API directly for structured data.
+func fetchAgentTasksViaCAPI(repo string) ([]AgentTask, error) {
+	client, err := newCAPIClient()
+	if err != nil {
+		return nil, err
+	}
+	sessions, err := client.ListSessions(context.Background(), 50)
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := make([]AgentTask, 0, len(sessions))
+	for _, s := range sessions {
+		task := agentTaskFromCAPISession(s)
+
+		if repo != "" && task.Repository != repo {
+			continue
+		}
+		tasks = append(tasks, task)
+	}
+	return tasks, nil
+}
+
+// agentTaskFromCAPISession maps a CAPI session to our AgentTask model.
+func agentTaskFromCAPISession(s capi.Session) AgentTask {
+	createdAt, _ := time.Parse(time.RFC3339, s.CreatedAt)
+	updatedAt, _ := time.Parse(time.RFC3339, s.LastUpdatedAt)
+
+	prNumber := 0
+	if s.ResourceType == "pull" {
+		prNumber = int(s.ResourceID)
+	}
+
+	return AgentTask{
+		ID:         s.ID,
+		Status:     normalizeStatus(s.State),
+		Title:      s.Name,
+		Branch:     s.HeadRef,
+		PRNumber:   prNumber,
+		CreatedAt:  createdAt,
+		UpdatedAt:  updatedAt,
+		Source:     "agent-task",
+	}
+}
+
+// fetchAgentTasksViaCLI is the original exec.Command-based implementation.
+func fetchAgentTasksViaCLI(repo string) ([]AgentTask, error) {
 	jsonArgs := []string{"agent-task", "list", "--json"}
 	if repo != "" {
 		jsonArgs = append(jsonArgs, "-R", repo)
@@ -111,12 +173,34 @@ func FetchAgentTasks(repo string) ([]AgentTask, error) {
 	return tasks, nil
 }
 
-// FetchAgentTaskDetail retrieves detailed information for a specific agent task
+// FetchAgentTaskDetail retrieves detailed information for a specific agent task.
+// Tries the Copilot API directly first, falling back to the gh CLI subprocess.
 func FetchAgentTaskDetail(id string, repo string) (*AgentTask, error) {
 	if id == "" {
 		return nil, fmt.Errorf("task id is required")
 	}
 
+	if task, err := fetchAgentTaskDetailViaCAPI(id); err == nil {
+		return task, nil
+	}
+
+	return fetchAgentTaskDetailViaCLI(id, repo)
+}
+
+func fetchAgentTaskDetailViaCAPI(id string) (*AgentTask, error) {
+	client, err := newCAPIClient()
+	if err != nil {
+		return nil, err
+	}
+	s, err := client.GetSession(context.Background(), id)
+	if err != nil {
+		return nil, err
+	}
+	task := agentTaskFromCAPISession(*s)
+	return &task, nil
+}
+
+func fetchAgentTaskDetailViaCLI(id string, repo string) (*AgentTask, error) {
 	args := []string{"agent-task", "view", id, "--json"}
 	if repo != "" {
 		args = append(args, "-R", repo)
@@ -174,12 +258,29 @@ func FetchAgentTaskDetail(id string, repo string) (*AgentTask, error) {
 	}, nil
 }
 
-// FetchAgentTaskLog retrieves the event log for a specific agent task
+// FetchAgentTaskLog retrieves the event log for a specific agent task.
+// Tries the Copilot API directly first, falling back to the gh CLI subprocess.
 func FetchAgentTaskLog(id string, repo string) (string, error) {
 	if id == "" {
 		return "", fmt.Errorf("task id is required")
 	}
 
+	if log, err := fetchAgentTaskLogViaCAPI(id); err == nil {
+		return log, nil
+	}
+
+	return fetchAgentTaskLogViaCLI(id, repo)
+}
+
+func fetchAgentTaskLogViaCAPI(id string) (string, error) {
+	client, err := newCAPIClient()
+	if err != nil {
+		return "", err
+	}
+	return client.GetSessionLogs(context.Background(), id)
+}
+
+func fetchAgentTaskLogViaCLI(id string, repo string) (string, error) {
 	args := []string{"agent-task", "view", id, "--log"}
 	if repo != "" {
 		args = append(args, "-R", repo)

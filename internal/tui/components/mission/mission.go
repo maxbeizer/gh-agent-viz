@@ -48,9 +48,9 @@ type PanelFocus int
 
 const (
 PanelActive PanelFocus = iota
+PanelRecent
 PanelAttention
 PanelRepos
-PanelRecent
 PanelIdle
 )
 

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [v0.5.0] - 2026-02-28
+
+### Added
+
+- Direct Copilot API client (`internal/data/capi/`) — calls `api.githubcopilot.com` directly instead of shelling out to `gh agent-task`
+- Structured JSON responses with access to all API fields (timestamps, model, premium_requests, error details)
+- Graceful fallback to CLI subprocess when CAPI auth is unavailable
+- `go-gh` dependency for auth token retrieval
+
+### Changed
+
+- `FetchAgentTasks`, `FetchAgentTaskDetail`, and `FetchAgentTaskLog` now try CAPI first
+- Updated documentation across 5 files to reflect new data-fetching architecture
+
 ## [v0.3.0] - 2026-02-20
 
 ### Added

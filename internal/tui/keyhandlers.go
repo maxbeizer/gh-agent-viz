@@ -426,3 +426,50 @@ func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+// handleMouse processes mouse events for scrolling and navigation.
+func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	switch msg.Button {
+	case tea.MouseButtonWheelUp:
+		switch m.viewMode {
+		case ViewModeList:
+			m.taskList.MoveCursor(-3)
+		case ViewModeKanban:
+			m.kanban.MoveRow(-1)
+		case ViewModeMission:
+			m.mission.MoveCursor(-1)
+		case ViewModeLog:
+			if m.showConversation {
+				m.conversationView.LineUp()
+				m.conversationView.LineUp()
+				m.conversationView.LineUp()
+			} else {
+				m.logView.SetFollowMode(false)
+				m.logView.LineUp()
+				m.logView.LineUp()
+				m.logView.LineUp()
+			}
+		}
+	case tea.MouseButtonWheelDown:
+		switch m.viewMode {
+		case ViewModeList:
+			m.taskList.MoveCursor(3)
+		case ViewModeKanban:
+			m.kanban.MoveRow(1)
+		case ViewModeMission:
+			m.mission.MoveCursor(1)
+		case ViewModeLog:
+			if m.showConversation {
+				m.conversationView.LineDown()
+				m.conversationView.LineDown()
+				m.conversationView.LineDown()
+			} else {
+				m.logView.SetFollowMode(false)
+				m.logView.LineDown()
+				m.logView.LineDown()
+				m.logView.LineDown()
+			}
+		}
+	}
+	return m, nil
+}

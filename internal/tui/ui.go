@@ -197,6 +197,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
 
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
+
 	case localSessionsLoadedMsg:
 		// Phase 1: show local sessions immediately
 		m.mergeSessions(msg.sessions)

@@ -245,39 +245,28 @@ w = 40
 
 dim := lipgloss.NewStyle().Faint(true)
 sectionHead := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
+sessionTitle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
 
 var lines []string
 
-// ── Fleet summary bar ──
+// ── Fleet summary ──
 lines = append(lines, "")
 summaryParts := []string{}
 if m.stats.Active > 0 {
-summaryParts = append(summaryParts, fmt.Sprintf("● %d in progress", m.stats.Active))
+summaryParts = append(summaryParts, fmt.Sprintf("● %d active", m.stats.Active))
 }
 if m.stats.Idle > 0 {
 summaryParts = append(summaryParts, fmt.Sprintf("💤 %d idle", m.stats.Idle))
 }
 if m.stats.NeedsInput > 0 {
-summaryParts = append(summaryParts, fmt.Sprintf("✋ %d waiting on you", m.stats.NeedsInput))
+summaryParts = append(summaryParts, fmt.Sprintf("✋ %d input", m.stats.NeedsInput))
 }
 if m.stats.Done > 0 {
 summaryParts = append(summaryParts, fmt.Sprintf("✅ %d done", m.stats.Done))
 }
 if m.stats.Failed > 0 {
-summaryParts = append(summaryParts, fmt.Sprintf("❌ %d failed", m.stats.Failed))
+summaryParts = append(summaryParts, fmt.Sprintf("❌ %d fail", m.stats.Failed))
 }
-lines = append(lines, "  "+strings.Join(summaryParts, "    "))
-
-// ── Proportional bar ──
-barWidth := w - 4
-if barWidth > 60 {
-barWidth = 60
-}
-if barWidth > 0 && m.stats.Total > 0 {
-bar := m.renderBar(barWidth)
-lines = append(lines, "  "+bar)
-}
-// Total token usage across all sessions
 totalTokens := int64(0)
 for _, s := range m.sessions {
 if s.Telemetry != nil {
@@ -285,38 +274,77 @@ totalTokens += s.Telemetry.InputTokens
 }
 }
 if totalTokens > 0 {
-lines = append(lines, fmt.Sprintf("  🪙 %s tokens consumed", data.FormatTokenCount(totalTokens)))
+summaryParts = append(summaryParts, fmt.Sprintf("🪙 %s tokens", data.FormatTokenCount(totalTokens)))
 }
-lines = append(lines, "")
+lines = append(lines, "  "+strings.Join(summaryParts, "  "))
+barWidth := w - 4
+if barWidth > 60 {
+barWidth = 60
+}
+if barWidth > 0 && m.stats.Total > 0 {
+lines = append(lines, "  "+m.renderBar(barWidth))
+}
 
-// ── Needs your attention (urgent + warning) ──
+// ── Active sessions (what's running right now) ──
+activeSessions := m.activeSessions()
+if len(activeSessions) > 0 {
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render("Active now"))
+lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
+for _, s := range activeSessions {
+icon := m.statusIcon(s.Status)
+if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
+icon = m.animStatusIcon(s.Status, m.animFrame)
+}
+title := s.Title
+maxTitle := w / 2
+if maxTitle < 15 { maxTitle = 15 }
+if len(title) > maxTitle { title = title[:maxTitle-1] + "…" }
+
+action := DeriveLastAction(s)
+maxAction := w/3
+if len(action) > maxAction { action = action[:maxAction-1] + "…" }
+
+repo := s.Repository
+if repo == "" { repo = "local" }
+if parts := strings.SplitN(repo, "/", 2); len(parts) == 2 { repo = parts[1] }
+
+line := fmt.Sprintf("  %s %s", icon, sessionTitle.Render(title))
+right := dim.Render(fmt.Sprintf("%s  %s", action, repo))
+pad := w - lipgloss.Width(line) - lipgloss.Width(right)
+if pad < 1 { pad = 1 }
+lines = append(lines, line + strings.Repeat(" ", pad) + right)
+}
+}
+
+// ── Needs your attention ──
 if len(m.attention) > 0 {
-lines = append(lines, "  "+sectionHead.Render("Needs your attention"))
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Needs attention (%d)", len(m.attention))))
 lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
 for _, item := range m.attention {
+title := item.Session.Title
+maxTitle := w / 3
+if maxTitle < 15 { maxTitle = 15 }
+if len(title) > maxTitle { title = title[:maxTitle-1] + "…" }
+
 repo := item.Session.Repository
-if repo == "" {
-repo = "local"
-}
+if repo == "" { repo = "local" }
+if parts := strings.SplitN(repo, "/", 2); len(parts) == 2 { repo = parts[1] }
+
 ago := formatAge(item.Session.UpdatedAt)
-reasonPart := item.Reason
-if len(reasonPart) > w/2 {
-reasonPart = reasonPart[:w/2-3] + "..."
-}
+left := fmt.Sprintf("  %s %s", item.Reason, sessionTitle.Render(title))
 right := dim.Render(fmt.Sprintf("%s  %s", repo, ago))
-pad := w - len(reasonPart) - len(repo) - len(ago) - 6
-if pad < 2 {
-pad = 2
+pad := w - lipgloss.Width(left) - lipgloss.Width(right)
+if pad < 1 { pad = 1 }
+lines = append(lines, left + strings.Repeat(" ", pad) + right)
 }
-lines = append(lines, fmt.Sprintf("  %s%s%s", reasonPart, strings.Repeat(" ", pad), right))
-}
-lines = append(lines, "")
 }
 
-// ── Repos with activity ──
+// ── Repos ──
+lines = append(lines, "")
 lines = append(lines, "  "+sectionHead.Render("Repos"))
 lines = append(lines, "  "+dim.Render(strings.Repeat("─", w-4)))
-
 for i, r := range m.repos {
 selected := i == m.cursor
 lines = append(lines, m.renderRepoRow(r, selected, w))
@@ -442,6 +470,17 @@ m.cursor = 0
 if m.cursor >= len(m.repos) {
 m.cursor = len(m.repos) - 1
 }
+}
+
+// activeSessions returns sessions that are currently running or waiting for input.
+func (m *Model) activeSessions() []data.Session {
+var active []data.Session
+for _, s := range m.sessions {
+if data.SessionIsActiveNotIdle(s) || strings.EqualFold(strings.TrimSpace(s.Status), "needs-input") {
+active = append(active, s)
+}
+}
+return active
 }
 
 // recentCompletions returns the most recent n completed/failed sessions.

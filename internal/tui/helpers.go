@@ -145,6 +145,7 @@ func (m *Model) updateFooterHints() {
 	case ViewModeMission:
 		missionHints := []key.Binding{
 			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "navigate")),
+			key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "panel")),
 			m.keys.SelectTask,
 			m.keys.ToggleKanban,
 			m.keys.SearchFilter,

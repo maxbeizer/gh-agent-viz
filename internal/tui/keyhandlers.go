@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/mission"
 )
 
 // handleKeyPress processes keyboard input
@@ -428,9 +429,41 @@ func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mission.MoveCursor(1)
 	case "k", "up":
 		m.mission.MoveCursor(-1)
+	case "tab":
+		m.mission.CyclePanel(1)
+	case "shift+tab", "backtab":
+		m.mission.CyclePanel(-1)
 	case "enter":
-		m.viewMode = ViewModeList
-		m.taskList.SetTasks(m.visibleSessions())
+		// Drill into selected item based on focused panel
+		switch m.mission.Focus() {
+		case mission.PanelActive, mission.PanelAttention:
+			session := m.mission.SelectedSession()
+			if session != nil {
+				if session.Source == data.SourceLocalCopilot {
+					m.ctx.Error = nil
+					m.viewMode = ViewModeDetail
+					m.taskDetail.SetTask(session)
+					return m, nil
+				}
+				m.viewMode = ViewModeDetail
+				return m, m.fetchTaskDetail(session.ID, session.Repository)
+			}
+		case mission.PanelRepos:
+			// Filter list view to show only this repo's sessions
+			repo := m.mission.SelectedRepo()
+			if repo != "" {
+				m.viewMode = ViewModeList
+				filtered := []data.Session{}
+				for _, s := range m.visibleSessions() {
+					r := s.Repository
+					if r == "" { r = "local" }
+					if r == repo {
+						filtered = append(filtered, s)
+					}
+				}
+				m.taskList.SetTasks(filtered)
+			}
+		}
 	case "K":
 		m.viewMode = ViewModeKanban
 		m.kanban.SetSessions(m.visibleSessions())
@@ -482,6 +515,23 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				m.logView.LineDown()
 				m.logView.LineDown()
 				m.logView.LineDown()
+			}
+		}
+	case tea.MouseButtonLeft:
+		if msg.Action == tea.MouseActionPress && m.viewMode == ViewModeMission {
+			// Click left half → Active or Attention panel
+			// Click right half → Repos panel
+			midX := m.ctx.Width / 2
+			if msg.X < midX {
+				// Top half of left = Active, bottom half = Attention
+				leftMid := m.ctx.Height / 2
+				if msg.Y < leftMid {
+					m.mission.SetFocus(mission.PanelActive)
+				} else {
+					m.mission.SetFocus(mission.PanelAttention)
+				}
+			} else {
+				m.mission.SetFocus(mission.PanelRepos)
 			}
 		}
 	}

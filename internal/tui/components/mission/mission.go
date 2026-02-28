@@ -43,13 +43,25 @@ Session data.Session
 Reason  string
 }
 
+// PanelFocus indicates which dashboard panel has keyboard focus.
+type PanelFocus int
+
+const (
+PanelActive PanelFocus = iota
+PanelAttention
+PanelRepos
+)
+
 // Model represents the mission control summary dashboard.
 type Model struct {
 sessions   []data.Session
 stats      fleetStats
 repos      []repoSummary
 attention  []attentionItem
-cursor     int // navigates repo rows
+focus      PanelFocus // which panel has keyboard focus
+cursors    [3]int     // per-panel cursor: [active, attention, repos]
+// Panel Y ranges for mouse click detection (set during render)
+panelYRanges [3][2]int // [panel][start, end] row ranges
 statusIcon func(string) string
 animStatusIcon func(string, int) string
 animFrame  int
@@ -195,18 +207,57 @@ func (m *Model) SetAnimFrame(frame int) {
 m.animFrame = frame
 }
 
-// MoveCursor moves the cursor by delta (navigates repo rows).
+// MoveCursor moves the cursor within the focused panel.
 func (m *Model) MoveCursor(delta int) {
-if len(m.repos) == 0 {
+maxLen := m.focusedPanelLen()
+if maxLen == 0 { return }
+m.cursors[m.focus] += delta
+if m.cursors[m.focus] < 0 { m.cursors[m.focus] = 0 }
+if m.cursors[m.focus] >= maxLen { m.cursors[m.focus] = maxLen - 1 }
+}
+
+// CyclePanel moves focus to the next/previous panel.
+func (m *Model) CyclePanel(delta int) {
+m.focus = PanelFocus((int(m.focus) + delta + 3) % 3)
+m.clampCursor()
+}
+
+// SetFocus sets the focused panel directly.
+func (m *Model) SetFocus(panel PanelFocus) {
+m.focus = panel
+m.clampCursor()
+}
+
+// Focus returns the currently focused panel.
+func (m *Model) Focus() PanelFocus {
+return m.focus
+}
+
+// FocusPanelAtY sets focus based on a mouse click Y coordinate.
+func (m *Model) FocusPanelAtY(y int) {
+for i, r := range m.panelYRanges {
+if y >= r[0] && y <= r[1] {
+m.focus = PanelFocus(i)
 return
 }
-m.cursor += delta
-m.clampCursor()
+}
+}
+
+func (m *Model) focusedPanelLen() int {
+switch m.focus {
+case PanelActive:
+return len(m.activeSessions())
+case PanelAttention:
+return len(m.attention)
+case PanelRepos:
+return len(m.repos)
+}
+return 0
 }
 
 // Cursor returns the current cursor position.
 func (m *Model) Cursor() int {
-return m.cursor
+return m.cursors[m.focus]
 }
 
 // Cards returns session cards (kept for interface compat).
@@ -218,18 +269,36 @@ cards[i] = SessionCard{Session: s, LastAction: DeriveLastAction(s)}
 return cards
 }
 
-// SelectedSession returns nil — summary view doesn't select individual sessions.
-// Use SelectedRepo to get the focused repo name.
+// SelectedSession returns the session at the cursor in the focused panel, or nil.
 func (m *Model) SelectedSession() *data.Session {
+switch m.focus {
+case PanelActive:
+active := m.activeSessions()
+idx := m.cursors[PanelActive]
+if idx >= 0 && idx < len(active) {
+s := active[idx]
+return &s
+}
+case PanelAttention:
+idx := m.cursors[PanelAttention]
+if idx >= 0 && idx < len(m.attention) {
+s := m.attention[idx].Session
+return &s
+}
+case PanelRepos:
+// Repos don't select a single session
+return nil
+}
 return nil
 }
 
-// SelectedRepo returns the repository name at the cursor position.
+// SelectedRepo returns the repository name at the repos cursor position.
 func (m *Model) SelectedRepo() string {
-if len(m.repos) == 0 || m.cursor < 0 || m.cursor >= len(m.repos) {
+idx := m.cursors[PanelRepos]
+if len(m.repos) == 0 || idx < 0 || idx >= len(m.repos) {
 return ""
 }
-return m.repos[m.cursor].Name
+return m.repos[idx].Name
 }
 
 // View renders the summary dashboard.
@@ -271,17 +340,95 @@ return titleRendered + "\n" + box
 func (m *Model) viewMultiPane() string {
 dim := lipgloss.NewStyle().Faint(true)
 sessionStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
+cursorStyle := lipgloss.NewStyle().Bold(true)
 
 totalWidth := m.width - 2
 leftWidth := totalWidth * 55 / 100
 rightWidth := totalWidth - leftWidth
 
-availHeight := m.height - 6 // header + stats + footer chrome
+availHeight := m.height - 6
 if availHeight < 12 { availHeight = 12 }
 
-// ── Build left column content ──
+focusColor := lipgloss.AdaptiveColor{Light: "30", Dark: "73"}
 
-// Fleet panel
+// ── LEFT COLUMN ──
+
+// Active sessions panel (primary — what you care about most)
+activeSessions := m.activeSessions()
+var activeLines []string
+innerW := leftWidth - 6
+for i, s := range activeSessions {
+icon := m.statusIcon(s.Status)
+if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
+icon = m.animStatusIcon(s.Status, m.animFrame)
+}
+title := s.Title
+maxT := innerW / 2
+if maxT < 10 { maxT = 10 }
+if len(title) > maxT { title = title[:maxT-1] + "…" }
+action := DeriveLastAction(s)
+maxA := innerW / 3
+if len(action) > maxA { action = action[:maxA-1] + "…" }
+
+gutter := "  "
+titleRender := sessionStyle.Render(title)
+if m.focus == PanelActive && i == m.cursors[PanelActive] {
+gutter = "▎ "
+titleRender = cursorStyle.Render(title)
+}
+left := fmt.Sprintf("%s%s %s", gutter, icon, titleRender)
+right := dim.Render(action)
+pad := innerW - lipgloss.Width(left) - lipgloss.Width(right)
+if pad < 1 { pad = 1 }
+activeLines = append(activeLines, left + strings.Repeat(" ", pad) + right)
+}
+if len(activeLines) == 0 {
+activeLines = append(activeLines, dim.Render("  no active sessions"))
+}
+activeHeight := len(activeLines)
+maxActive := availHeight / 2
+if activeHeight > maxActive { activeHeight = maxActive; activeLines = activeLines[:maxActive] }
+if activeHeight < 2 { activeHeight = 2 }
+activeTitle := fmt.Sprintf("Active (%d)", len(activeSessions))
+activePanel := renderPanelFocused(activeTitle, strings.Join(activeLines, "\n"), leftWidth, activeHeight, m.focus == PanelActive, focusColor)
+
+// Attention panel
+var attnLines []string
+for i, item := range m.attention {
+title := item.Session.Title
+maxT := innerW / 2
+if maxT < 10 { maxT = 10 }
+if len(title) > maxT { title = title[:maxT-1] + "…" }
+repo := shortRepo(item.Session.Repository)
+ago := formatAge(item.Session.UpdatedAt)
+
+gutter := "  "
+titleRender := sessionStyle.Render(title)
+if m.focus == PanelAttention && i == m.cursors[PanelAttention] {
+gutter = "▎ "
+titleRender = cursorStyle.Render(title)
+}
+left := fmt.Sprintf("%s%s %s", gutter, item.Reason, titleRender)
+right := dim.Render(fmt.Sprintf("%s %s", repo, ago))
+pad := innerW - lipgloss.Width(left) - lipgloss.Width(right)
+if pad < 1 { pad = 1 }
+attnLines = append(attnLines, left + strings.Repeat(" ", pad) + right)
+}
+if len(attnLines) == 0 {
+attnLines = append(attnLines, dim.Render("  all clear ✨"))
+}
+attnHeight := len(attnLines)
+maxAttn := availHeight / 4
+if attnHeight > maxAttn { attnHeight = maxAttn; attnLines = attnLines[:maxAttn] }
+if attnHeight < 1 { attnHeight = 1 }
+attnTitle := fmt.Sprintf("Attention (%d)", len(m.attention))
+attnPanel := renderPanelFocused(attnTitle, strings.Join(attnLines, "\n"), leftWidth, attnHeight, m.focus == PanelAttention, focusColor)
+
+leftCol := lipgloss.JoinVertical(lipgloss.Left, activePanel, attnPanel)
+
+// ── RIGHT COLUMN ──
+
+// Fleet summary panel
 var fleetLines []string
 summaryParts := []string{}
 if m.stats.Active > 0 { summaryParts = append(summaryParts, fmt.Sprintf("● %d active", m.stats.Active)) }
@@ -297,93 +444,32 @@ if totalTokens > 0 {
 summaryParts = append(summaryParts, fmt.Sprintf("🪙 %s", data.FormatTokenCount(totalTokens)))
 }
 fleetLines = append(fleetLines, strings.Join(summaryParts, "  "))
-barWidth := leftWidth - 6
+barWidth := rightWidth - 6
 if barWidth > 50 { barWidth = 50 }
 if barWidth > 0 && m.stats.Total > 0 {
 fleetLines = append(fleetLines, m.renderBar(barWidth))
 }
 fleetHeight := len(fleetLines)
 if fleetHeight < 2 { fleetHeight = 2 }
-fleetPanel := renderPanel("Fleet", strings.Join(fleetLines, "\n"), leftWidth, fleetHeight)
-
-// Attention panel
-var attnLines []string
-innerW := leftWidth - 6
-for _, item := range m.attention {
-title := item.Session.Title
-maxT := innerW / 2
-if maxT < 10 { maxT = 10 }
-if len(title) > maxT { title = title[:maxT-1] + "…" }
-repo := shortRepo(item.Session.Repository)
-ago := formatAge(item.Session.UpdatedAt)
-left := fmt.Sprintf("%s %s", item.Reason, sessionStyle.Render(title))
-right := dim.Render(fmt.Sprintf("%s %s", repo, ago))
-pad := innerW - lipgloss.Width(left) - lipgloss.Width(right)
-if pad < 1 { pad = 1 }
-attnLines = append(attnLines, left + strings.Repeat(" ", pad) + right)
-}
-if len(attnLines) == 0 {
-attnLines = append(attnLines, dim.Render("all clear ✨"))
-}
-attnHeight := len(attnLines)
-maxAttn := availHeight / 3
-if attnHeight > maxAttn { attnHeight = maxAttn; attnLines = attnLines[:maxAttn] }
-if attnHeight < 1 { attnHeight = 1 }
-attnTitle := fmt.Sprintf("Attention (%d)", len(m.attention))
-attnPanel := renderPanel(attnTitle, strings.Join(attnLines, "\n"), leftWidth, attnHeight)
+fleetPanel := renderPanel("Fleet", strings.Join(fleetLines, "\n"), rightWidth, fleetHeight)
 
 // Repos panel
 var repoLines []string
+rInnerW := rightWidth - 6
 for i, r := range m.repos {
-selected := i == m.cursor
-repoLines = append(repoLines, m.renderRepoRow(r, selected, innerW))
+selected := (m.focus == PanelRepos) && i == m.cursors[PanelRepos]
+repoLines = append(repoLines, m.renderRepoRow(r, selected, rInnerW))
 }
 repoHeight := len(repoLines)
-maxRepo := availHeight - fleetHeight - attnHeight - 10
+maxRepo := availHeight - fleetHeight - 8
 if maxRepo < 3 { maxRepo = 3 }
 if repoHeight > maxRepo { repoHeight = maxRepo; repoLines = repoLines[:maxRepo] }
 if repoHeight < 1 { repoHeight = 1 }
-repoPanel := renderPanel("Repos", strings.Join(repoLines, "\n"), leftWidth, repoHeight)
+repoPanel := renderPanelFocused("Repos", strings.Join(repoLines, "\n"), rightWidth, repoHeight, m.focus == PanelRepos, focusColor)
 
-leftCol := lipgloss.JoinVertical(lipgloss.Left, fleetPanel, attnPanel, repoPanel)
-
-// ── Build right column content ──
-
-// Active sessions panel
-activeSessions := m.activeSessions()
-var activeLines []string
-for _, s := range activeSessions {
-icon := m.statusIcon(s.Status)
-if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
-icon = m.animStatusIcon(s.Status, m.animFrame)
-}
-title := s.Title
-rInnerW := rightWidth - 6
-maxT := rInnerW / 2
-if maxT < 10 { maxT = 10 }
-if len(title) > maxT { title = title[:maxT-1] + "…" }
-action := DeriveLastAction(s)
-maxA := rInnerW / 3
-if len(action) > maxA { action = action[:maxA-1] + "…" }
-left := fmt.Sprintf("%s %s", icon, sessionStyle.Render(title))
-right := dim.Render(action)
-pad := rInnerW - lipgloss.Width(left) - lipgloss.Width(right)
-if pad < 1 { pad = 1 }
-activeLines = append(activeLines, left + strings.Repeat(" ", pad) + right)
-}
-if len(activeLines) == 0 {
-activeLines = append(activeLines, dim.Render("no active sessions"))
-}
-activeHeight := len(activeLines)
-maxActive := availHeight / 2
-if activeHeight > maxActive { activeHeight = maxActive; activeLines = activeLines[:maxActive] }
-if activeHeight < 2 { activeHeight = 2 }
-activePanel := renderPanel(fmt.Sprintf("Active (%d)", len(activeSessions)), strings.Join(activeLines, "\n"), rightWidth, activeHeight)
-
-// Recent completions panel
-recentDone := m.recentCompletions(8)
+// Recent completions
+recentDone := m.recentCompletions(5)
 var recentLines []string
-rInnerW := rightWidth - 6
 for _, s := range recentDone {
 icon := "✅"
 if strings.EqualFold(s.Status, "failed") { icon = "❌" }
@@ -394,19 +480,26 @@ if len(title) > maxT { title = title[:maxT-1] + "…" }
 ago := formatAge(s.UpdatedAt)
 pr := ""
 if s.PRNumber > 0 { pr = dim.Render(fmt.Sprintf(" PR #%d", s.PRNumber)) }
-recentLines = append(recentLines, fmt.Sprintf("%s %s%s  %s", icon, title, pr, dim.Render(ago)))
+recentLines = append(recentLines, fmt.Sprintf("  %s %s%s  %s", icon, title, pr, dim.Render(ago)))
 }
 if len(recentLines) == 0 {
-recentLines = append(recentLines, dim.Render("no completions yet"))
+recentLines = append(recentLines, dim.Render("  no completions yet"))
 }
-recentHeight := availHeight - activeHeight - 6
+recentHeight := availHeight - fleetHeight - repoHeight - 10
 if recentHeight < 2 { recentHeight = 2 }
 if len(recentLines) > recentHeight { recentLines = recentLines[:recentHeight] }
 recentPanel := renderPanel("Recent", strings.Join(recentLines, "\n"), rightWidth, recentHeight)
 
-rightCol := lipgloss.JoinVertical(lipgloss.Left, activePanel, recentPanel)
+rightCol := lipgloss.JoinVertical(lipgloss.Left, fleetPanel, repoPanel, recentPanel)
 
 return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol)
+}
+
+// shortRepo extracts just the repo name from "owner/repo".
+func shortRepo(repo string) string {
+if repo == "" { return "local" }
+if parts := strings.SplitN(repo, "/", 2); len(parts) == 2 { return parts[1] }
+return repo
 }
 
 // viewSingleColumn renders the fallback single-column layout for narrow terminals.
@@ -464,18 +557,36 @@ lines = append(lines, fmt.Sprintf("  %s %s", item.Reason, sessionStyle.Render(ti
 lines = append(lines, "")
 lines = append(lines, "  "+sectionHead.Render("Repos"))
 for i, r := range m.repos {
-selected := i == m.cursor
+selected := (m.focus == PanelRepos) && i == m.cursors[PanelRepos]
 lines = append(lines, m.renderRepoRow(r, selected, w))
 }
 
 return strings.Join(lines, "\n")
 }
 
-// shortRepo extracts just the repo name from "owner/repo".
-func shortRepo(repo string) string {
-if repo == "" { return "local" }
-if parts := strings.SplitN(repo, "/", 2); len(parts) == 2 { return parts[1] }
-return repo
+// renderPanelFocused renders a panel with a highlighted border when focused.
+func renderPanelFocused(title string, content string, width, height int, focused bool, focusColor lipgloss.AdaptiveColor) string {
+borderColor := lipgloss.AdaptiveColor{Light: "249", Dark: "240"}
+titleColor := lipgloss.AdaptiveColor{Light: "24", Dark: "75"}
+if focused {
+borderColor = focusColor
+titleColor = focusColor
+}
+
+titleRendered := lipgloss.NewStyle().
+Bold(true).
+Foreground(titleColor).
+Render(" " + title)
+
+box := lipgloss.NewStyle().
+Border(lipgloss.RoundedBorder()).
+BorderForeground(borderColor).
+Width(width - 2).
+Height(height).
+Padding(0, 1).
+Render(content)
+
+return titleRendered + "\n" + box
 }
 
 func (m *Model) renderBar(width int) string {
@@ -557,15 +668,18 @@ return line
 }
 
 func (m *Model) clampCursor() {
-if len(m.repos) == 0 {
-m.cursor = 0
-return
+for i := range m.cursors {
+max := 0
+switch PanelFocus(i) {
+case PanelActive:
+max = len(m.activeSessions())
+case PanelAttention:
+max = len(m.attention)
+case PanelRepos:
+max = len(m.repos)
 }
-if m.cursor < 0 {
-m.cursor = 0
-}
-if m.cursor >= len(m.repos) {
-m.cursor = len(m.repos) - 1
+if m.cursors[i] < 0 { m.cursors[i] = 0 }
+if max > 0 && m.cursors[i] >= max { m.cursors[i] = max - 1 }
 }
 }
 

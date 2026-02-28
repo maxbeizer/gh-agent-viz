@@ -6,7 +6,9 @@ import "github.com/maxbeizer/gh-agent-viz/internal/config"
 type FilterCounts struct {
 	All       int
 	Attention int
-	Active    int
+	Warning   int
+	Active    int // truly active (updated within 20min)
+	Idle      int // running status but idle 20min+
 	Completed int
 	Failed    int
 }

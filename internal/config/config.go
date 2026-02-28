@@ -12,6 +12,7 @@ type Config struct {
 	Repos           []string `yaml:"repos"`
 	RefreshInterval int      `yaml:"refreshInterval"`
 	DefaultFilter   string   `yaml:"defaultFilter"`
+	DefaultView     string   `yaml:"defaultView,omitempty"` // "dashboard", "table", "kanban"
 	Animations      *bool    `yaml:"animations,omitempty"`
 	AsciiHeader     *bool    `yaml:"asciiHeader,omitempty"`
 	Theme           string   `yaml:"theme,omitempty"`

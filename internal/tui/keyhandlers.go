@@ -2,17 +2,55 @@ package tui
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/mission"
 )
 
 // handleKeyPress processes keyboard input
 func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// When help overlay is visible, only ? and esc close it; ignore everything else
 	if m.help.Visible() {
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
 		if msg.String() == "?" || msg.Type == tea.KeyEscape {
 			m.help.Toggle()
+		}
+		return m, nil
+	}
+
+	// Search mode: capture text input for filtering
+	if m.searchActive {
+		// ctrl+c always quits, even in search mode
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		switch msg.Type {
+		case tea.KeyEscape:
+			m.searchActive = false
+			m.searchQuery = ""
+			m.recomputeAndDisplay(m.visibleSessions())
+			return m, nil
+		case tea.KeyEnter:
+			m.searchActive = false
+			// Keep the filter active, just stop capturing input
+			return m, nil
+		case tea.KeyBackspace:
+			if len(m.searchQuery) > 0 {
+				m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+				m.recomputeAndDisplay(m.visibleSessions())
+			}
+			return m, nil
+		default:
+			if msg.Type == tea.KeyRunes {
+				m.searchQuery += string(msg.Runes)
+				m.recomputeAndDisplay(m.visibleSessions())
+				return m, nil
+			}
 		}
 		return m, nil
 	}
@@ -26,6 +64,27 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Global quit key
 	if msg.String() == "q" || msg.String() == "ctrl+c" {
 		return m, tea.Quit
+	}
+
+	// Debug snapshot (any view)
+	if msg.String() == "S" {
+		ts := time.Now().UTC().Format("2006-01-02T150405Z")
+		path := fmt.Sprintf("/tmp/gh-agent-viz-snapshot-%s.json", ts)
+		origPath := m.snapshotPath
+		m.snapshotPath = path
+		m.writeSnapshot()
+		m.snapshotPath = origPath
+		m.toast.Push("📸", "Snapshot", path)
+		return m, nil
+	}
+
+	// / activates search in navigable views
+	if msg.String() == "/" {
+		if m.viewMode == ViewModeList || m.viewMode == ViewModeKanban || m.viewMode == ViewModeMission {
+			m.searchActive = true
+			m.searchQuery = ""
+			return m, nil
+		}
 	}
 
 	switch m.viewMode {
@@ -51,6 +110,10 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleListKeys handles keys in list view mode
 func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "esc":
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 	case "j", "down":
 		m.taskList.MoveCursor(1)
 	case "k", "up":
@@ -178,7 +241,9 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.viewMode = ViewModeList
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 	case "l":
 		session := m.taskList.SelectedTask()
 		if session != nil {
@@ -233,7 +298,9 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleDiffKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.viewMode = ViewModeList
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
 	}
 
@@ -246,7 +313,9 @@ func (m Model) handleDiffKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.viewMode = ViewModeList
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 		m.logView.SetLive(false)
 		m.logView.SetFollowMode(false)
 		m.showConversation = false
@@ -321,11 +390,17 @@ func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "K":
-		m.viewMode = ViewModeList
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 	case "h", "left":
 		m.kanban.MoveColumn(-1)
 	case "l", "right":
 		m.kanban.MoveColumn(1)
+	case "tab":
+		m.kanban.MoveColumn(1)
+	case "shift+tab", "backtab":
+		m.kanban.MoveColumn(-1)
 	case "j", "down":
 		m.kanban.MoveRow(1)
 	case "k", "up":
@@ -341,6 +416,25 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.viewMode = ViewModeDetail
 			return m, m.fetchTaskDetail(session.ID, session.Repository)
+		}
+	case "X":
+		// Dismiss completed/failed sessions from all sessions
+		count := 0
+		if m.dismissedStore != nil {
+			m.toast.Push("🧹", "Sweeping", "clearing the decks...")
+			for _, s := range m.allSessions {
+				status := strings.ToLower(strings.TrimSpace(s.Status))
+				if status == "completed" || status == "failed" {
+					m.dismissedStore.Add(s.ID)
+					count++
+				}
+			}
+		}
+		if count > 0 {
+			m.toast.Push("✨", "Spotless", fmt.Sprintf("%d session(s) swept away", count))
+			m.kanban.SetSessions(m.visibleSessions())
+		} else {
+			m.toast.Push("🤷", "Already clean", "nothing to dismiss")
 		}
 	case "r":
 		return m, m.fetchTasks
@@ -368,17 +462,115 @@ func (m Model) handleToolTimelineKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleMissionKeys handles keys in mission control view mode
 func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "M":
-		m.viewMode = ViewModeList
 	case "j", "down":
 		m.mission.MoveCursor(1)
 	case "k", "up":
 		m.mission.MoveCursor(-1)
+	case "tab":
+		m.mission.CyclePanel(1)
+	case "shift+tab", "backtab":
+		m.mission.CyclePanel(-1)
 	case "enter":
-		// Return to list view (enter feels natural to "drill in")
-		m.viewMode = ViewModeList
+		// Drill into selected item based on focused panel
+		switch m.mission.Focus() {
+		case mission.PanelActive, mission.PanelAttention, mission.PanelRecent, mission.PanelIdle:
+			session := m.mission.SelectedSession()
+			if session != nil {
+				if session.Source == data.SourceLocalCopilot {
+					m.ctx.Error = nil
+					m.viewMode = ViewModeDetail
+					m.taskDetail.SetTask(session)
+					return m, nil
+				}
+				m.viewMode = ViewModeDetail
+				return m, m.fetchTaskDetail(session.ID, session.Repository)
+			}
+		case mission.PanelRepos:
+			// Filter list view to show only this repo's sessions
+			repo := m.mission.SelectedRepo()
+			if repo != "" {
+				m.viewMode = ViewModeList
+				filtered := []data.Session{}
+				for _, s := range m.visibleSessions() {
+					r := s.Repository
+					if r == "" { r = "local" }
+					if r == repo {
+						filtered = append(filtered, s)
+					}
+				}
+				m.taskList.SetTasks(filtered)
+			}
+		}
+	case "K":
+		m.viewMode = ViewModeKanban
+		m.kanban.SetSessions(m.visibleSessions())
+		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
 	case "r":
 		return m, m.fetchTasks
+	}
+	return m, nil
+}
+
+// handleMouse processes mouse events for scrolling and navigation.
+func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	switch msg.Button {
+	case tea.MouseButtonWheelUp:
+		switch m.viewMode {
+		case ViewModeList:
+			m.taskList.MoveCursor(-3)
+		case ViewModeKanban:
+			m.kanban.MoveRow(-1)
+		case ViewModeMission:
+			m.mission.MoveCursor(-1)
+		case ViewModeLog:
+			if m.showConversation {
+				m.conversationView.LineUp()
+				m.conversationView.LineUp()
+				m.conversationView.LineUp()
+			} else {
+				m.logView.SetFollowMode(false)
+				m.logView.LineUp()
+				m.logView.LineUp()
+				m.logView.LineUp()
+			}
+		}
+	case tea.MouseButtonWheelDown:
+		switch m.viewMode {
+		case ViewModeList:
+			m.taskList.MoveCursor(3)
+		case ViewModeKanban:
+			m.kanban.MoveRow(1)
+		case ViewModeMission:
+			m.mission.MoveCursor(1)
+		case ViewModeLog:
+			if m.showConversation {
+				m.conversationView.LineDown()
+				m.conversationView.LineDown()
+				m.conversationView.LineDown()
+			} else {
+				m.logView.SetFollowMode(false)
+				m.logView.LineDown()
+				m.logView.LineDown()
+				m.logView.LineDown()
+			}
+		}
+	case tea.MouseButtonLeft:
+		if msg.Action == tea.MouseActionPress && m.viewMode == ViewModeMission {
+			// Click left half → Active or Attention panel
+			// Click right half → Repos panel
+			midX := m.ctx.Width / 2
+			if msg.X < midX {
+				// Top half of left = Active, bottom half = Attention
+				leftMid := m.ctx.Height / 2
+				if msg.Y < leftMid {
+					m.mission.SetFocus(mission.PanelActive)
+				} else {
+					m.mission.SetFocus(mission.PanelAttention)
+				}
+			} else {
+				m.mission.SetFocus(mission.PanelRepos)
+			}
+		}
 	}
 	return m, nil
 }

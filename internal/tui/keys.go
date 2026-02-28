@@ -27,6 +27,7 @@ type Keybindings struct {
 	OpenRepo       key.Binding
 	FileIssue      key.Binding
 	MassDismiss    key.Binding
+	SearchFilter   key.Binding
 }
 
 // NewKeybindings creates the default key bindings for the TUI
@@ -123,6 +124,10 @@ func NewKeybindings() Keybindings {
 		MassDismiss: key.NewBinding(
 			key.WithKeys("X"),
 			key.WithHelp("X", "dismiss done"),
+		),
+		SearchFilter: key.NewBinding(
+			key.WithKeys("/"),
+			key.WithHelp("/", "search"),
 		),
 	}
 }

@@ -28,6 +28,7 @@ var taglines = []string{
 type FilterCounts struct {
 	All       int
 	Attention int
+	Warning   int
 	Active    int
 	Completed int
 	Failed    int
@@ -105,7 +106,7 @@ func (m Model) View() string {
 		{"completed", "DONE", m.counts.Completed},
 		{"failed", "FAILED", m.counts.Failed},
 		{"all", "ALL", m.counts.All},
-		{"attention", "ATTENTION", m.counts.Attention},
+		{"attention", "ATTENTION", m.counts.Attention + m.counts.Warning},
 	}
 
 	renderedTabs := make([]string, 0, len(tabs))
@@ -147,4 +148,33 @@ func (m Model) View() string {
 	}
 
 	return tabLine + "\n" + separator + "\n"
+}
+
+// ViewBannerOnly renders just the banner and tagline without the tab bar.
+func (m Model) ViewBannerOnly() string {
+	separator := lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "249", Dark: "240"}).
+		Render(strings.Repeat("━", m.width))
+
+	if m.showBanner() {
+		bannerStyle := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(m.titleStyle.GetForeground())
+		styledBanner := bannerStyle.Render(Banner)
+		if m.tagline != "" {
+			tagStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.AdaptiveColor{Light: "245", Dark: "250"}).
+				Italic(true)
+			styledBanner = lipgloss.JoinHorizontal(lipgloss.Center, styledBanner, "  ", tagStyle.Render(m.tagline))
+		}
+		return styledBanner + "\n" + separator + "\n"
+	}
+
+	// Narrow terminal: just tagline
+	if m.tagline != "" {
+		tagStyle := lipgloss.NewStyle().Faint(true).Italic(true)
+		return tagStyle.Render(m.tagline) + "\n" + separator + "\n"
+	}
+
+	return separator + "\n"
 }

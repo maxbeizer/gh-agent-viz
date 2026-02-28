@@ -211,7 +211,11 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 	}
 
 	// Meta line: repo + time, dimmed for visual hierarchy
-	repo := truncate(rowRepository(session), width/2)
+	repoMaxWidth := width / 3 // responsive: use 1/3 of width for repo
+	if repoMaxWidth < 10 {
+		repoMaxWidth = 10
+	}
+	repo := truncate(rowRepository(session), repoMaxWidth)
 	metaText := fmt.Sprintf("    %s  %s", repo, formatTime(session.UpdatedAt))
 
 	if dur := compactDuration(session); dur != "" {

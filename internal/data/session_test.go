@@ -187,3 +187,88 @@ func TestFromAgentTask_ToAgentTask_Roundtrip(t *testing.T) {
 		t.Errorf("UpdatedAt mismatch: %v != %v", roundtripped.UpdatedAt, original.UpdatedAt)
 	}
 }
+
+func TestSessionAttentionLevel(t *testing.T) {
+	cases := []struct {
+		name    string
+		session Session
+		want    AttentionLevel
+	}{
+		{
+			name:    "needs-input is urgent",
+			session: Session{Status: "needs-input"},
+			want:    AttentionUrgent,
+		},
+		{
+			name:    "failed is urgent",
+			session: Session{Status: "failed"},
+			want:    AttentionUrgent,
+		},
+		{
+			name:    "running idle 5h is none (no idle warnings)",
+			session: Session{Status: "running", UpdatedAt: time.Now().Add(-5 * time.Hour)},
+			want:    AttentionNone,
+		},
+		{
+			name:    "running idle 5min is none",
+			session: Session{Status: "running", UpdatedAt: time.Now().Add(-5 * time.Minute)},
+			want:    AttentionNone,
+		},
+		{
+			name:    "queued 45min is none (no queued warnings)",
+			session: Session{Status: "queued", CreatedAt: time.Now().Add(-45 * time.Minute)},
+			want:    AttentionNone,
+		},
+		{
+			name:    "queued 5min is none",
+			session: Session{Status: "queued", CreatedAt: time.Now().Add(-5 * time.Minute)},
+			want:    AttentionNone,
+		},
+		{
+			name:    "completed is none",
+			session: Session{Status: "completed"},
+			want:    AttentionNone,
+		},
+		{
+			name:    "running idle 25h is none",
+			session: Session{Status: "running", UpdatedAt: time.Now().Add(-25 * time.Hour)},
+			want:    AttentionNone,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := SessionAttentionLevel(tc.session)
+			if got != tc.want {
+				t.Fatalf("SessionAttentionLevel: expected %v, got %v", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestSessionNeedsAnyAttention(t *testing.T) {
+	// Urgent → true
+	if !SessionNeedsAnyAttention(Session{Status: "failed"}) {
+		t.Fatal("failed should need any attention")
+	}
+	// Warning → no longer triggers (idle warnings removed)
+	if SessionNeedsAnyAttention(Session{Status: "running", UpdatedAt: time.Now().Add(-5 * time.Hour)}) {
+		t.Fatal("idle running should not need attention")
+	}
+	// None → false
+	if SessionNeedsAnyAttention(Session{Status: "completed"}) {
+		t.Fatal("completed should not need any attention")
+	}
+}
+
+func TestAttentionLevelString(t *testing.T) {
+	if AttentionUrgent.String() != "urgent" {
+		t.Fatal("expected 'urgent'")
+	}
+	if AttentionWarning.String() != "warning" {
+		t.Fatal("expected 'warning'")
+	}
+	if AttentionNone.String() != "none" {
+		t.Fatal("expected 'none'")
+	}
+}

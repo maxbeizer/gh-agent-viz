@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/statsbar"
 )
 
 // sessionFingerprint returns a hash summarising session IDs, statuses, and
@@ -54,7 +55,7 @@ func smartDefaultFilter(counts FilterCounts) string {
 	if counts.Active > 0 {
 		return "active"
 	}
-	if counts.Attention > 0 {
+	if counts.Attention > 0 || counts.Warning > 0 {
 		return "attention"
 	}
 	return "all"
@@ -89,6 +90,7 @@ func (m *Model) updateFooterHints() {
 			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "navigate")),
 			m.keys.SelectTask,
 			m.keys.ToggleFilter,
+			m.keys.SearchFilter,
 			m.keys.ToggleKanban,
 			m.keys.ToggleMission,
 			m.keys.ShowHelp,
@@ -125,8 +127,10 @@ func (m *Model) updateFooterHints() {
 	case ViewModeKanban:
 		kanbanHints := []key.Binding{
 			m.keys.NavigateBack,
-			key.NewBinding(key.WithKeys("h/l"), key.WithHelp("h/l", "column")),
+			key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "column")),
 			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "card")),
+			m.keys.SelectTask,
+			m.keys.MassDismiss,
 			m.keys.ShowHelp,
 			m.keys.ExitApp,
 		}
@@ -141,9 +145,12 @@ func (m *Model) updateFooterHints() {
 		m.footer.SetHints(timelineHints)
 	case ViewModeMission:
 		missionHints := []key.Binding{
-			m.keys.NavigateBack,
 			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "navigate")),
+			key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "panel")),
 			m.keys.SelectTask,
+			m.keys.ToggleKanban,
+			m.keys.SearchFilter,
+			m.keys.RefreshData,
 			m.keys.ShowHelp,
 			m.keys.ExitApp,
 		}
@@ -280,7 +287,7 @@ func (m *Model) enrichTokenUsage(usage map[string]*data.TokenUsage) {
 // session data has not changed (fingerprint match).
 func (m *Model) recomputeAndDisplay(visible []data.Session) {
 	// Fast-path: skip when data and active filter haven't changed
-	fp := sessionFingerprint(visible) + "|" + m.ctx.StatusFilter
+	fp := sessionFingerprint(visible) + "|" + m.ctx.StatusFilter + "|" + m.searchQuery
 	unchanged := m.lastFingerprint == fp && m.initialLoadDone
 	if !unchanged {
 		m.lastFingerprint = fp
@@ -289,11 +296,19 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 	// Compute counts
 	counts := FilterCounts{All: len(visible)}
 	for _, session := range visible {
-		if data.SessionNeedsAttention(session) {
+		level := data.SessionAttentionLevel(session)
+		if level >= data.AttentionUrgent {
 			counts.Attention++
 		}
+		if level == data.AttentionWarning {
+			counts.Warning++
+		}
 		if data.StatusIsActive(session.Status) || strings.EqualFold(session.Status, "needs-input") {
-			counts.Active++
+			if data.SessionIsActiveNotIdle(session) {
+				counts.Active++
+			} else {
+				counts.Idle++
+			}
 		}
 		if strings.EqualFold(session.Status, "completed") {
 			counts.Completed++
@@ -308,9 +323,26 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 	m.header.SetCounts(header.FilterCounts{
 		All:       counts.All,
 		Attention: counts.Attention,
+		Warning:   counts.Warning,
 		Active:    counts.Active,
 		Completed: counts.Completed,
 		Failed:    counts.Failed,
+	})
+
+	// Update stats bar with aggregate metrics
+	totalTokens := int64(0)
+	for _, session := range visible {
+		if session.Telemetry != nil {
+			totalTokens += session.Telemetry.InputTokens
+		}
+	}
+	m.statsBar.SetCounts(statsbar.Counts{
+		Active:      counts.Active,
+		Idle:        counts.Idle,
+		Attention:   counts.Attention,
+		Warning:     counts.Warning,
+		Completed:   counts.Completed,
+		TotalTokens: totalTokens,
 	})
 
 	// On first render, pick the best default tab
@@ -329,7 +361,7 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 	if m.ctx.StatusFilter != "all" {
 		filtered = []data.Session{}
 		for _, session := range visible {
-			if m.ctx.StatusFilter == "attention" && data.SessionNeedsAttention(session) {
+			if m.ctx.StatusFilter == "attention" && data.SessionNeedsAnyAttention(session) {
 				filtered = append(filtered, session)
 			} else if m.ctx.StatusFilter == "active" && (data.StatusIsActive(session.Status) || strings.EqualFold(session.Status, "needs-input")) {
 				filtered = append(filtered, session)
@@ -337,6 +369,21 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 				filtered = append(filtered, session)
 			}
 		}
+	}
+
+	// Apply search filter
+	if m.searchQuery != "" {
+		q := strings.ToLower(m.searchQuery)
+		searchFiltered := make([]data.Session, 0, len(filtered))
+		for _, session := range filtered {
+			if strings.Contains(strings.ToLower(session.Title), q) ||
+				strings.Contains(strings.ToLower(session.Repository), q) ||
+				strings.Contains(strings.ToLower(session.Branch), q) ||
+				strings.Contains(strings.ToLower(session.Status), q) {
+				searchFiltered = append(searchFiltered, session)
+			}
+		}
+		filtered = searchFiltered
 	}
 
 	// Update display components — only push data to the active view to avoid

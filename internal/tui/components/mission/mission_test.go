@@ -101,7 +101,7 @@ func TestCursorNavigationEmpty(t *testing.T) {
 	}
 }
 
-func TestSelectedSession_ReturnsNil(t *testing.T) {
+func TestSelectedSession_FromActivePanel(t *testing.T) {
 	m := newTestModel()
 	now := time.Now()
 	sessions := []data.Session{
@@ -109,12 +109,18 @@ func TestSelectedSession_ReturnsNil(t *testing.T) {
 	}
 	m.SetSessions(sessions)
 
-	// Summary view doesn't select individual sessions
-	if m.SelectedSession() != nil {
-		t.Fatal("expected nil — summary view doesn't select sessions")
+	// Default focus is Active panel — should select the running session
+	m.SetFocus(PanelActive)
+	s := m.SelectedSession()
+	if s == nil {
+		t.Fatal("expected session from active panel")
+	}
+	if s.ID != "1" {
+		t.Fatalf("expected session ID '1', got %q", s.ID)
 	}
 
-	// But SelectedRepo should work
+	// Repos panel returns repo
+	m.SetFocus(PanelRepos)
 	repo := m.SelectedRepo()
 	if repo != "owner/repo" {
 		t.Fatalf("expected repo 'owner/repo', got %q", repo)
@@ -158,8 +164,8 @@ func TestViewRendersSummary(t *testing.T) {
 		t.Fatal("expected repo owner/docs in view")
 	}
 	// Should show aggregate stats
-	if !strings.Contains(view, "in progress") {
-		t.Fatal("expected 'in progress' in summary")
+	if !strings.Contains(view, "active") {
+		t.Fatal("expected 'active' in summary")
 	}
 	if !strings.Contains(view, "done") {
 		t.Fatal("expected 'done' in summary")
@@ -255,6 +261,7 @@ func TestSelectedRepo_ReturnsCorrectRepoAtCursor(t *testing.T) {
 		{ID: "1", Status: "running", Title: "Task A", Repository: "owner/repo-a", UpdatedAt: now},
 		{ID: "2", Status: "running", Title: "Task B", Repository: "owner/repo-b", UpdatedAt: now.Add(-time.Hour)},
 	})
+	m.SetFocus(PanelRepos)
 	m.MoveCursor(1)
 	got := m.SelectedRepo()
 	if got != "owner/repo-b" {
@@ -291,8 +298,8 @@ func TestView_AttentionSectionWithNeedsInput(t *testing.T) {
 		{ID: "1", Status: "needs-input", Title: "Waiting task", Repository: "owner/repo", Source: data.SourceAgentTask, UpdatedAt: now},
 	})
 	view := m.View()
-	if !strings.Contains(view, "Needs your attention") {
-		t.Fatal("expected 'Needs your attention' section when needs-input session exists")
+	if !strings.Contains(view, "Attention") {
+		t.Fatal("expected 'Attention' section when needs-input session exists")
 	}
 }
 

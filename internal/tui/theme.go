@@ -1,6 +1,9 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+	"github.com/maxbeizer/gh-agent-viz/internal/data"
+)
 
 // Theme contains all Lip Gloss styles for the UI
 type Theme struct {
@@ -420,4 +423,32 @@ func AnimatedStatusIcon(status string, frame int) string {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render("●")
 	}
 	return StatusIcon(status)
+}
+
+// AttentionLevelIcon returns the icon for a graduated attention level.
+func AttentionLevelIcon(level data.AttentionLevel) string {
+	switch level {
+	case data.AttentionUrgent:
+		return "🔴"
+	case data.AttentionWarning:
+		return "🟡"
+	case data.AttentionInfo:
+		return "🟢"
+	default:
+		return ""
+	}
+}
+
+// AttentionLevelColor returns an ANSI color string for a graduated attention level.
+func AttentionLevelColor(level data.AttentionLevel) string {
+	switch level {
+	case data.AttentionUrgent:
+		return "203" // red
+	case data.AttentionWarning:
+		return "214" // amber/orange
+	case data.AttentionInfo:
+		return "72" // teal/green
+	default:
+		return "245" // gray
+	}
 }

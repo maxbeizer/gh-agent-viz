@@ -21,6 +21,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/tasklist"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/toast"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/tooltimeline"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/statsbar"
 )
 
 // ViewMode represents the current view mode
@@ -53,6 +54,7 @@ type Model struct {
 	conversationView conversation.Model
 	mission        mission.Model
 	dismissedStore *data.DismissedStore
+	statsBar       statsbar.Model
 	viewMode       ViewMode
 	showConversation bool // true when conversation bubble view is active in log mode
 	showPreview  bool
@@ -66,10 +68,13 @@ type Model struct {
 	allSessions  []data.Session // accumulated across load phases
 	initialLoadDone bool       // true after all initial load phases complete
 	lastFingerprint string     // hash of session data; used to skip no-op refreshes
+	searchActive bool          // true when search input is active
+	searchQuery  string        // current search filter text
+	snapshotPath string        // if set, write snapshot on initial load and quit
 }
 
 // NewModel creates a new TUI model
-func NewModel(repo string, debug bool, demo bool) Model {
+func NewModel(repo string, debug bool, demo bool, snapshotPath string) Model {
 	ctx := NewProgramContext()
 	ctx.Debug = debug
 	cfg, err := config.Load("")
@@ -112,6 +117,17 @@ func NewModel(repo string, debug bool, demo bool) Model {
 		animIconFunc = AnimatedStatusIcon
 	}
 
+	// Determine default view mode
+	defaultView := ViewModeMission // dashboard-first by default
+	switch ctx.Config.DefaultView {
+	case "table":
+		defaultView = ViewModeList
+	case "kanban":
+		defaultView = ViewModeKanban
+	case "dashboard", "mission", "":
+		defaultView = ViewModeMission
+	}
+
 	return Model{
 		ctx:         ctx,
 		theme:       theme,
@@ -128,13 +144,15 @@ func NewModel(repo string, debug bool, demo bool) Model {
 		conversationView: conversation.New(80, 20),
 		mission:        mission.New(theme.Title, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
 		dismissedStore: dismissedStore,
-		viewMode:    ViewModeList,
+		statsBar:       statsbar.New(),
+		viewMode:    defaultView,
 		showPreview: false,
 		ready:       false,
 		repo:        repo,
 		refreshInt:  time.Duration(refreshSeconds) * time.Second,
 		toast:       toast.New(),
 		demo:        demo,
+		snapshotPath: snapshotPath,
 	}
 }
 
@@ -143,7 +161,6 @@ func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		m.fetchLocalSessions,  // Phase 1: fast, shows content immediately
 		m.fetchAgentTasks,     // Phase 2: runs concurrently, returns when API responds
-		tea.EnterAltScreen,
 	}
 	if m.ctx.Config.AnimationsEnabled() {
 		cmds = append(cmds, m.animationTickCmd())
@@ -159,6 +176,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ctx.Height = msg.Height
 		m.header.SetSize(msg.Width, msg.Height)
 		m.help.SetSize(msg.Width, msg.Height)
+		m.statsBar.SetWidth(msg.Width)
 		m.updateSplitLayout()
 		m.ready = true
 		// Debounce heavy component resizes (logview, diffview, etc.)
@@ -179,6 +197,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
+
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
 
 	case localSessionsLoadedMsg:
 		// Phase 1: show local sessions immediately
@@ -205,6 +226,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			for _, s := range m.allSessions {
 				m.prevSessions[s.ID] = s.Status
 			}
+			if m.snapshotPath != "" {
+				m.writeSnapshot()
+				return m, tea.Quit
+			}
 		}
 		return m, m.refreshCmd()
 
@@ -214,6 +239,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.header.SetCounts(header.FilterCounts{
 			All:       msg.counts.All,
 			Attention: msg.counts.Attention,
+			Warning:   msg.counts.Warning,
 			Active:    msg.counts.Active,
 			Completed: msg.counts.Completed,
 			Failed:    msg.counts.Failed,
@@ -350,7 +376,8 @@ func (m Model) View() string {
 	// Update footer hints based on current context
 	m.updateFooterHints()
 
-	headerView := m.header.View()
+	// All views: show banner + stats bar, no tab bar
+	chrome := m.header.ViewBannerOnly() + m.statsBar.View() + "\n"
 	footerView := m.footer.View()
 
 	var mainView string
@@ -395,7 +422,20 @@ func (m Model) View() string {
 		toastView = "\n" + m.toast.View()
 	}
 
-	result := headerView + mainView + toastView + footerView
+	// Search bar indicator
+	searchView := ""
+	if m.searchActive || m.searchQuery != "" {
+		searchStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"}).
+			Bold(true)
+		queryDisplay := m.searchQuery
+		if m.searchActive {
+			queryDisplay += "▍" // cursor
+		}
+		searchView = searchStyle.Render(fmt.Sprintf("  🔍 Filter: %s", queryDisplay)) + "\n"
+	}
+
+	result := chrome + mainView + toastView + searchView + footerView
 
 	// Overlay help panel when visible
 	if m.help.Visible() {
@@ -403,5 +443,61 @@ func (m Model) View() string {
 	}
 
 	return result
+}
+
+// viewModeName returns a human-readable name for the current view mode.
+func (m Model) viewModeName() string {
+	switch m.viewMode {
+	case ViewModeList:
+		return "list"
+	case ViewModeDetail:
+		return "detail"
+	case ViewModeLog:
+		return "log"
+	case ViewModeKanban:
+		return "kanban"
+	case ViewModeToolTimeline:
+		return "timeline"
+	case ViewModeMission:
+		return "dashboard"
+	case ViewModeDiff:
+		return "diff"
+	default:
+		return "unknown"
+	}
+}
+
+// writeSnapshot captures the current TUI state to snapshotPath as JSON.
+func (m Model) writeSnapshot() {
+	sessions := make([]data.SnapshotSession, len(m.allSessions))
+	for i, s := range m.allSessions {
+		sessions[i] = data.SnapshotSession{
+			ID:             s.ID,
+			Status:         s.Status,
+			Title:          s.Title,
+			Repository:     s.Repository,
+			AttentionLevel: data.SessionAttentionLevel(s).String(),
+		}
+	}
+	snap := &data.Snapshot{
+		ViewMode: m.viewModeName(),
+		TerminalSize: data.SnapshotSize{
+			Width:  m.ctx.Width,
+			Height: m.ctx.Height,
+		},
+		RenderedOutput: m.View(),
+		SessionCount:   len(m.allSessions),
+		FilterCounts: data.SnapshotCounts{
+			All:       m.ctx.Counts.All,
+			Attention: m.ctx.Counts.Attention,
+			Warning:   m.ctx.Counts.Warning,
+			Active:    m.ctx.Counts.Active,
+			Completed: m.ctx.Counts.Completed,
+			Failed:    m.ctx.Counts.Failed,
+		},
+		Sessions:     sessions,
+		FocusedPanel: m.viewModeName(),
+	}
+	_ = data.WriteSnapshot(m.snapshotPath, snap)
 }
 

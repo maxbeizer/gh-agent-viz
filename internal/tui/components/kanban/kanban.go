@@ -104,22 +104,15 @@ func (m *Model) SetSessions(sessions []data.Session) {
 		}
 	}
 	m.columns = cols
-	// Clamp cursors
 	m.clampCursors()
 }
 
-// MoveColumn moves the column cursor by delta (negative = left, positive = right).
+// MoveColumn moves the column cursor by delta, wrapping around.
 func (m *Model) MoveColumn(delta int) {
 	if len(m.columns) == 0 {
 		return
 	}
-	m.colCursor += delta
-	if m.colCursor < 0 {
-		m.colCursor = 0
-	}
-	if m.colCursor >= len(m.columns) {
-		m.colCursor = len(m.columns) - 1
-	}
+	m.colCursor = (m.colCursor + delta + len(m.columns)) % len(m.columns)
 	// Clamp row cursor to new column
 	m.clampRowCursor()
 }
@@ -286,8 +279,13 @@ func (m *Model) renderCard(session data.Session, width int, selected bool) strin
 		icon = m.animStatusIcon(session.Status, m.animFrame)
 	}
 
-	// First line: icon + title (truncated)
-	titleMaxLen := width - 4 // icon + space + padding
+	level := data.SessionAttentionLevel(session)
+	if level >= data.AttentionUrgent {
+		icon = "🔴"
+	}
+
+	// Line 1: icon + title
+	titleMaxLen := width - 4
 	if titleMaxLen < 5 {
 		titleMaxLen = 5
 	}
@@ -297,17 +295,22 @@ func (m *Model) renderCard(session data.Session, width int, selected bool) strin
 	}
 	line1 := fmt.Sprintf("%s %s", icon, title)
 
-	// Second line: repo + age
+	// Line 2: compact metadata — repo • age • tokens • PR
 	repo := session.Repository
 	if repo == "" {
 		repo = "local"
 	}
-	// Shorten repo: "owner/repo" → "repo"
 	if parts := strings.SplitN(repo, "/", 2); len(parts) == 2 {
 		repo = parts[1]
 	}
-	age := formatAge(session.CreatedAt)
-	line2 := fmt.Sprintf("  %s • %s", repo, age)
+	meta := []string{repo, formatAge(session.CreatedAt)}
+	if session.Telemetry != nil && session.Telemetry.InputTokens > 0 {
+		meta = append(meta, "🪙 "+data.FormatTokenCount(session.Telemetry.InputTokens))
+	}
+	if session.PRNumber > 0 {
+		meta = append(meta, fmt.Sprintf("PR #%d", session.PRNumber))
+	}
+	line2 := "  " + strings.Join(meta, " • ")
 	if len(line2) > width {
 		line2 = line2[:width]
 	}

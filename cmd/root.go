@@ -11,9 +11,10 @@ import (
 )
 
 var (
-	repoFlag  string
-	debugFlag bool
-	demoFlag  bool
+	repoFlag     string
+	debugFlag    bool
+	demoFlag     bool
+	snapshotFlag string
 )
 
 // Version is set by goreleaser at build time.
@@ -30,7 +31,7 @@ terminal UI for visualizing and managing GitHub Copilot coding agent sessions.
 		data.SetDebug(debugFlag)
 
 		// Create the Bubble Tea program
-		model := tui.NewModel(repoFlag, debugFlag, demoFlag)
+		model := tui.NewModel(repoFlag, debugFlag, demoFlag, snapshotFlag)
 		p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseAllMotion())
 
 		// Run the program
@@ -57,4 +58,5 @@ func init() {
 	rootCmd.Flags().StringVarP(&repoFlag, "repo", "R", "", "Scope to a specific repository (format: owner/repo)")
 	rootCmd.Flags().BoolVar(&debugFlag, "debug", false, "Enable debug diagnostics and write command logs to ~/.gh-agent-viz-debug.log")
 	rootCmd.Flags().BoolVar(&demoFlag, "demo", false, "Run with fake demo data for screenshots and recordings")
+	rootCmd.Flags().StringVar(&snapshotFlag, "snapshot", "", "Write a JSON snapshot of TUI state after initial load and exit")
 }

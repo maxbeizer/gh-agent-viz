@@ -70,10 +70,11 @@ type Model struct {
 	lastFingerprint string     // hash of session data; used to skip no-op refreshes
 	searchActive bool          // true when search input is active
 	searchQuery  string        // current search filter text
+	snapshotPath string        // if set, write snapshot on initial load and quit
 }
 
 // NewModel creates a new TUI model
-func NewModel(repo string, debug bool, demo bool) Model {
+func NewModel(repo string, debug bool, demo bool, snapshotPath string) Model {
 	ctx := NewProgramContext()
 	ctx.Debug = debug
 	cfg, err := config.Load("")
@@ -151,6 +152,7 @@ func NewModel(repo string, debug bool, demo bool) Model {
 		refreshInt:  time.Duration(refreshSeconds) * time.Second,
 		toast:       toast.New(),
 		demo:        demo,
+		snapshotPath: snapshotPath,
 	}
 }
 
@@ -223,6 +225,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.prevSessions = make(map[string]string, len(m.allSessions))
 			for _, s := range m.allSessions {
 				m.prevSessions[s.ID] = s.Status
+			}
+			if m.snapshotPath != "" {
+				m.writeSnapshot()
+				return m, tea.Quit
 			}
 		}
 		return m, m.refreshCmd()
@@ -445,5 +451,61 @@ func (m Model) View() string {
 	}
 
 	return result
+}
+
+// viewModeName returns a human-readable name for the current view mode.
+func (m Model) viewModeName() string {
+	switch m.viewMode {
+	case ViewModeList:
+		return "list"
+	case ViewModeDetail:
+		return "detail"
+	case ViewModeLog:
+		return "log"
+	case ViewModeKanban:
+		return "kanban"
+	case ViewModeToolTimeline:
+		return "timeline"
+	case ViewModeMission:
+		return "dashboard"
+	case ViewModeDiff:
+		return "diff"
+	default:
+		return "unknown"
+	}
+}
+
+// writeSnapshot captures the current TUI state to snapshotPath as JSON.
+func (m Model) writeSnapshot() {
+	sessions := make([]data.SnapshotSession, len(m.allSessions))
+	for i, s := range m.allSessions {
+		sessions[i] = data.SnapshotSession{
+			ID:             s.ID,
+			Status:         s.Status,
+			Title:          s.Title,
+			Repository:     s.Repository,
+			AttentionLevel: data.SessionAttentionLevel(s).String(),
+		}
+	}
+	snap := &data.Snapshot{
+		ViewMode: m.viewModeName(),
+		TerminalSize: data.SnapshotSize{
+			Width:  m.ctx.Width,
+			Height: m.ctx.Height,
+		},
+		RenderedOutput: m.View(),
+		SessionCount:   len(m.allSessions),
+		FilterCounts: data.SnapshotCounts{
+			All:       m.ctx.Counts.All,
+			Attention: m.ctx.Counts.Attention,
+			Warning:   m.ctx.Counts.Warning,
+			Active:    m.ctx.Counts.Active,
+			Completed: m.ctx.Counts.Completed,
+			Failed:    m.ctx.Counts.Failed,
+		},
+		Sessions:     sessions,
+		FocusedPanel: m.viewModeName(),
+	}
+	_ = data.WriteSnapshot(m.snapshotPath, snap)
 }
 

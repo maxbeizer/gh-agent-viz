@@ -325,7 +325,7 @@ return m.viewMultiPane()
 }
 
 // renderPanel returns a bordered panel with a title header line above the box.
-func renderPanel(title string, content string, width, height int) string {
+func renderPanel(title string, content string, width, _ int) string {
 borderColor := lipgloss.AdaptiveColor{Light: "249", Dark: "240"}
 titleColor := lipgloss.AdaptiveColor{Light: "24", Dark: "75"}
 
@@ -338,7 +338,6 @@ box := lipgloss.NewStyle().
 Border(lipgloss.RoundedBorder()).
 BorderForeground(borderColor).
 Width(width - 2).
-Height(height).
 Padding(0, 1).
 Render(content)
 
@@ -499,9 +498,10 @@ recentLines = append(recentLines, fmt.Sprintf("%s%s %s%s  %s", gutter, icon, tit
 if len(recentLines) == 0 {
 recentLines = append(recentLines, dim.Render("  no completions yet"))
 }
-recentHeight := availHeight - fleetHeight - repoHeight - 10
-if recentHeight < 2 { recentHeight = 2 }
-if len(recentLines) > recentHeight { recentLines = recentLines[:recentHeight] }
+recentHeight := len(recentLines)
+if recentHeight < 1 { recentHeight = 1 }
+maxRecent := availHeight / 3
+if recentHeight > maxRecent { recentHeight = maxRecent; recentLines = recentLines[:maxRecent] }
 recentPanel := renderPanelFocused("Recent", strings.Join(recentLines, "\n"), rightWidth, recentHeight, m.focus == PanelRecent, focusColor)
 
 rightCol := lipgloss.JoinVertical(lipgloss.Left, fleetPanel, repoPanel, recentPanel)
@@ -579,7 +579,7 @@ return strings.Join(lines, "\n")
 }
 
 // renderPanelFocused renders a panel with a highlighted border when focused.
-func renderPanelFocused(title string, content string, width, height int, focused bool, focusColor lipgloss.AdaptiveColor) string {
+func renderPanelFocused(title string, content string, width, _ int, focused bool, focusColor lipgloss.AdaptiveColor) string {
 borderColor := lipgloss.AdaptiveColor{Light: "249", Dark: "240"}
 titleColor := lipgloss.AdaptiveColor{Light: "24", Dark: "75"}
 if focused {
@@ -596,7 +596,6 @@ box := lipgloss.NewStyle().
 Border(lipgloss.RoundedBorder()).
 BorderForeground(borderColor).
 Width(width - 2).
-Height(height).
 Padding(0, 1).
 Render(content)
 

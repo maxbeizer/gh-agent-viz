@@ -10,10 +10,11 @@ import (
 
 // Counts holds the stats to display.
 type Counts struct {
-	Active    int
-	Attention int // urgent
-	Warning   int
-	Completed int
+	Active      int
+	Idle        int
+	Attention   int // urgent
+	Warning     int
+	Completed   int
 	TotalTokens int64
 }
 
@@ -51,6 +52,10 @@ func (m Model) View() string {
 
 	if m.counts.Active > 0 {
 		parts = append(parts, activeStyle.Render(fmt.Sprintf("● %d active", m.counts.Active)))
+	}
+	if m.counts.Idle > 0 {
+		idleStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "245"})
+		parts = append(parts, idleStyle.Render(fmt.Sprintf("💤 %d idle", m.counts.Idle)))
 	}
 	if m.counts.Attention > 0 {
 		parts = append(parts, urgentStyle.Render(fmt.Sprintf("🔴 %d urgent", m.counts.Attention)))

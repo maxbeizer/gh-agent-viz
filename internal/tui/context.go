@@ -7,7 +7,8 @@ type FilterCounts struct {
 	All       int
 	Attention int
 	Warning   int
-	Active    int
+	Active    int // truly active (updated within 20min)
+	Idle      int // running status but idle 20min+
 	Completed int
 	Failed    int
 }

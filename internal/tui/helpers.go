@@ -303,7 +303,11 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 			counts.Warning++
 		}
 		if data.StatusIsActive(session.Status) || strings.EqualFold(session.Status, "needs-input") {
-			counts.Active++
+			if data.SessionIsActiveNotIdle(session) {
+				counts.Active++
+			} else {
+				counts.Idle++
+			}
 		}
 		if strings.EqualFold(session.Status, "completed") {
 			counts.Completed++
@@ -333,6 +337,7 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 	}
 	m.statsBar.SetCounts(statsbar.Counts{
 		Active:      counts.Active,
+		Idle:        counts.Idle,
 		Attention:   counts.Attention,
 		Warning:     counts.Warning,
 		Completed:   counts.Completed,

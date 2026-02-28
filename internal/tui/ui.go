@@ -68,6 +68,8 @@ type Model struct {
 	allSessions  []data.Session // accumulated across load phases
 	initialLoadDone bool       // true after all initial load phases complete
 	lastFingerprint string     // hash of session data; used to skip no-op refreshes
+	searchActive bool          // true when search input is active
+	searchQuery  string        // current search filter text
 }
 
 // NewModel creates a new TUI model
@@ -412,7 +414,20 @@ func (m Model) View() string {
 		toastView = "\n" + m.toast.View()
 	}
 
-	result := headerView + statsBarView + "\n" + mainView + toastView + footerView
+	// Search bar indicator
+	searchView := ""
+	if m.searchActive || m.searchQuery != "" {
+		searchStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"}).
+			Bold(true)
+		queryDisplay := m.searchQuery
+		if m.searchActive {
+			queryDisplay += "▍" // cursor
+		}
+		searchView = searchStyle.Render(fmt.Sprintf("  🔍 Filter: %s", queryDisplay)) + "\n"
+	}
+
+	result := headerView + statsBarView + "\n" + mainView + toastView + searchView + footerView
 
 	// Overlay help panel when visible
 	if m.help.Visible() {

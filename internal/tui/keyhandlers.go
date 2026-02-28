@@ -17,6 +17,34 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Search mode: capture text input for filtering
+	if m.searchActive {
+		switch msg.Type {
+		case tea.KeyEscape:
+			m.searchActive = false
+			m.searchQuery = ""
+			m.recomputeAndDisplay(m.visibleSessions())
+			return m, nil
+		case tea.KeyEnter:
+			m.searchActive = false
+			// Keep the filter active, just stop capturing input
+			return m, nil
+		case tea.KeyBackspace:
+			if len(m.searchQuery) > 0 {
+				m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+				m.recomputeAndDisplay(m.visibleSessions())
+			}
+			return m, nil
+		default:
+			if msg.Type == tea.KeyRunes {
+				m.searchQuery += string(msg.Runes)
+				m.recomputeAndDisplay(m.visibleSessions())
+				return m, nil
+			}
+		}
+		return m, nil
+	}
+
 	// ? toggles help overlay in any mode
 	if msg.String() == "?" {
 		m.help.Toggle()
@@ -26,6 +54,15 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Global quit key
 	if msg.String() == "q" || msg.String() == "ctrl+c" {
 		return m, tea.Quit
+	}
+
+	// / activates search in navigable views
+	if msg.String() == "/" {
+		if m.viewMode == ViewModeList || m.viewMode == ViewModeKanban || m.viewMode == ViewModeMission {
+			m.searchActive = true
+			m.searchQuery = ""
+			return m, nil
+		}
 	}
 
 	switch m.viewMode {

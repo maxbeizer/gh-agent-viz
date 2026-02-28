@@ -90,6 +90,7 @@ func (m *Model) updateFooterHints() {
 			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "navigate")),
 			m.keys.SelectTask,
 			m.keys.ToggleFilter,
+			m.keys.SearchFilter,
 			m.keys.ToggleKanban,
 			m.keys.ToggleMission,
 			m.keys.ShowHelp,
@@ -281,7 +282,7 @@ func (m *Model) enrichTokenUsage(usage map[string]*data.TokenUsage) {
 // session data has not changed (fingerprint match).
 func (m *Model) recomputeAndDisplay(visible []data.Session) {
 	// Fast-path: skip when data and active filter haven't changed
-	fp := sessionFingerprint(visible) + "|" + m.ctx.StatusFilter
+	fp := sessionFingerprint(visible) + "|" + m.ctx.StatusFilter + "|" + m.searchQuery
 	unchanged := m.lastFingerprint == fp && m.initialLoadDone
 	if !unchanged {
 		m.lastFingerprint = fp
@@ -358,6 +359,21 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 				filtered = append(filtered, session)
 			}
 		}
+	}
+
+	// Apply search filter
+	if m.searchQuery != "" {
+		q := strings.ToLower(m.searchQuery)
+		searchFiltered := make([]data.Session, 0, len(filtered))
+		for _, session := range filtered {
+			if strings.Contains(strings.ToLower(session.Title), q) ||
+				strings.Contains(strings.ToLower(session.Repository), q) ||
+				strings.Contains(strings.ToLower(session.Branch), q) ||
+				strings.Contains(strings.ToLower(session.Status), q) {
+				searchFiltered = append(searchFiltered, session)
+			}
+		}
+		filtered = searchFiltered
 	}
 
 	// Update display components — only push data to the active view to avoid

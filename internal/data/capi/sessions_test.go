@@ -53,7 +53,7 @@ func TestListSessions(t *testing.T) {
 
 		resp := sessionsResponse{Sessions: sessions}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
@@ -88,7 +88,7 @@ func TestListSessionsDeduplicates(t *testing.T) {
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(sessionsResponse{Sessions: sessions})
+		_ = json.NewEncoder(w).Encode(sessionsResponse{Sessions: sessions})
 	}))
 	defer srv.Close()
 
@@ -118,7 +118,7 @@ func TestGetSession(t *testing.T) {
 			http.NotFound(w, r)
 			return
 		}
-		json.NewEncoder(w).Encode(sess)
+		_ = json.NewEncoder(w).Encode(sess)
 	}))
 	defer srv.Close()
 
@@ -154,7 +154,7 @@ func TestGetSessionLogs(t *testing.T) {
 			http.NotFound(w, r)
 			return
 		}
-		w.Write([]byte("line 1\nline 2\nline 3"))
+		_, _ = w.Write([]byte("line 1\nline 2\nline 3"))
 	}))
 	defer srv.Close()
 
@@ -171,7 +171,7 @@ func TestGetSessionLogs(t *testing.T) {
 func TestListSessionsHTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal error"))
+		_, _ = w.Write([]byte("internal error"))
 	}))
 	defer srv.Close()
 

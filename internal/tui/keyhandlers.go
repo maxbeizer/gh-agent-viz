@@ -64,6 +64,17 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
+	// Debug snapshot (any view)
+	if msg.String() == "S" {
+		path := "/tmp/gh-agent-viz-snapshot.json"
+		origPath := m.snapshotPath
+		m.snapshotPath = path
+		m.writeSnapshot()
+		m.snapshotPath = origPath
+		m.toast.Push("📸", "Snapshot", path)
+		return m, nil
+	}
+
 	// / activates search in navigable views
 	if msg.String() == "/" {
 		if m.viewMode == ViewModeList || m.viewMode == ViewModeKanban || m.viewMode == ViewModeMission {

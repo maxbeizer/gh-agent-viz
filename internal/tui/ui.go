@@ -376,16 +376,8 @@ func (m Model) View() string {
 	// Update footer hints based on current context
 	m.updateFooterHints()
 
-	// Dashboard view: show banner + stats bar but skip tab bar
-	// Other views: show full chrome with tabs
-	var chrome string
-	if m.viewMode == ViewModeMission {
-		chrome = m.header.ViewBannerOnly() + m.statsBar.View() + "\n"
-	} else {
-		headerView := m.header.View()
-		statsBarView := m.statsBar.View()
-		chrome = headerView + statsBarView + "\n"
-	}
+	// All views: show banner + stats bar, no tab bar
+	chrome := m.header.ViewBannerOnly() + m.statsBar.View() + "\n"
 	footerView := m.footer.View()
 
 	var mainView string

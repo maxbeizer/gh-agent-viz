@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
@@ -66,7 +67,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Debug snapshot (any view)
 	if msg.String() == "S" {
-		path := "/tmp/gh-agent-viz-snapshot.json"
+		ts := time.Now().UTC().Format("2006-01-02T150405Z")
+		path := fmt.Sprintf("/tmp/gh-agent-viz-snapshot-%s.json", ts)
 		origPath := m.snapshotPath
 		m.snapshotPath = path
 		m.writeSnapshot()

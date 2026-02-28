@@ -477,15 +477,14 @@ pad := innerW - lipgloss.Width(left) - lipgloss.Width(right)
 if pad < 1 { pad = 1 }
 idleLines = append(idleLines, left + strings.Repeat(" ", pad) + right)
 }
-leftPanels := []string{activePanel, attnPanel}
+// Attention
+var idlePanel string
 if len(idleLines) > 0 {
 idleHeight := len(idleLines)
 maxIdle := availHeight / 4
 if idleHeight > maxIdle { idleHeight = maxIdle; idleLines = idleLines[:maxIdle] }
-idlePanel := renderPanelFocused(fmt.Sprintf("Idle (%d)", len(idleSessions)), strings.Join(idleLines, "\n"), leftWidth, idleHeight, m.focus == PanelIdle, focusColor)
-leftPanels = append(leftPanels, idlePanel)
+idlePanel = renderPanelFocused(fmt.Sprintf("Idle (%d)", len(idleSessions)), strings.Join(idleLines, "\n"), rightWidth, idleHeight, m.focus == PanelIdle, focusColor)
 }
-leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 
 // ── RIGHT COLUMN ──
 
@@ -530,20 +529,21 @@ selected := (m.focus == PanelRepos) && i == m.cursors[PanelRepos]
 repoLines = append(repoLines, m.renderRepoRow(r, selected, rInnerW))
 }
 repoHeight := len(repoLines)
-maxRepo := availHeight - fleetHeight - 8
+maxRepo := availHeight / 2
 if maxRepo < 3 { maxRepo = 3 }
 if repoHeight > maxRepo { repoHeight = maxRepo; repoLines = repoLines[:maxRepo] }
 if repoHeight < 1 { repoHeight = 1 }
 repoPanel := renderPanelFocused("Repos", strings.Join(repoLines, "\n"), rightWidth, repoHeight, m.focus == PanelRepos, focusColor)
 
-// Recent completions
+// Recent completions (left column, below Active)
 recentDone := m.recentCompletions(8)
 var recentLines []string
+recentInnerW := leftWidth - 6
 for i, s := range recentDone {
 icon := "✅"
 if strings.EqualFold(s.Status, "failed") { icon = "❌" }
 title := s.Title
-maxT := rInnerW - 20
+maxT := recentInnerW - 20
 if maxT < 10 { maxT = 10 }
 if len(title) > maxT { title = title[:maxT-1] + "…" }
 ago := formatAge(s.UpdatedAt)
@@ -563,9 +563,18 @@ recentHeight := len(recentLines)
 if recentHeight < 1 { recentHeight = 1 }
 maxRecent := availHeight / 3
 if recentHeight > maxRecent { recentHeight = maxRecent; recentLines = recentLines[:maxRecent] }
-recentPanel := renderPanelFocused("Recent", strings.Join(recentLines, "\n"), rightWidth, recentHeight, m.focus == PanelRecent, focusColor)
+recentPanel := renderPanelFocused("Recent", strings.Join(recentLines, "\n"), leftWidth, recentHeight, m.focus == PanelRecent, focusColor)
 
-rightCol := lipgloss.JoinVertical(lipgloss.Left, fleetPanel, repoPanel, recentPanel)
+// ── ASSEMBLE COLUMNS ──
+// Left: Active → Recent → Attention
+leftCol := lipgloss.JoinVertical(lipgloss.Left, activePanel, recentPanel, attnPanel)
+
+// Right: Fleet → Repos → Idle
+rightPanels := []string{fleetPanel, repoPanel}
+if len(idleLines) > 0 {
+rightPanels = append(rightPanels, idlePanel)
+}
+rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
 return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol)
 }

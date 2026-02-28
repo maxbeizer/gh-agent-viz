@@ -449,7 +449,7 @@ func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		// Drill into selected item based on focused panel
 		switch m.mission.Focus() {
-		case mission.PanelActive, mission.PanelAttention, mission.PanelRecent:
+		case mission.PanelActive, mission.PanelAttention, mission.PanelRecent, mission.PanelIdle:
 			session := m.mission.SelectedSession()
 			if session != nil {
 				if session.Source == data.SourceLocalCopilot {

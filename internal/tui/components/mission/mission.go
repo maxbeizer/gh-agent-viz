@@ -51,6 +51,7 @@ PanelActive PanelFocus = iota
 PanelAttention
 PanelRepos
 PanelRecent
+PanelIdle
 )
 
 // Model represents the mission control summary dashboard.
@@ -60,7 +61,7 @@ stats      fleetStats
 repos      []repoSummary
 attention  []attentionItem
 focus      PanelFocus // which panel has keyboard focus
-cursors    [4]int     // per-panel cursor: [active, attention, repos, recent]
+cursors    [5]int     // per-panel cursor: [active, attention, repos, recent, idle]
 // Panel Y ranges for mouse click detection (set during render)
 panelYRanges [3][2]int // [panel][start, end] row ranges
 statusIcon func(string) string
@@ -219,7 +220,7 @@ if m.cursors[m.focus] >= maxLen { m.cursors[m.focus] = maxLen - 1 }
 
 // CyclePanel moves focus to the next/previous panel.
 func (m *Model) CyclePanel(delta int) {
-m.focus = PanelFocus((int(m.focus) + delta + 4) % 4)
+m.focus = PanelFocus((int(m.focus) + delta + 5) % 5)
 m.clampCursor()
 }
 
@@ -254,6 +255,8 @@ case PanelRepos:
 return len(m.repos)
 case PanelRecent:
 return len(m.recentCompletions(8))
+case PanelIdle:
+return len(m.idleSessions())
 }
 return 0
 }
@@ -293,6 +296,13 @@ recent := m.recentCompletions(8)
 idx := m.cursors[PanelRecent]
 if idx >= 0 && idx < len(recent) {
 s := recent[idx]
+return &s
+}
+case PanelIdle:
+idle := m.idleSessions()
+idx := m.cursors[PanelIdle]
+if idx >= 0 && idx < len(idle) {
+s := idle[idx]
 return &s
 }
 case PanelRepos:
@@ -371,7 +381,7 @@ if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
 icon = m.animStatusIcon(s.Status, m.animFrame)
 }
 title := s.Title
-maxT := innerW / 2
+maxT := innerW * 2 / 3
 if maxT < 10 { maxT = 10 }
 if len(title) > maxT { title = title[:maxT-1] + "…" }
 action := DeriveLastAction(s)
@@ -384,11 +394,24 @@ if m.focus == PanelActive && i == m.cursors[PanelActive] {
 gutter = "▎ "
 titleRender = cursorStyle.Render(title)
 }
+// Line 1: icon + title + action
 left := fmt.Sprintf("%s%s %s", gutter, icon, titleRender)
 right := dim.Render(action)
 pad := innerW - lipgloss.Width(left) - lipgloss.Width(right)
 if pad < 1 { pad = 1 }
 activeLines = append(activeLines, left + strings.Repeat(" ", pad) + right)
+
+// Line 2: duration + tokens + repo (dim metadata)
+var meta []string
+if !s.CreatedAt.IsZero() {
+meta = append(meta, "⏱ "+formatDuration(time.Since(s.CreatedAt)))
+}
+if s.Telemetry != nil && s.Telemetry.InputTokens > 0 {
+meta = append(meta, "🪙 "+data.FormatTokenCount(s.Telemetry.InputTokens))
+}
+repo := shortRepo(s.Repository)
+meta = append(meta, repo)
+activeLines = append(activeLines, gutter + "  " + dim.Render(strings.Join(meta, "  ")))
 }
 if len(activeLines) == 0 {
 activeLines = append(activeLines, dim.Render("  no active sessions"))
@@ -432,7 +455,37 @@ if attnHeight < 1 { attnHeight = 1 }
 attnTitle := fmt.Sprintf("Attention (%d)", len(m.attention))
 attnPanel := renderPanelFocused(attnTitle, strings.Join(attnLines, "\n"), leftWidth, attnHeight, m.focus == PanelAttention, focusColor)
 
-leftCol := lipgloss.JoinVertical(lipgloss.Left, activePanel, attnPanel)
+// Idle sessions panel
+idleSessions := m.idleSessions()
+var idleLines []string
+for i, s := range idleSessions {
+title := s.Title
+maxT := innerW * 2 / 3
+if maxT < 10 { maxT = 10 }
+if len(title) > maxT { title = title[:maxT-1] + "…" }
+gutter := "  "
+titleRender := sessionStyle.Render(title)
+if m.focus == PanelIdle && i == m.cursors[PanelIdle] {
+gutter = "▎ "
+titleRender = cursorStyle.Render(title)
+}
+ago := formatAge(s.UpdatedAt)
+repo := shortRepo(s.Repository)
+left := fmt.Sprintf("%s💤 %s", gutter, titleRender)
+right := dim.Render(fmt.Sprintf("%s  %s", repo, ago))
+pad := innerW - lipgloss.Width(left) - lipgloss.Width(right)
+if pad < 1 { pad = 1 }
+idleLines = append(idleLines, left + strings.Repeat(" ", pad) + right)
+}
+leftPanels := []string{activePanel, attnPanel}
+if len(idleLines) > 0 {
+idleHeight := len(idleLines)
+maxIdle := availHeight / 4
+if idleHeight > maxIdle { idleHeight = maxIdle; idleLines = idleLines[:maxIdle] }
+idlePanel := renderPanelFocused(fmt.Sprintf("Idle (%d)", len(idleSessions)), strings.Join(idleLines, "\n"), leftWidth, idleHeight, m.focus == PanelIdle, focusColor)
+leftPanels = append(leftPanels, idlePanel)
+}
+leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 
 // ── RIGHT COLUMN ──
 
@@ -456,6 +509,14 @@ barWidth := rightWidth - 6
 if barWidth > 50 { barWidth = 50 }
 if barWidth > 0 && m.stats.Total > 0 {
 fleetLines = append(fleetLines, m.renderBar(barWidth))
+}
+// Today stats
+todayDone, todayTokens := m.todayStats()
+if todayDone > 0 || todayTokens > 0 {
+var todayParts []string
+if todayDone > 0 { todayParts = append(todayParts, fmt.Sprintf("✅ %d completed", todayDone)) }
+if todayTokens > 0 { todayParts = append(todayParts, fmt.Sprintf("🪙 %s", data.FormatTokenCount(todayTokens))) }
+fleetLines = append(fleetLines, dim.Render("today: " + strings.Join(todayParts, "  ")))
 }
 fleetHeight := len(fleetLines)
 if fleetHeight < 2 { fleetHeight = 2 }
@@ -692,6 +753,8 @@ case PanelRepos:
 max = len(m.repos)
 case PanelRecent:
 max = len(m.recentCompletions(8))
+case PanelIdle:
+max = len(m.idleSessions())
 }
 if m.cursors[i] < 0 { m.cursors[i] = 0 }
 if max > 0 && m.cursors[i] >= max { m.cursors[i] = max - 1 }
@@ -707,6 +770,37 @@ active = append(active, s)
 }
 }
 return active
+}
+
+// idleSessions returns sessions with active status but idle for 20+ minutes.
+func (m *Model) idleSessions() []data.Session {
+var idle []data.Session
+for _, s := range m.sessions {
+if data.StatusIsActive(s.Status) && !data.SessionIsActiveNotIdle(s) {
+idle = append(idle, s)
+}
+}
+return idle
+}
+
+// todayStats returns completed count and tokens burned since midnight UTC.
+func (m *Model) todayStats() (int, int64) {
+now := time.Now().UTC()
+todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+completed := 0
+tokens := int64(0)
+for _, s := range m.sessions {
+if s.UpdatedAt.After(todayStart) {
+status := strings.ToLower(strings.TrimSpace(s.Status))
+if status == "completed" || status == "failed" {
+completed++
+}
+if s.Telemetry != nil {
+tokens += s.Telemetry.InputTokens
+}
+}
+}
+return completed, tokens
 }
 
 // recentCompletions returns the most recent n completed/failed sessions.
@@ -742,6 +836,22 @@ case d < 24*time.Hour:
 return fmt.Sprintf("%dh ago", int(d.Hours()))
 default:
 return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+}
+}
+
+func formatDuration(d time.Duration) string {
+switch {
+case d < time.Minute:
+return fmt.Sprintf("%ds", int(d.Seconds()))
+case d < time.Hour:
+return fmt.Sprintf("%dm", int(d.Minutes()))
+case d < 24*time.Hour:
+h := int(d.Hours())
+m := int(d.Minutes()) % 60
+if m > 0 { return fmt.Sprintf("%dh%dm", h, m) }
+return fmt.Sprintf("%dh", h)
+default:
+return fmt.Sprintf("%dd", int(d.Hours()/24))
 }
 }
 

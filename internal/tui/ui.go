@@ -370,8 +370,16 @@ func (m Model) View() string {
 	// Update footer hints based on current context
 	m.updateFooterHints()
 
-	headerView := m.header.View()
-	statsBarView := m.statsBar.View()
+	// Dashboard view: skip tab bar and stats bar (dashboard has its own fleet summary)
+	// Other views: show full chrome
+	var chrome string
+	if m.viewMode == ViewModeMission {
+		chrome = ""
+	} else {
+		headerView := m.header.View()
+		statsBarView := m.statsBar.View()
+		chrome = headerView + statsBarView + "\n"
+	}
 	footerView := m.footer.View()
 
 	var mainView string
@@ -429,7 +437,7 @@ func (m Model) View() string {
 		searchView = searchStyle.Render(fmt.Sprintf("  🔍 Filter: %s", queryDisplay)) + "\n"
 	}
 
-	result := headerView + statsBarView + "\n" + mainView + toastView + searchView + footerView
+	result := chrome + mainView + toastView + searchView + footerView
 
 	// Overlay help panel when visible
 	if m.help.Visible() {

@@ -126,10 +126,9 @@ func (m *Model) updateFooterHints() {
 		m.footer.SetHints(logHints)
 	case ViewModeKanban:
 		kanbanHints := []key.Binding{
-			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "dashboard")),
+			m.keys.NavigateBack,
 			key.NewBinding(key.WithKeys("h/l"), key.WithHelp("h/l", "column")),
 			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "card")),
-			m.keys.ToggleFilter,
 			m.keys.SelectTask,
 			m.keys.ShowHelp,
 			m.keys.ExitApp,
@@ -145,12 +144,11 @@ func (m *Model) updateFooterHints() {
 		m.footer.SetHints(timelineHints)
 	case ViewModeMission:
 		missionHints := []key.Binding{
-			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "list")),
 			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "navigate")),
-			m.keys.ToggleFilter,
+			m.keys.SelectTask,
 			m.keys.ToggleKanban,
 			m.keys.SearchFilter,
-			m.keys.SelectTask,
+			m.keys.RefreshData,
 			m.keys.ShowHelp,
 			m.keys.ExitApp,
 		}

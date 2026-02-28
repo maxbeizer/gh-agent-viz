@@ -95,6 +95,10 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleListKeys handles keys in list view mode
 func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "esc":
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 	case "j", "down":
 		m.taskList.MoveCursor(1)
 	case "k", "up":
@@ -222,7 +226,9 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.viewMode = ViewModeList
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 	case "l":
 		session := m.taskList.SelectedTask()
 		if session != nil {
@@ -277,7 +283,9 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleDiffKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.viewMode = ViewModeList
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
 	}
 
@@ -290,7 +298,9 @@ func (m Model) handleDiffKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.viewMode = ViewModeList
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 		m.logView.SetLive(false)
 		m.logView.SetFollowMode(false)
 		m.showConversation = false
@@ -366,6 +376,8 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "K":
 		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 	case "h", "left":
 		m.kanban.MoveColumn(-1)
 	case "l", "right":
@@ -386,14 +398,6 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.viewMode = ViewModeDetail
 			return m, m.fetchTaskDetail(session.ID, session.Repository)
 		}
-	case "tab":
-		m.cycleFilter(1)
-		m.kanban.SetSessions(m.visibleSessions())
-		return m, nil
-	case "shift+tab", "backtab":
-		m.cycleFilter(-1)
-		m.kanban.SetSessions(m.visibleSessions())
-		return m, nil
 	case "r":
 		return m, m.fetchTasks
 	}
@@ -420,9 +424,6 @@ func (m Model) handleToolTimelineKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleMissionKeys handles keys in mission control view mode
 func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc":
-		m.viewMode = ViewModeList
-		m.taskList.SetTasks(m.visibleSessions())
 	case "j", "down":
 		m.mission.MoveCursor(1)
 	case "k", "up":
@@ -434,14 +435,6 @@ func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.viewMode = ViewModeKanban
 		m.kanban.SetSessions(m.visibleSessions())
 		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
-	case "tab":
-		m.cycleFilter(1)
-		m.mission.SetSessions(m.visibleSessions())
-		return m, nil
-	case "shift+tab", "backtab":
-		m.cycleFilter(-1)
-		m.mission.SetSessions(m.visibleSessions())
-		return m, nil
 	case "r":
 		return m, m.fetchTasks
 	}

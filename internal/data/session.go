@@ -19,7 +19,7 @@ const AttentionStaleThreshold = 20 * time.Minute
 
 // AttentionStaleMax is the upper bound — sessions idle longer than this
 // are considered abandoned and no longer need attention.
-const AttentionStaleMax = 4 * time.Hour
+const AttentionStaleMax = 24 * time.Hour
 
 // SessionTelemetry holds derived usage metrics for a session
 type SessionTelemetry struct {
@@ -124,9 +124,13 @@ func SessionAttentionLevel(session Session) AttentionLevel {
 	}
 
 	// Warning: running but idle too long (possibly stuck)
+	// Sessions idle >24h are likely abandoned, not stuck — skip them
 	if StatusIsActive(session.Status) && status != "queued" {
-		if !session.UpdatedAt.IsZero() && time.Since(session.UpdatedAt) >= IdleWarningThreshold {
-			return AttentionWarning
+		if !session.UpdatedAt.IsZero() {
+			idle := time.Since(session.UpdatedAt)
+			if idle >= IdleWarningThreshold && idle < AttentionStaleMax {
+				return AttentionWarning
+			}
 		}
 	}
 

@@ -239,6 +239,11 @@ func TestSessionAttentionLevel(t *testing.T) {
 			session: Session{Status: "active", UpdatedAt: time.Now().Add(-IdleWarningThreshold)},
 			want:    AttentionWarning,
 		},
+		{
+			name:    "running idle 25h is abandoned not warning",
+			session: Session{Status: "running", UpdatedAt: time.Now().Add(-25 * time.Hour)},
+			want:    AttentionNone,
+		},
 	}
 
 	for _, tc := range cases {

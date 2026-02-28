@@ -50,6 +50,7 @@ const (
 PanelActive PanelFocus = iota
 PanelAttention
 PanelRepos
+PanelRecent
 )
 
 // Model represents the mission control summary dashboard.
@@ -59,7 +60,7 @@ stats      fleetStats
 repos      []repoSummary
 attention  []attentionItem
 focus      PanelFocus // which panel has keyboard focus
-cursors    [3]int     // per-panel cursor: [active, attention, repos]
+cursors    [4]int     // per-panel cursor: [active, attention, repos, recent]
 // Panel Y ranges for mouse click detection (set during render)
 panelYRanges [3][2]int // [panel][start, end] row ranges
 statusIcon func(string) string
@@ -218,7 +219,7 @@ if m.cursors[m.focus] >= maxLen { m.cursors[m.focus] = maxLen - 1 }
 
 // CyclePanel moves focus to the next/previous panel.
 func (m *Model) CyclePanel(delta int) {
-m.focus = PanelFocus((int(m.focus) + delta + 3) % 3)
+m.focus = PanelFocus((int(m.focus) + delta + 4) % 4)
 m.clampCursor()
 }
 
@@ -251,6 +252,8 @@ case PanelAttention:
 return len(m.attention)
 case PanelRepos:
 return len(m.repos)
+case PanelRecent:
+return len(m.recentCompletions(8))
 }
 return 0
 }
@@ -285,8 +288,14 @@ if idx >= 0 && idx < len(m.attention) {
 s := m.attention[idx].Session
 return &s
 }
+case PanelRecent:
+recent := m.recentCompletions(8)
+idx := m.cursors[PanelRecent]
+if idx >= 0 && idx < len(recent) {
+s := recent[idx]
+return &s
+}
 case PanelRepos:
-// Repos don't select a single session
 return nil
 }
 return nil
@@ -468,9 +477,9 @@ if repoHeight < 1 { repoHeight = 1 }
 repoPanel := renderPanelFocused("Repos", strings.Join(repoLines, "\n"), rightWidth, repoHeight, m.focus == PanelRepos, focusColor)
 
 // Recent completions
-recentDone := m.recentCompletions(5)
+recentDone := m.recentCompletions(8)
 var recentLines []string
-for _, s := range recentDone {
+for i, s := range recentDone {
 icon := "✅"
 if strings.EqualFold(s.Status, "failed") { icon = "❌" }
 title := s.Title
@@ -480,7 +489,12 @@ if len(title) > maxT { title = title[:maxT-1] + "…" }
 ago := formatAge(s.UpdatedAt)
 pr := ""
 if s.PRNumber > 0 { pr = dim.Render(fmt.Sprintf(" PR #%d", s.PRNumber)) }
-recentLines = append(recentLines, fmt.Sprintf("  %s %s%s  %s", icon, title, pr, dim.Render(ago)))
+gutter := "  "
+if m.focus == PanelRecent && i == m.cursors[PanelRecent] {
+gutter = "▎ "
+title = cursorStyle.Render(title)
+}
+recentLines = append(recentLines, fmt.Sprintf("%s%s %s%s  %s", gutter, icon, title, pr, dim.Render(ago)))
 }
 if len(recentLines) == 0 {
 recentLines = append(recentLines, dim.Render("  no completions yet"))
@@ -488,7 +502,7 @@ recentLines = append(recentLines, dim.Render("  no completions yet"))
 recentHeight := availHeight - fleetHeight - repoHeight - 10
 if recentHeight < 2 { recentHeight = 2 }
 if len(recentLines) > recentHeight { recentLines = recentLines[:recentHeight] }
-recentPanel := renderPanel("Recent", strings.Join(recentLines, "\n"), rightWidth, recentHeight)
+recentPanel := renderPanelFocused("Recent", strings.Join(recentLines, "\n"), rightWidth, recentHeight, m.focus == PanelRecent, focusColor)
 
 rightCol := lipgloss.JoinVertical(lipgloss.Left, fleetPanel, repoPanel, recentPanel)
 
@@ -677,6 +691,8 @@ case PanelAttention:
 max = len(m.attention)
 case PanelRepos:
 max = len(m.repos)
+case PanelRecent:
+max = len(m.recentCompletions(8))
 }
 if m.cursors[i] < 0 { m.cursors[i] = 0 }
 if max > 0 && m.cursors[i] >= max { m.cursors[i] = max - 1 }

@@ -26,6 +26,8 @@ type LocalSessionWorkspace struct {
 	Branch              string                   `yaml:"branch"`
 	Title               string                   `yaml:"title"`
 	Summary             string                   `yaml:"summary"`
+	CWD                 string                   `yaml:"cwd"`
+	GitRoot             string                   `yaml:"git_root"`
 	AwaitingUserInput   bool                     `yaml:"awaiting_user_input"`
 	NeedsHumanInput     bool                     `yaml:"needs_human_input"`
 	WaitingForUser      bool                     `yaml:"waiting_for_user"`
@@ -186,6 +188,10 @@ func parseWorkspaceFileFallback(data []byte) (Session, error) {
 			if t, ok := parseAnyTime(timeStr); ok {
 				session.UpdatedAt = t
 			}
+		} else if strings.HasPrefix(line, "git_root:") {
+			session.WorkDir = strings.Trim(strings.TrimPrefix(line, "git_root:"), `" `)
+		} else if strings.HasPrefix(line, "cwd:") && session.WorkDir == "" {
+			session.WorkDir = strings.Trim(strings.TrimPrefix(line, "cwd:"), `" `)
 		}
 	}
 
@@ -261,6 +267,13 @@ func convertLocalSessionToSession(workspace LocalSessionWorkspace) (Session, err
 
 	// Derive telemetry from workspace metadata
 	session.Telemetry = deriveSessionTelemetry(workspace, session.CreatedAt, session.UpdatedAt)
+
+	// Set working directory (prefer git_root, fall back to cwd)
+	if workspace.GitRoot != "" {
+		session.WorkDir = workspace.GitRoot
+	} else if workspace.CWD != "" {
+		session.WorkDir = workspace.CWD
+	}
 
 	return session, nil
 }

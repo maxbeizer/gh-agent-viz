@@ -486,3 +486,43 @@ func TestLoadingTaglines_NotEmpty(t *testing.T) {
 		t.Fatal("loadingTaglines should not be empty")
 	}
 }
+
+func TestHandleListKeys_GOpensGitActivity(t *testing.T) {
+	m := NewModel("", false, false, "")
+	m.taskList.SetTasks([]data.Session{
+		{
+			ID:      "local-1",
+			Status:  "running",
+			Title:   "Local Session",
+			Source:  data.SourceLocalCopilot,
+			WorkDir: "/tmp/test-repo",
+		},
+	})
+
+	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	if cmd == nil {
+		t.Fatal("expected git diff fetch command for G key")
+	}
+	updatedModel := updated.(Model)
+	if updatedModel.viewMode != ViewModeGitActivity {
+		t.Fatalf("expected git activity view mode, got %v", updatedModel.viewMode)
+	}
+}
+
+func TestHandleListKeys_GToastsForNonLocalSession(t *testing.T) {
+	m := NewModel("", false, false, "")
+	m.taskList.SetTasks([]data.Session{
+		{
+			ID:     "agent-1",
+			Status: "running",
+			Title:  "Agent Session",
+			Source: data.SourceAgentTask,
+		},
+	})
+
+	updated, _ := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	updatedModel := updated.(Model)
+	if updatedModel.viewMode == ViewModeGitActivity {
+		t.Fatal("should not switch to git activity for non-local session")
+	}
+}

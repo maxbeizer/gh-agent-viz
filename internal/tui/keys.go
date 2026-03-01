@@ -28,6 +28,7 @@ type Keybindings struct {
 	FileIssue      key.Binding
 	MassDismiss    key.Binding
 	SearchFilter   key.Binding
+	ShowGitActivity key.Binding
 }
 
 // NewKeybindings creates the default key bindings for the TUI
@@ -128,6 +129,10 @@ func NewKeybindings() Keybindings {
 		SearchFilter: key.NewBinding(
 			key.WithKeys("/"),
 			key.WithHelp("/", "search"),
+		),
+		ShowGitActivity: key.NewBinding(
+			key.WithKeys("G"),
+			key.WithHelp("G", "git changes"),
 		),
 	}
 }

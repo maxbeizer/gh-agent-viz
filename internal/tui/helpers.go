@@ -110,6 +110,10 @@ func (m *Model) updateFooterHints() {
 		if canShowDiff(session) {
 			hints = append(hints, m.keys.ShowDiff)
 		}
+		// Show git activity hint for local sessions with a working directory
+		if session != nil && session.Source == data.SourceLocalCopilot && session.WorkDir != "" {
+			hints = append(hints, m.keys.ShowGitActivity)
+		}
 		hints = append(hints, m.keys.ShowHelp, m.keys.ExitApp)
 		m.footer.SetHints(hints)
 	case ViewModeLog:
@@ -163,6 +167,15 @@ func (m *Model) updateFooterHints() {
 			m.keys.ExitApp,
 		}
 		m.footer.SetHints(diffHints)
+	case ViewModeGitActivity:
+		gitHints := []key.Binding{
+			m.keys.NavigateBack,
+			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "scroll")),
+			m.keys.RefreshData,
+			m.keys.ShowHelp,
+			m.keys.ExitApp,
+		}
+		m.footer.SetHints(gitHints)
 	}
 }
 
@@ -214,6 +227,12 @@ func (m Model) animationTickCmd() tea.Cmd {
 func (m Model) logPollTick() tea.Cmd {
 	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
 		return logPollTickMsg{}
+	})
+}
+
+func (m Model) gitDiffPollTick() tea.Cmd {
+	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+		return gitDiffPollTickMsg{}
 	})
 }
 

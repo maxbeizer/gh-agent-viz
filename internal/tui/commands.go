@@ -71,6 +71,12 @@ type conversationLoadedMsg struct {
 	messages []conversation.ChatMessage
 }
 
+type gitDiffLoadedMsg struct {
+	result *data.GitDiffResult
+}
+
+type gitDiffPollTickMsg struct{}
+
 // fetchTasks fetches the list of sessions (both agent tasks and local sessions)
 func (m Model) fetchTasks() tea.Msg {
 	var sessions []data.Session
@@ -452,5 +458,16 @@ func (m Model) fetchPRDiff(session *data.Session) tea.Cmd {
 		}
 		files := diffview.ParseUnifiedDiff(raw)
 		return diffLoadedMsg{files}
+	}
+}
+
+// fetchGitDiff fetches the current git diff for a session's working directory
+func (m Model) fetchGitDiff(workDir string) tea.Cmd {
+	return func() tea.Msg {
+		result, err := data.FetchSessionGitDiff(workDir)
+		if err != nil {
+			return errMsg{err}
+		}
+		return gitDiffLoadedMsg{result}
 	}
 }

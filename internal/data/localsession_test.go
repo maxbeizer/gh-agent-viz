@@ -383,6 +383,62 @@ updated_at: %q
 	if session.Status != "running" {
 		t.Errorf("expected running from recent updated_at, got %q", session.Status)
 	}
+	if session.WorkDir != "/Users/maxbeizer/code/gh-agent-viz" {
+		t.Errorf("expected WorkDir from git_root, got %q", session.WorkDir)
+	}
+}
+
+func TestParseWorkspaceFile_WorkDir_FallbackToCWD(t *testing.T) {
+	tmpDir := t.TempDir()
+	workspaceFile := filepath.Join(tmpDir, "workspace.yaml")
+
+	createdAt := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339)
+	updatedAt := time.Now().Add(-5 * time.Minute).UTC().Format(time.RFC3339)
+
+	// Only cwd, no git_root
+	content := fmt.Sprintf(`id: workdir-test-cwd
+cwd: /Users/test/some-project
+repository: test/some-project
+branch: main
+summary: CWD Only Session
+created_at: %q
+updated_at: %q
+`, createdAt, updatedAt)
+
+	if err := os.WriteFile(workspaceFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	session, err := parseWorkspaceFile(workspaceFile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if session.WorkDir != "/Users/test/some-project" {
+		t.Errorf("expected WorkDir from cwd fallback, got %q", session.WorkDir)
+	}
+}
+
+func TestParseWorkspaceFileFallback_ParsesWorkDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	workspaceFile := filepath.Join(tmpDir, "workspace.yaml")
+
+	content := `id: "fallback-workdir"
+cwd: /Users/test/fallback
+git_root: /Users/test/fallback-root
+{ invalid yaml here
+`
+	if err := os.WriteFile(workspaceFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	session, err := parseWorkspaceFile(workspaceFile)
+	if err != nil {
+		t.Fatalf("expected fallback parsing to succeed, got error: %v", err)
+	}
+	// git_root should take priority even in fallback
+	if session.WorkDir != "/Users/test/fallback-root" {
+		t.Errorf("expected WorkDir from git_root in fallback, got %q", session.WorkDir)
+	}
 }
 
 func TestFetchLocalSessions_NoDirectory(t *testing.T) {

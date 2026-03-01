@@ -47,6 +47,7 @@ type Session struct {
 	CreatedAt  time.Time     `json:"createdAt"`
 	UpdatedAt  time.Time     `json:"updatedAt"`
 	Source     SessionSource `json:"source"`
+	WorkDir    string        `json:"workDir,omitempty"` // local filesystem path (git_root or cwd)
 	Telemetry  *SessionTelemetry `json:"telemetry,omitempty"`
 	HasLog     bool              `json:"-"` // true when a viewable log exists (e.g. events.jsonl)
 }

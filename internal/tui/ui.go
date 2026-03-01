@@ -13,6 +13,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/conversation"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/footer"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/gitactivity"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/help"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/kanban"
@@ -37,6 +38,7 @@ const (
 	ViewModeToolTimeline
 	ViewModeMission
 	ViewModeDiff
+	ViewModeGitActivity
 )
 
 // Model represents the main TUI application state
@@ -55,6 +57,7 @@ type Model struct {
 	toolTimeline   tooltimeline.Model
 	conversationView conversation.Model
 	mission        mission.Model
+	gitActivity    gitactivity.Model
 	dismissedStore *data.DismissedStore
 	statsBar       statsbar.Model
 	viewMode       ViewMode
@@ -153,6 +156,7 @@ func NewModel(repo string, debug bool, demo bool, snapshotPath string) Model {
 		toolTimeline:   tooltimeline.New(80, 20),
 		conversationView: conversation.New(80, 20),
 		mission:        mission.New(theme.Title, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
+		gitActivity:    gitactivity.New(80, 20),
 		dismissedStore: dismissedStore,
 		statsBar:       statsbar.New(),
 		viewMode:    defaultView,
@@ -212,6 +216,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.toolTimeline.SetSize(m.ctx.Width-4, m.ctx.Height-8)
 		m.conversationView.SetSize(m.ctx.Width-4, m.ctx.Height-8)
 		m.diffView.SetSize(m.ctx.Width-4, m.ctx.Height-8)
+		m.gitActivity.SetSize(m.ctx.Width-4, m.ctx.Height-8)
 		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
@@ -321,6 +326,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.diffView.SetDiffs(msg.files)
 		return m, nil
 
+	case gitDiffLoadedMsg:
+		m.ctx.Error = nil
+		m.gitActivity.SetDiffResult(msg.result)
+		return m, nil
+
+	case gitDiffPollTickMsg:
+		if m.viewMode != ViewModeGitActivity {
+			return m, nil
+		}
+		session := m.taskList.SelectedTask()
+		if session == nil || session.WorkDir == "" {
+			return m, nil
+		}
+		return m, tea.Batch(m.fetchGitDiff(session.WorkDir), m.gitDiffPollTick())
+
 	case refreshTickMsg:
 		return m, tea.Batch(m.fetchTasks, m.refreshCmd())
 
@@ -385,6 +405,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// Update the git activity view if active
+	if m.viewMode == ViewModeGitActivity {
+		var cmd tea.Cmd
+		m.gitActivity, cmd = m.gitActivity.Update(msg)
+		return m, cmd
+	}
+
 	return m, nil
 }
 
@@ -436,6 +463,8 @@ func (m Model) View() string {
 		mainView = m.mission.View()
 	case ViewModeDiff:
 		mainView = m.diffView.View()
+	case ViewModeGitActivity:
+		mainView = m.gitActivity.View()
 	}
 
 	if m.ctx.Debug {
@@ -521,6 +550,8 @@ func (m Model) viewModeName() string {
 		return "dashboard"
 	case ViewModeDiff:
 		return "diff"
+	case ViewModeGitActivity:
+		return "git-activity"
 	default:
 		return "unknown"
 	}

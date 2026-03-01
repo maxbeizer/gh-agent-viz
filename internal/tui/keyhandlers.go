@@ -102,6 +102,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleToolTimelineKeys(msg)
 	case ViewModeMission:
 		return m.handleMissionKeys(msg)
+	case ViewModeGitActivity:
+		return m.handleGitActivityKeys(msg)
 	}
 
 	return m, nil
@@ -233,6 +235,16 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else if session != nil {
 			m.toast.Push("ℹ️", "Tool Timeline", "only available for local Copilot sessions")
 		}
+	case "G":
+		session := m.taskList.SelectedTask()
+		if session != nil && session.Source == data.SourceLocalCopilot && session.WorkDir != "" {
+			m.gitActivity.SetLoading(true)
+			m.gitActivity.SetSize(m.ctx.Width-4, m.ctx.Height-8)
+			m.viewMode = ViewModeGitActivity
+			return m, tea.Batch(m.fetchGitDiff(session.WorkDir), m.gitDiffPollTick())
+		} else if session != nil {
+			m.toast.Push("ℹ️", "Git Activity", "only available for local sessions with a working directory")
+		}
 	}
 	return m, nil
 }
@@ -290,6 +302,16 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.viewMode = ViewModeDiff
 			return m, m.fetchPRDiff(session)
 		}
+	case "G":
+		session := m.taskList.SelectedTask()
+		if session != nil && session.Source == data.SourceLocalCopilot && session.WorkDir != "" {
+			m.gitActivity.SetLoading(true)
+			m.gitActivity.SetSize(m.ctx.Width-4, m.ctx.Height-8)
+			m.viewMode = ViewModeGitActivity
+			return m, tea.Batch(m.fetchGitDiff(session.WorkDir), m.gitDiffPollTick())
+		} else if session != nil {
+			m.toast.Push("ℹ️", "Git Activity", "only available for local sessions with a working directory")
+		}
 	}
 	return m, nil
 }
@@ -307,6 +329,30 @@ func (m Model) handleDiffKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Delegate to viewport for scrolling
 	var cmd tea.Cmd
 	m.diffView, cmd = m.diffView.Update(msg)
+	return m, cmd
+}
+
+// handleGitActivityKeys handles keys in git activity view mode
+func (m Model) handleGitActivityKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		return m, nil
+	case "r":
+		// Manual refresh
+		session := m.taskList.SelectedTask()
+		if session != nil && session.WorkDir != "" {
+			m.gitActivity.SetLoading(true)
+			return m, m.fetchGitDiff(session.WorkDir)
+		}
+		return m, nil
+	}
+
+	// Delegate to viewport for scrolling
+	var cmd tea.Cmd
+	m.gitActivity, cmd = m.gitActivity.Update(msg)
 	return m, cmd
 }
 

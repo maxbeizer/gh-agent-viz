@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [v0.6.0] - 2026-03-01
+
+### Added
+
+- Animated loading screen with ⚡ branding, spinner, and fun randomized taglines shown during initial data fetch
+- Replaces empty containers with a polished startup experience
+
 ## [v0.5.0] - 2026-02-28
 
 ### Added

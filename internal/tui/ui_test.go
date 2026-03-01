@@ -437,3 +437,52 @@ func TestIsSessionRunning(t *testing.T) {
 		t.Fatal("expected nil session to not be running")
 	}
 }
+
+func TestView_LoadingScreenShownBeforeDataLoads(t *testing.T) {
+	m := NewModel("", false, false, "")
+	// Simulate terminal sizing (sets ready = true)
+	m.ready = true
+	m.ctx.Width = 80
+	m.ctx.Height = 24
+
+	view := m.View()
+	if strings.Contains(view, "Agent Sessions") {
+		t.Fatal("expected loading screen, not the main UI")
+	}
+	// Should contain the spinner/tagline content
+	found := false
+	for _, tagline := range loadingTaglines {
+		if strings.Contains(view, tagline) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected loading screen to contain a tagline, got: %q", view)
+	}
+	if !strings.Contains(view, "Agent Viz") {
+		t.Fatalf("expected loading screen to contain branding, got: %q", view)
+	}
+}
+
+func TestView_LoadingScreenTransitionsAfterInitialLoad(t *testing.T) {
+	m := NewModel("", false, true, "") // demo mode for simplicity
+	m.ready = true
+	m.ctx.Width = 120
+	m.ctx.Height = 40
+	m.initialLoadDone = true
+
+	view := m.View()
+	// Should NOT show loading screen
+	for _, tagline := range loadingTaglines {
+		if strings.Contains(view, tagline) {
+			t.Fatalf("loading screen should not show after initialLoadDone, found tagline: %q", tagline)
+		}
+	}
+}
+
+func TestLoadingTaglines_NotEmpty(t *testing.T) {
+	if len(loadingTaglines) == 0 {
+		t.Fatal("loadingTaglines should not be empty")
+	}
+}

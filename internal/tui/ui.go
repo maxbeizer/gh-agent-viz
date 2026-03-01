@@ -2,9 +2,11 @@ package tui
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/maxbeizer/gh-agent-viz/internal/config"
@@ -71,6 +73,8 @@ type Model struct {
 	searchActive bool          // true when search input is active
 	searchQuery  string        // current search filter text
 	snapshotPath string        // if set, write snapshot on initial load and quit
+	loadSpinner  spinner.Model // animated spinner shown during initial load
+	loadTagline  string        // randomized tagline for the loading screen
 }
 
 // NewModel creates a new TUI model
@@ -117,6 +121,12 @@ func NewModel(repo string, debug bool, demo bool, snapshotPath string) Model {
 		animIconFunc = AnimatedStatusIcon
 	}
 
+	// Loading screen spinner
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
+	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
+	tagline := loadingTaglines[rand.Intn(len(loadingTaglines))]
+
 	// Determine default view mode
 	defaultView := ViewModeMission // dashboard-first by default
 	switch ctx.Config.DefaultView {
@@ -153,12 +163,15 @@ func NewModel(repo string, debug bool, demo bool, snapshotPath string) Model {
 		toast:       toast.New(),
 		demo:        demo,
 		snapshotPath: snapshotPath,
+		loadSpinner: sp,
+		loadTagline: tagline,
 	}
 }
 
 // Init initializes the Bubble Tea program
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
+		m.loadSpinner.Tick,
 		m.fetchLocalSessions,  // Phase 1: fast, shows content immediately
 		m.fetchAgentTasks,     // Phase 2: runs concurrently, returns when API responds
 	}
@@ -185,6 +198,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			50*time.Millisecond,
 			func(time.Time) tea.Msg { return resizeDebouncedMsg{} },
 		)
+
+	case spinner.TickMsg:
+		if !m.initialLoadDone {
+			var cmd tea.Cmd
+			m.loadSpinner, cmd = m.loadSpinner.Update(msg)
+			return m, cmd
+		}
+		return m, nil
 
 	case resizeDebouncedMsg:
 		m.logView.SetSize(m.ctx.Width-4, m.ctx.Height-8)
@@ -373,6 +394,11 @@ func (m Model) View() string {
 		return "Loading sessions..."
 	}
 
+	// Show loading screen until initial data load completes
+	if !m.initialLoadDone {
+		return m.viewLoading()
+	}
+
 	// Update footer hints based on current context
 	m.updateFooterHints()
 
@@ -443,6 +469,39 @@ func (m Model) View() string {
 	}
 
 	return result
+}
+
+// loadingTaglines are randomly selected for the loading screen.
+var loadingTaglines = []string{
+	"Waking up the agents…",
+	"Scanning the multiverse for sessions…",
+	"Tuning into the agent frequency…",
+	"Herding digital cats…",
+	"Reticulating splines…",
+	"Consulting the oracle…",
+	"Brewing a fresh batch of data…",
+	"Spinning up the flux capacitor…",
+}
+
+// viewLoading renders a centered animated loading screen.
+func (m Model) viewLoading() string {
+	logo := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"}).
+		Render("⚡ Agent Viz")
+
+	spinnerLine := m.loadSpinner.View() + " " + lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "242", Dark: "245"}).
+		Italic(true).
+		Render(m.loadTagline)
+
+	block := lipgloss.JoinVertical(lipgloss.Center, "", logo, "", spinnerLine, "")
+
+	return lipgloss.Place(
+		m.ctx.Width, m.ctx.Height,
+		lipgloss.Center, lipgloss.Center,
+		block,
+	)
 }
 
 // viewModeName returns a human-readable name for the current view mode.

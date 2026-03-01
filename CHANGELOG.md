@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [v0.7.0] - 2026-03-01
+
+### Added
+
+- Live Git Activity view — press `G` to see real-time uncommitted changes in an agent's working directory
+- Auto-polling every 3 seconds with colored diff output and file stats
+- Parse `cwd`/`git_root` from workspace.yaml into `Session.WorkDir`
+
 ## [v0.6.0] - 2026-03-01
 
 ### Added

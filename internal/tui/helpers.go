@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/statsbar"
 )
+
+// maxSessions is the upper bound on accumulated sessions kept in memory.
+// When exceeded, the oldest sessions (by UpdatedAt) are discarded.
+const maxSessions = 500
 
 // sessionFingerprint returns a hash summarising session IDs, statuses, and
 // update timestamps so callers can cheaply detect whether a refresh actually
@@ -254,6 +259,14 @@ func (m *Model) mergeSessions(newSessions []data.Session) {
 			m.allSessions = append(m.allSessions, s)
 			existingIdx[s.ID] = len(m.allSessions) - 1
 		}
+	}
+
+	// Cap session count to prevent unbounded memory growth
+	if len(m.allSessions) > maxSessions {
+		sort.SliceStable(m.allSessions, func(i, j int) bool {
+			return m.allSessions[i].UpdatedAt.After(m.allSessions[j].UpdatedAt)
+		})
+		m.allSessions = m.allSessions[:maxSessions]
 	}
 
 	// Filter dismissed

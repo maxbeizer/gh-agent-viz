@@ -164,8 +164,9 @@ func NewModel(repo string, debug bool, demo bool, snapshotPath string) Model {
 		ready:       false,
 		repo:        repo,
 		refreshInt:  time.Duration(refreshSeconds) * time.Second,
-		toast:       toast.New(),
-		demo:        demo,
+		toast:        toast.New(),
+		prevSessions: make(map[string]string, 64),
+		demo:         demo,
 		snapshotPath: snapshotPath,
 		loadSpinner: sp,
 		loadTagline: tagline,
@@ -248,7 +249,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Initial load complete — snapshot prevSessions and start refresh timer
 		if !m.initialLoadDone {
 			m.initialLoadDone = true
-			m.prevSessions = make(map[string]string, len(m.allSessions))
+			clear(m.prevSessions)
 			for _, s := range m.allSessions {
 				m.prevSessions[s.ID] = s.Status
 			}
@@ -293,14 +294,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// First load: pick the best default tab based on actual data
 			m.ctx.StatusFilter = smartDefaultFilter(msg.counts)
 			m.taskList.SetLoading(true)
-			m.prevSessions = make(map[string]string, len(msg.tasks))
+			clear(m.prevSessions)
 			for _, s := range msg.tasks {
 				m.prevSessions[s.ID] = s.Status
 			}
 			return m, m.fetchTasks
 		}
 		// Update prevSessions for next comparison
-		m.prevSessions = make(map[string]string, len(msg.tasks))
+		clear(m.prevSessions)
 		for _, s := range msg.tasks {
 			m.prevSessions[s.ID] = s.Status
 		}

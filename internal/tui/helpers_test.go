@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -67,5 +68,43 @@ func TestSessionFingerprint_SameDataDifferentOrder(t *testing.T) {
 	// This is fine because session order is deterministic.
 	if fp1 == fp2 {
 		t.Fatal("different ordering should produce different fingerprints")
+	}
+}
+
+func TestMergeSessions_CapsAtMaxSessions(t *testing.T) {
+	m := &Model{ctx: NewProgramContext()}
+	// Generate more sessions than the cap
+	sessions := make([]data.Session, maxSessions+100)
+	for i := range sessions {
+		sessions[i] = data.Session{
+			ID:        fmt.Sprintf("session-%d", i),
+			Status:    "completed",
+			UpdatedAt: time.Unix(int64(i), 0),
+		}
+	}
+	m.mergeSessions(sessions)
+
+	if len(m.allSessions) != maxSessions {
+		t.Fatalf("expected %d sessions after cap, got %d", maxSessions, len(m.allSessions))
+	}
+
+	// Verify the newest sessions were kept (highest UpdatedAt)
+	for _, s := range m.allSessions {
+		if s.UpdatedAt.Unix() < int64(100) {
+			t.Fatalf("oldest sessions should have been trimmed, found UpdatedAt=%d", s.UpdatedAt.Unix())
+		}
+	}
+}
+
+func TestMergeSessions_BelowCapUnchanged(t *testing.T) {
+	m := &Model{ctx: NewProgramContext()}
+	sessions := []data.Session{
+		{ID: "a", Status: "running", UpdatedAt: time.Unix(1000, 0)},
+		{ID: "b", Status: "completed", UpdatedAt: time.Unix(2000, 0)},
+	}
+	m.mergeSessions(sessions)
+
+	if len(m.allSessions) != 2 {
+		t.Fatalf("expected 2 sessions, got %d", len(m.allSessions))
 	}
 }

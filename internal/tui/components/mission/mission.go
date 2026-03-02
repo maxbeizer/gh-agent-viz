@@ -593,6 +593,7 @@ if w < 40 { w = 40 }
 
 sectionHead := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
 sessionStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
+dim := lipgloss.NewStyle().Faint(true)
 
 var lines []string
 lines = append(lines, "")
@@ -637,12 +638,41 @@ lines = append(lines, fmt.Sprintf("  %s %s", item.Reason, sessionStyle.Render(ti
 }
 }
 
+// Recent completions
+recentDone := m.recentCompletions(8)
+if len(recentDone) > 0 {
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Recent (%d)", len(recentDone))))
+for _, s := range recentDone {
+icon := "\u2705"
+if strings.EqualFold(s.Status, "failed") { icon = "\u274c" }
+title := s.Title
+if len(title) > w/2 { title = title[:w/2-1] + "\u2026" }
+ago := formatAge(s.UpdatedAt)
+lines = append(lines, fmt.Sprintf("  %s %s  %s", icon, sessionStyle.Render(title), dim.Render(ago)))
+}
+}
+
 // Repos
 lines = append(lines, "")
 lines = append(lines, "  "+sectionHead.Render("Repos"))
 for i, r := range m.repos {
 selected := (m.focus == PanelRepos) && i == m.cursors[PanelRepos]
 lines = append(lines, m.renderRepoRow(r, selected, w))
+}
+
+// Idle sessions
+idleSessions := m.idleSessions()
+if len(idleSessions) > 0 {
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Idle (%d)", len(idleSessions))))
+for _, s := range idleSessions {
+title := s.Title
+if len(title) > w/2 { title = title[:w/2-1] + "\u2026" }
+ago := formatAge(s.UpdatedAt)
+repo := shortRepo(s.Repository)
+lines = append(lines, fmt.Sprintf("  \U0001f4a4 %s  %s  %s", sessionStyle.Render(title), dim.Render(repo), dim.Render(ago)))
+}
 }
 
 return strings.Join(lines, "\n")

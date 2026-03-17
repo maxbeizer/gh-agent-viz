@@ -795,6 +795,9 @@ sectionHead := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{
 sessionStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
 dim := lipgloss.NewStyle().Faint(true)
 
+availHeight := m.height - 6
+if availHeight < 12 { availHeight = 12 }
+
 var lines []string
 lines = append(lines, "")
 
@@ -811,11 +814,13 @@ if barWidth > 0 && m.stats.Total > 0 {
 lines = append(lines, "  "+m.renderBar(barWidth))
 }
 
-// Active
+// Count fixed chrome lines (fleet + section headers + blank separators).
+// Budget remaining height for scrollable content.
+fleetUsed := len(lines)
+
+// Gather section content into slices, then budget-allocate.
 activeSessions := m.activeSessions()
-if len(activeSessions) > 0 {
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render("Active now"))
+var activeItems []string
 for _, s := range activeSessions {
 icon := m.statusIcon(s.Status)
 if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
@@ -823,56 +828,96 @@ icon = m.animStatusIcon(s.Status, m.animFrame)
 }
 title := s.Title
 if len(title) > w/2 { title = title[:w/2-1] + "…" }
-lines = append(lines, fmt.Sprintf("  %s %s", icon, sessionStyle.Render(title)))
-}
+activeItems = append(activeItems, fmt.Sprintf("  %s %s", icon, sessionStyle.Render(title)))
 }
 
-// Attention
-if len(m.attention) > 0 {
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Attention (%d)", len(m.attention))))
+var attnItems []string
 for _, item := range m.attention {
 title := item.Session.Title
 if len(title) > w/2 { title = title[:w/2-1] + "…" }
-lines = append(lines, fmt.Sprintf("  %s %s", item.Reason, sessionStyle.Render(title)))
-}
+attnItems = append(attnItems, fmt.Sprintf("  %s %s", item.Reason, sessionStyle.Render(title)))
 }
 
-// Recent completions
 recentDone := m.recentCompletions(8)
-if len(recentDone) > 0 {
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Recent (%d)", len(recentDone))))
+var recentItems []string
 for _, s := range recentDone {
 icon := "\u2705"
 if strings.EqualFold(s.Status, "failed") { icon = "\u274c" }
 title := s.Title
 if len(title) > w/2 { title = title[:w/2-1] + "\u2026" }
 ago := formatAge(s.UpdatedAt)
-lines = append(lines, fmt.Sprintf("  %s %s  %s", icon, sessionStyle.Render(title), dim.Render(ago)))
-}
+recentItems = append(recentItems, fmt.Sprintf("  %s %s  %s", icon, sessionStyle.Render(title), dim.Render(ago)))
 }
 
-// Repos
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render("Repos"))
+var repoItems []string
 for i, r := range m.repos {
 selected := (m.focus == PanelRepos) && i == m.cursors[PanelRepos]
-lines = append(lines, m.renderRepoRow(r, selected, w))
+repoItems = append(repoItems, m.renderRepoRow(r, selected, w))
 }
 
-// Idle sessions
 idleSessions := m.idleSessions()
-if len(idleSessions) > 0 {
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Idle (%d)", len(idleSessions))))
+var idleItems []string
 for _, s := range idleSessions {
 title := s.Title
 if len(title) > w/2 { title = title[:w/2-1] + "\u2026" }
 ago := formatAge(s.UpdatedAt)
 repo := shortRepo(s.Repository)
-lines = append(lines, fmt.Sprintf("  \U0001f4a4 %s  %s  %s", sessionStyle.Render(title), dim.Render(repo), dim.Render(ago)))
+idleItems = append(idleItems, fmt.Sprintf("  \U0001f4a4 %s  %s  %s", sessionStyle.Render(title), dim.Render(repo), dim.Render(ago)))
 }
+
+// Count section headers (each non-empty section adds header + blank line = 2 lines).
+sectionCount := 0
+if len(activeItems) > 0 { sectionCount++ }
+if len(attnItems) > 0 { sectionCount++ }
+if len(recentItems) > 0 { sectionCount++ }
+sectionCount++ // repos always shown
+if len(idleItems) > 0 { sectionCount++ }
+
+contentBudget := availHeight - fleetUsed - (sectionCount * 2) // 2 = header + blank line
+if contentBudget < 5 { contentBudget = 5 }
+
+// Distribute budget across sections.
+requested := []int{len(activeItems), len(attnItems), len(recentItems), len(repoItems), len(idleItems)}
+alloc := allocateBudget(requested, contentBudget, 1)
+
+activeItems = truncateWithIndicator(activeItems, alloc[0], len(activeSessions))
+attnItems = truncateWithIndicator(attnItems, alloc[1], len(m.attention))
+recentItems = truncateWithIndicator(recentItems, alloc[2], len(recentDone))
+repoItems = truncateWithIndicator(repoItems, alloc[3], len(m.repos))
+idleItems = truncateWithIndicator(idleItems, alloc[4], len(idleSessions))
+
+// Assemble output.
+if len(activeItems) > 0 {
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render("Active now"))
+lines = append(lines, activeItems...)
+}
+
+if len(attnItems) > 0 {
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Attention (%d)", len(m.attention))))
+lines = append(lines, attnItems...)
+}
+
+if len(recentItems) > 0 {
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Recent (%d)", len(recentDone))))
+lines = append(lines, recentItems...)
+}
+
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render("Repos"))
+lines = append(lines, repoItems...)
+
+if len(idleItems) > 0 {
+lines = append(lines, "")
+lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Idle (%d)", len(idleSessions))))
+lines = append(lines, idleItems...)
+}
+
+// Safety clamp.
+if len(lines) > availHeight {
+lines = lines[:availHeight]
 }
 
 return strings.Join(lines, "\n")

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [v0.8.0] - 2026-03-17
+
+### Fixed
+
+- Mission Control dashboard no longer clips the top when many sessions are present
+- Budget-based height allocation ensures panels never exceed terminal height
+- Idle panel entries no longer wrap to 2 lines in the right column
+- Fleet panel is treated as fixed-size and no longer shows erroneous "▼ N more"
+
+### Added
+
+- Scrollable panels in Mission Control — j/k scrolls within the focused panel with `▲ N above` / `▼ N more` indicators
+- Tab-based navigation for narrow terminals (width < 100) — one section at a time with a highlighted tab bar showing counts
+- Scroll offset follows cursor so the selected item is always visible
+
 ## [v0.7.0] - 2026-03-01
 
 ### Added

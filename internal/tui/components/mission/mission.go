@@ -534,22 +534,29 @@ recentLines = append(recentLines, dim.Render("  no completions yet"))
 // Idle sessions
 idleSessions := m.idleSessions()
 var idleLines []string
-rInnerW := rightWidth - 6
+// Panel box has border (2) + padding (2) so real inner width is rightWidth - 4.
+// Use a conservative inner width to prevent line wrapping.
+rInnerW := rightWidth - 8
+if rInnerW < 30 { rInnerW = 30 }
 for i, s := range idleSessions {
 title := s.Title
-maxT := rInnerW * 2 / 3
+repo := shortRepo(s.Repository)
+ago := formatAge(s.UpdatedAt)
+
+// Reserve space for gutter (2) + emoji (3) + right side
+rightText := fmt.Sprintf("%s  %s", repo, ago)
+maxT := rInnerW - lipgloss.Width(rightText) - 7 // gutter+emoji+padding
 if maxT < 10 { maxT = 10 }
 if len(title) > maxT { title = title[:maxT-1] + "…" }
+
 gutter := "  "
 titleRender := sessionStyle.Render(title)
 if m.focus == PanelIdle && i == m.cursors[PanelIdle] {
 gutter = "▎ "
 titleRender = cursorStyle.Render(title)
 }
-ago := formatAge(s.UpdatedAt)
-repo := shortRepo(s.Repository)
 left := fmt.Sprintf("%s💤 %s", gutter, titleRender)
-right := dim.Render(fmt.Sprintf("%s  %s", repo, ago))
+right := dim.Render(rightText)
 pad := rInnerW - lipgloss.Width(left) - lipgloss.Width(right)
 if pad < 1 { pad = 1 }
 idleLines = append(idleLines, left + strings.Repeat(" ", pad) + right)
@@ -594,11 +601,12 @@ repoLines = append(repoLines, m.renderRepoRow(r, selected, rInnerW))
 // ── BUDGET-BASED HEIGHT ALLOCATION ──
 //
 // Left column: Active, Recent, Attention (3 panels)
-// Right column: Fleet, Repos, Idle (2–3 panels)
+// Right column: Fleet (fixed), Repos, Idle (2–3 panels)
 //
 // Each panel costs panelChrome (3) lines of overhead beyond its content.
 // We subtract total chrome from availHeight to get the content budget,
 // then distribute proportionally based on actual content needs.
+// Fleet is treated as fixed-size (always shows all its lines).
 
 leftPanelCount := 3 // Active, Recent, Attention
 rightPanelCount := 2 // Fleet, Repos
@@ -607,8 +615,11 @@ if hasIdle { rightPanelCount = 3 }
 
 leftContentBudget := availHeight - (leftPanelCount * panelChrome)
 if leftContentBudget < leftPanelCount { leftContentBudget = leftPanelCount }
-rightContentBudget := availHeight - (rightPanelCount * panelChrome)
-if rightContentBudget < rightPanelCount { rightContentBudget = rightPanelCount }
+
+// Right column: reserve fleet lines first (fixed), budget the rest.
+fleetFixed := len(fleetLines)
+rightContentBudget := availHeight - (rightPanelCount * panelChrome) - fleetFixed
+if rightContentBudget < 2 { rightContentBudget = 2 }
 
 // Allocate left column: Active (priority) → Recent → Attention
 leftRequested := []int{len(activeLines), len(recentLines), len(attnLines)}
@@ -617,18 +628,14 @@ activeLines = truncateWithIndicator(activeLines, leftAlloc[0], len(activeSession
 recentLines = truncateWithIndicator(recentLines, leftAlloc[1], len(recentDone))
 attnLines = truncateWithIndicator(attnLines, leftAlloc[2], len(m.attention))
 
-// Allocate right column: Fleet (fixed) → Repos → Idle
+// Allocate right column: Repos → Idle (fleet is fixed, not truncated)
 if hasIdle {
-rightRequested := []int{len(fleetLines), len(repoLines), len(idleLines)}
+rightRequested := []int{len(repoLines), len(idleLines)}
 rightAlloc := allocateBudget(rightRequested, rightContentBudget, 1)
-fleetLines = truncateWithIndicator(fleetLines, rightAlloc[0], len(fleetLines))
-repoLines = truncateWithIndicator(repoLines, rightAlloc[1], len(m.repos))
-idleLines = truncateWithIndicator(idleLines, rightAlloc[2], len(idleSessions))
+repoLines = truncateWithIndicator(repoLines, rightAlloc[0], len(m.repos))
+idleLines = truncateWithIndicator(idleLines, rightAlloc[1], len(idleSessions))
 } else {
-rightRequested := []int{len(fleetLines), len(repoLines)}
-rightAlloc := allocateBudget(rightRequested, rightContentBudget, 1)
-fleetLines = truncateWithIndicator(fleetLines, rightAlloc[0], len(fleetLines))
-repoLines = truncateWithIndicator(repoLines, rightAlloc[1], len(m.repos))
+repoLines = truncateWithIndicator(repoLines, rightContentBudget, len(m.repos))
 }
 
 // ── RENDER PANELS ──

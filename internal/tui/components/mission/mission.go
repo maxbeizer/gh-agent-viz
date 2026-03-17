@@ -814,8 +814,8 @@ type tabDef struct {
 }
 tabs := []tabDef{
 	{PanelActive, fmt.Sprintf("Active(%d)", len(activeSessions))},
-	{PanelAttention, fmt.Sprintf("Attn(%d)", len(m.attention))},
 	{PanelRecent, fmt.Sprintf("Recent(%d)", len(recentDone))},
+	{PanelAttention, fmt.Sprintf("Attn(%d)", len(m.attention))},
 	{PanelRepos, fmt.Sprintf("Repos(%d)", len(m.repos))},
 	{PanelIdle, fmt.Sprintf("Idle(%d)", len(idleSessions))},
 }

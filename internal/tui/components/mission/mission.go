@@ -786,141 +786,176 @@ if parts := strings.SplitN(repo, "/", 2); len(parts) == 2 { return parts[1] }
 return repo
 }
 
-// viewSingleColumn renders the fallback single-column layout for narrow terminals.
+// viewSingleColumn renders a tab-based layout for narrow terminals.
+// Only the focused section is displayed at full height; a tab bar at
+// the top shows all sections with counts for quick switching.
 func (m *Model) viewSingleColumn() string {
 w := m.width - 4
 if w < 40 { w = 40 }
 
-sectionHead := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
 sessionStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
+cursorStyle := lipgloss.NewStyle().Bold(true)
 dim := lipgloss.NewStyle().Faint(true)
+tabActive := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "15", Dark: "15"}).Background(lipgloss.AdaptiveColor{Light: "24", Dark: "62"}).Padding(0, 1)
+tabInactive := lipgloss.NewStyle().Faint(true).Padding(0, 1)
 
 availHeight := m.height - 6
 if availHeight < 12 { availHeight = 12 }
 
-var lines []string
-lines = append(lines, "")
+// Compute counts for tab bar.
+activeSessions := m.activeSessions()
+recentDone := m.recentCompletions(8)
+idleSessions := m.idleSessions()
 
-// Fleet
+// Build tab bar.
+type tabDef struct {
+	panel PanelFocus
+	label string
+}
+tabs := []tabDef{
+	{PanelActive, fmt.Sprintf("Active(%d)", len(activeSessions))},
+	{PanelAttention, fmt.Sprintf("Attn(%d)", len(m.attention))},
+	{PanelRecent, fmt.Sprintf("Recent(%d)", len(recentDone))},
+	{PanelRepos, fmt.Sprintf("Repos(%d)", len(m.repos))},
+	{PanelIdle, fmt.Sprintf("Idle(%d)", len(idleSessions))},
+}
+
+var tabParts []string
+for _, tab := range tabs {
+	if tab.panel == m.focus {
+		tabParts = append(tabParts, tabActive.Render(tab.label))
+	} else {
+		tabParts = append(tabParts, tabInactive.Render(tab.label))
+	}
+}
+tabBar := strings.Join(tabParts, " ")
+
+// Fleet summary line.
 summaryParts := []string{}
 if m.stats.Active > 0 { summaryParts = append(summaryParts, fmt.Sprintf("● %d active", m.stats.Active)) }
 if m.stats.Idle > 0 { summaryParts = append(summaryParts, fmt.Sprintf("💤 %d idle", m.stats.Idle)) }
 if m.stats.Done > 0 { summaryParts = append(summaryParts, fmt.Sprintf("✅ %d done", m.stats.Done)) }
 if m.stats.Failed > 0 { summaryParts = append(summaryParts, fmt.Sprintf("❌ %d fail", m.stats.Failed)) }
-lines = append(lines, "  "+strings.Join(summaryParts, "  "))
-barWidth := w - 4
-if barWidth > 50 { barWidth = 50 }
-if barWidth > 0 && m.stats.Total > 0 {
-lines = append(lines, "  "+m.renderBar(barWidth))
+fleetLine := "  " + strings.Join(summaryParts, "  ")
+
+// Chrome: fleet line + tab bar + blank line = 3 lines.
+contentHeight := availHeight - 3
+if contentHeight < 3 { contentHeight = 3 }
+
+// Build content for the focused section.
+var items []string
+var totalCount int
+
+switch m.focus {
+case PanelActive:
+	totalCount = len(activeSessions)
+	for i, s := range activeSessions {
+		icon := m.statusIcon(s.Status)
+		if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
+			icon = m.animStatusIcon(s.Status, m.animFrame)
+		}
+		title := s.Title
+		maxT := w - 10
+		if maxT < 10 { maxT = 10 }
+		if len(title) > maxT { title = title[:maxT-1] + "…" }
+		gutter := "  "
+		titleRender := sessionStyle.Render(title)
+		if i == m.cursors[PanelActive] {
+			gutter = "▎ "
+			titleRender = cursorStyle.Render(title)
+		}
+		items = append(items, fmt.Sprintf("%s%s %s", gutter, icon, titleRender))
+	}
+	if len(items) == 0 {
+		items = append(items, dim.Render("  no active sessions"))
+	}
+
+case PanelAttention:
+	totalCount = len(m.attention)
+	for i, item := range m.attention {
+		title := item.Session.Title
+		maxT := w / 2
+		if maxT < 10 { maxT = 10 }
+		if len(title) > maxT { title = title[:maxT-1] + "…" }
+		ago := formatAge(item.Session.UpdatedAt)
+		gutter := "  "
+		titleRender := sessionStyle.Render(title)
+		if i == m.cursors[PanelAttention] {
+			gutter = "▎ "
+			titleRender = cursorStyle.Render(title)
+		}
+		items = append(items, fmt.Sprintf("%s%s %s  %s", gutter, item.Reason, titleRender, dim.Render(ago)))
+	}
+	if len(items) == 0 {
+		items = append(items, dim.Render("  all clear ✨"))
+	}
+
+case PanelRecent:
+	totalCount = len(recentDone)
+	for i, s := range recentDone {
+		icon := "✅"
+		if strings.EqualFold(s.Status, "failed") { icon = "❌" }
+		title := s.Title
+		maxT := w - 20
+		if maxT < 10 { maxT = 10 }
+		if len(title) > maxT { title = title[:maxT-1] + "…" }
+		ago := formatAge(s.UpdatedAt)
+		pr := ""
+		if s.PRNumber > 0 { pr = dim.Render(fmt.Sprintf(" PR #%d", s.PRNumber)) }
+		gutter := "  "
+		if i == m.cursors[PanelRecent] {
+			gutter = "▎ "
+			title = cursorStyle.Render(title)
+		}
+		items = append(items, fmt.Sprintf("%s%s %s%s  %s", gutter, icon, title, pr, dim.Render(ago)))
+	}
+	if len(items) == 0 {
+		items = append(items, dim.Render("  no completions yet"))
+	}
+
+case PanelRepos:
+	totalCount = len(m.repos)
+	for i, r := range m.repos {
+		selected := i == m.cursors[PanelRepos]
+		items = append(items, m.renderRepoRow(r, selected, w))
+	}
+	if len(items) == 0 {
+		items = append(items, dim.Render("  no repos"))
+	}
+
+case PanelIdle:
+	totalCount = len(idleSessions)
+	for i, s := range idleSessions {
+		title := s.Title
+		maxT := w / 2
+		if maxT < 10 { maxT = 10 }
+		if len(title) > maxT { title = title[:maxT-1] + "…" }
+		ago := formatAge(s.UpdatedAt)
+		repo := shortRepo(s.Repository)
+		gutter := "  "
+		titleRender := sessionStyle.Render(title)
+		if i == m.cursors[PanelIdle] {
+			gutter = "▎ "
+			titleRender = cursorStyle.Render(title)
+		}
+		items = append(items, fmt.Sprintf("%s💤 %s  %s  %s", gutter, titleRender, dim.Render(repo), dim.Render(ago)))
+	}
+	if len(items) == 0 {
+		items = append(items, dim.Render("  no idle sessions"))
+	}
 }
 
-// Count fixed chrome lines (fleet + section headers + blank separators).
-// Budget remaining height for scrollable content.
-fleetUsed := len(lines)
+// Apply windowed scrolling to the content.
+m.panelHeights[m.focus] = contentHeight
+m.ensureVisible()
+items = windowLines(items, m.scrollOffsets[m.focus], contentHeight, totalCount, 1)
 
-// Gather section content into slices, then budget-allocate.
-activeSessions := m.activeSessions()
-var activeItems []string
-for _, s := range activeSessions {
-icon := m.statusIcon(s.Status)
-if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
-icon = m.animStatusIcon(s.Status, m.animFrame)
-}
-title := s.Title
-if len(title) > w/2 { title = title[:w/2-1] + "…" }
-activeItems = append(activeItems, fmt.Sprintf("  %s %s", icon, sessionStyle.Render(title)))
-}
-
-var attnItems []string
-for _, item := range m.attention {
-title := item.Session.Title
-if len(title) > w/2 { title = title[:w/2-1] + "…" }
-attnItems = append(attnItems, fmt.Sprintf("  %s %s", item.Reason, sessionStyle.Render(title)))
-}
-
-recentDone := m.recentCompletions(8)
-var recentItems []string
-for _, s := range recentDone {
-icon := "\u2705"
-if strings.EqualFold(s.Status, "failed") { icon = "\u274c" }
-title := s.Title
-if len(title) > w/2 { title = title[:w/2-1] + "\u2026" }
-ago := formatAge(s.UpdatedAt)
-recentItems = append(recentItems, fmt.Sprintf("  %s %s  %s", icon, sessionStyle.Render(title), dim.Render(ago)))
-}
-
-var repoItems []string
-for i, r := range m.repos {
-selected := (m.focus == PanelRepos) && i == m.cursors[PanelRepos]
-repoItems = append(repoItems, m.renderRepoRow(r, selected, w))
-}
-
-idleSessions := m.idleSessions()
-var idleItems []string
-for _, s := range idleSessions {
-title := s.Title
-if len(title) > w/2 { title = title[:w/2-1] + "\u2026" }
-ago := formatAge(s.UpdatedAt)
-repo := shortRepo(s.Repository)
-idleItems = append(idleItems, fmt.Sprintf("  \U0001f4a4 %s  %s  %s", sessionStyle.Render(title), dim.Render(repo), dim.Render(ago)))
-}
-
-// Count section headers (each non-empty section adds header + blank line = 2 lines).
-sectionCount := 0
-if len(activeItems) > 0 { sectionCount++ }
-if len(attnItems) > 0 { sectionCount++ }
-if len(recentItems) > 0 { sectionCount++ }
-sectionCount++ // repos always shown
-if len(idleItems) > 0 { sectionCount++ }
-
-contentBudget := availHeight - fleetUsed - (sectionCount * 2) // 2 = header + blank line
-if contentBudget < 5 { contentBudget = 5 }
-
-// Distribute budget across sections.
-requested := []int{len(activeItems), len(attnItems), len(recentItems), len(repoItems), len(idleItems)}
-alloc := allocateBudget(requested, contentBudget, 1)
-
-activeItems = truncateWithIndicator(activeItems, alloc[0], len(activeSessions))
-attnItems = truncateWithIndicator(attnItems, alloc[1], len(m.attention))
-recentItems = truncateWithIndicator(recentItems, alloc[2], len(recentDone))
-repoItems = truncateWithIndicator(repoItems, alloc[3], len(m.repos))
-idleItems = truncateWithIndicator(idleItems, alloc[4], len(idleSessions))
-
-// Assemble output.
-if len(activeItems) > 0 {
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render("Active now"))
-lines = append(lines, activeItems...)
-}
-
-if len(attnItems) > 0 {
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Attention (%d)", len(m.attention))))
-lines = append(lines, attnItems...)
-}
-
-if len(recentItems) > 0 {
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Recent (%d)", len(recentDone))))
-lines = append(lines, recentItems...)
-}
-
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render("Repos"))
-lines = append(lines, repoItems...)
-
-if len(idleItems) > 0 {
-lines = append(lines, "")
-lines = append(lines, "  "+sectionHead.Render(fmt.Sprintf("Idle (%d)", len(idleSessions))))
-lines = append(lines, idleItems...)
-}
-
-// Safety clamp.
-if len(lines) > availHeight {
-lines = lines[:availHeight]
-}
-
-return strings.Join(lines, "\n")
+return strings.Join([]string{
+	fleetLine,
+	tabBar,
+	"",
+	strings.Join(items, "\n"),
+}, "\n")
 }
 
 // renderPanelFocused renders a panel with a highlighted border when focused.

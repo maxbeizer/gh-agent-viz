@@ -62,6 +62,8 @@ repos      []repoSummary
 attention  []attentionItem
 focus      PanelFocus // which panel has keyboard focus
 cursors    [5]int     // per-panel cursor: [active, attention, repos, recent, idle]
+scrollOffsets [5]int  // per-panel scroll offset (first visible item index)
+panelHeights  [5]int  // per-panel visible content height from last render
 // Panel Y ranges for mouse click detection (set during render)
 panelYRanges [3][2]int // [panel][start, end] row ranges
 statusIcon func(string) string
@@ -216,18 +218,44 @@ if maxLen == 0 { return }
 m.cursors[m.focus] += delta
 if m.cursors[m.focus] < 0 { m.cursors[m.focus] = 0 }
 if m.cursors[m.focus] >= maxLen { m.cursors[m.focus] = maxLen - 1 }
+m.ensureVisible()
+}
+
+// ensureVisible adjusts the scroll offset so the cursor is within the visible window.
+func (m *Model) ensureVisible() {
+p := m.focus
+visible := m.panelHeights[p]
+if visible <= 0 { visible = 5 } // sane default before first render
+
+// For active panel, each item is 2 lines; for others, 1 line per item.
+linesPerItem := 1
+if p == PanelActive { linesPerItem = 2 }
+
+maxVisible := visible / linesPerItem
+if maxVisible < 1 { maxVisible = 1 }
+
+cursor := m.cursors[p]
+if cursor < m.scrollOffsets[p] {
+m.scrollOffsets[p] = cursor
+}
+if cursor >= m.scrollOffsets[p] + maxVisible {
+m.scrollOffsets[p] = cursor - maxVisible + 1
+}
+if m.scrollOffsets[p] < 0 { m.scrollOffsets[p] = 0 }
 }
 
 // CyclePanel moves focus to the next/previous panel.
 func (m *Model) CyclePanel(delta int) {
 m.focus = PanelFocus((int(m.focus) + delta + 5) % 5)
 m.clampCursor()
+m.ensureVisible()
 }
 
 // SetFocus sets the focused panel directly.
 func (m *Model) SetFocus(panel PanelFocus) {
 m.focus = panel
 m.clampCursor()
+m.ensureVisible()
 }
 
 // Focus returns the currently focused panel.
@@ -416,6 +444,54 @@ func truncateWithIndicator(lines []string, maxLines, totalItems int) []string {
 	result := make([]string, maxLines)
 	copy(result, lines[:maxLines-1])
 	result[maxLines-1] = indicator
+	return result
+}
+
+// windowLines returns a visible slice of lines based on scroll offset, adding
+// "▲ N above" / "▼ N below" indicators when content extends beyond the window.
+// linesPerItem indicates how many lines each logical item occupies (1 for most
+// panels, 2 for Active which has a metadata line per session).
+func windowLines(lines []string, scrollOffset, maxLines, totalItems, linesPerItem int) []string {
+	if len(lines) <= maxLines {
+		return lines
+	}
+
+	// Convert item-based scroll offset to line offset.
+	lineOffset := scrollOffset * linesPerItem
+	if lineOffset > len(lines) { lineOffset = len(lines) }
+
+	dim := lipgloss.NewStyle().Faint(true)
+
+	hasAbove := lineOffset > 0
+
+	// After reserving a line for "above" indicator, check if remaining
+	// lines fit in the budget.
+	availForContent := maxLines
+	if hasAbove { availForContent-- }
+	hasBelow := len(lines) - lineOffset > availForContent
+
+	// Reserve lines for indicators.
+	contentLines := maxLines
+	if hasAbove { contentLines-- }
+	if hasBelow { contentLines-- }
+	if contentLines < 1 { contentLines = 1 }
+
+	end := lineOffset + contentLines
+	if end > len(lines) { end = len(lines) }
+	visible := lines[lineOffset:end]
+
+	var result []string
+	if hasAbove {
+		above := scrollOffset
+		result = append(result, dim.Render(fmt.Sprintf("  ▲ %d above", above)))
+	}
+	result = append(result, visible...)
+	if hasBelow {
+		belowItems := totalItems - scrollOffset - (len(visible) / linesPerItem)
+		if belowItems < 1 { belowItems = 1 }
+		result = append(result, dim.Render(fmt.Sprintf("  ▼ %d more", belowItems)))
+	}
+
 	return result
 }
 
@@ -624,18 +700,29 @@ if rightContentBudget < 2 { rightContentBudget = 2 }
 // Allocate left column: Active (priority) → Recent → Attention
 leftRequested := []int{len(activeLines), len(recentLines), len(attnLines)}
 leftAlloc := allocateBudget(leftRequested, leftContentBudget, 1)
-activeLines = truncateWithIndicator(activeLines, leftAlloc[0], len(activeSessions))
-recentLines = truncateWithIndicator(recentLines, leftAlloc[1], len(recentDone))
-attnLines = truncateWithIndicator(attnLines, leftAlloc[2], len(m.attention))
+
+// Store panel heights for scroll tracking, then apply windowed views.
+m.panelHeights[PanelActive] = leftAlloc[0]
+m.panelHeights[PanelRecent] = leftAlloc[1]
+m.panelHeights[PanelAttention] = leftAlloc[2]
+
+// Active panel: 2 lines per item, so use linesPerItem=2
+m.ensureVisible()
+activeLines = windowLines(activeLines, m.scrollOffsets[PanelActive], leftAlloc[0], len(activeSessions), 2)
+recentLines = windowLines(recentLines, m.scrollOffsets[PanelRecent], leftAlloc[1], len(recentDone), 1)
+attnLines = windowLines(attnLines, m.scrollOffsets[PanelAttention], leftAlloc[2], len(m.attention), 1)
 
 // Allocate right column: Repos → Idle (fleet is fixed, not truncated)
 if hasIdle {
 rightRequested := []int{len(repoLines), len(idleLines)}
 rightAlloc := allocateBudget(rightRequested, rightContentBudget, 1)
-repoLines = truncateWithIndicator(repoLines, rightAlloc[0], len(m.repos))
-idleLines = truncateWithIndicator(idleLines, rightAlloc[1], len(idleSessions))
+m.panelHeights[PanelRepos] = rightAlloc[0]
+m.panelHeights[PanelIdle] = rightAlloc[1]
+repoLines = windowLines(repoLines, m.scrollOffsets[PanelRepos], rightAlloc[0], len(m.repos), 1)
+idleLines = windowLines(idleLines, m.scrollOffsets[PanelIdle], rightAlloc[1], len(idleSessions), 1)
 } else {
-repoLines = truncateWithIndicator(repoLines, rightContentBudget, len(m.repos))
+m.panelHeights[PanelRepos] = rightContentBudget
+repoLines = windowLines(repoLines, m.scrollOffsets[PanelRepos], rightContentBudget, len(m.repos), 1)
 }
 
 // ── RENDER PANELS ──

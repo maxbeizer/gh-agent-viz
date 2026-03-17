@@ -411,3 +411,86 @@ func TestViewMultiPane_FitsHeight(t *testing.T) {
 		t.Fatalf("view has %d lines, exceeds max allowed %d", lineCount, maxAllowed)
 	}
 }
+
+func TestScrollFollowsCursor(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(140, 30)
+
+	now := time.Now()
+	var sessions []data.Session
+	// Create 20 repos worth of completed sessions so repos panel overflows
+	for i := 0; i < 30; i++ {
+		sessions = append(sessions, data.Session{
+			ID:         fmt.Sprintf("s%d", i),
+			Status:     "completed",
+			Title:      fmt.Sprintf("Session %d", i),
+			Repository: fmt.Sprintf("owner/repo-%d", i),
+			UpdatedAt:  now.Add(-time.Duration(i) * time.Hour),
+		})
+	}
+	m.SetSessions(sessions)
+
+	// First render to set panel heights
+	m.View()
+
+	// Focus on repos panel and navigate down past visible area
+	m.SetFocus(PanelRepos)
+	for i := 0; i < 25; i++ {
+		m.MoveCursor(1)
+	}
+
+	// Cursor should be at 25
+	if m.Cursor() != 25 {
+		t.Fatalf("expected cursor at 25, got %d", m.Cursor())
+	}
+
+	// Scroll offset should have moved to keep cursor visible
+	if m.scrollOffsets[PanelRepos] == 0 {
+		t.Fatal("expected scroll offset to advance, but it's still 0")
+	}
+
+	// Re-render should show cursor's repo in the view
+	view := m.View()
+	// Repo names are "owner/repo-N" but may be truncated in display.
+	// Check that the scrolled-to region is visible (not stuck at top).
+	// After scrolling to cursor=25, we should NOT see repo-0 (it's scrolled away).
+	if strings.Contains(view, "owner/repo-0 ") {
+		t.Fatal("repo-0 should be scrolled out of view when cursor is at 25")
+	}
+
+	// Navigate back up
+	for i := 0; i < 25; i++ {
+		m.MoveCursor(-1)
+	}
+	if m.scrollOffsets[PanelRepos] != 0 {
+		t.Fatalf("expected scroll offset back to 0, got %d", m.scrollOffsets[PanelRepos])
+	}
+
+	view = m.View()
+	if !strings.Contains(view, "owner/repo-0") {
+		t.Fatal("expected owner/repo-0 visible after scrolling back up")
+	}
+}
+
+func TestWindowLines_NoOverflow(t *testing.T) {
+	lines := []string{"a", "b", "c"}
+	result := windowLines(lines, 0, 5, 3, 1)
+	if len(result) != 3 {
+		t.Fatalf("expected 3 lines, got %d", len(result))
+	}
+}
+
+func TestWindowLines_ScrolledDown(t *testing.T) {
+	lines := []string{"a", "b", "c", "d", "e", "f", "g"}
+	result := windowLines(lines, 3, 4, 7, 1)
+	// Should have: ▲ indicator, d, e, ▼ indicator
+	if len(result) != 4 {
+		t.Fatalf("expected 4 lines, got %d", len(result))
+	}
+	if !strings.Contains(result[0], "above") {
+		t.Fatalf("expected above indicator, got %q", result[0])
+	}
+	if !strings.Contains(result[3], "more") {
+		t.Fatalf("expected below indicator, got %q", result[3])
+	}
+}

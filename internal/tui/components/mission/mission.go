@@ -354,6 +354,71 @@ Render(content)
 return titleRendered + "\n" + box
 }
 
+// panelChrome is the number of lines each panel adds beyond content:
+// 1 title line + 2 border lines (top + bottom of the rounded box).
+const panelChrome = 3
+
+// allocateBudget distributes contentBudget lines across panels proportionally
+// based on each panel's requested line count. Every panel gets at least minLines.
+// Returns the allocated height for each panel.
+func allocateBudget(requested []int, contentBudget, minLines int) []int {
+	n := len(requested)
+	alloc := make([]int, n)
+
+	totalRequested := 0
+	for _, r := range requested {
+		totalRequested += r
+	}
+
+	// Everything fits — give each panel what it asked for.
+	if totalRequested <= contentBudget {
+		copy(alloc, requested)
+		return alloc
+	}
+
+	// Distribute proportionally, then assign remainders by largest fraction.
+	remaining := contentBudget
+	for i, r := range requested {
+		a := r * contentBudget / totalRequested
+		if a < minLines { a = minLines }
+		alloc[i] = a
+		remaining -= a
+	}
+	// Distribute remaining lines to panels that still need more.
+	for remaining > 0 {
+		bestIdx := -1
+		bestNeed := 0
+		for i, r := range requested {
+			need := r - alloc[i]
+			if need > bestNeed {
+				bestNeed = need
+				bestIdx = i
+			}
+		}
+		if bestIdx < 0 { break }
+		alloc[bestIdx]++
+		remaining--
+	}
+
+	return alloc
+}
+
+// truncateWithIndicator truncates lines to maxLines and appends an overflow
+// indicator if any lines were hidden. The indicator counts toward maxLines.
+func truncateWithIndicator(lines []string, maxLines, totalItems int) []string {
+	if len(lines) <= maxLines {
+		return lines
+	}
+	hidden := totalItems - (maxLines - 1) // -1 for the indicator line
+	if hidden < 1 { hidden = 1 }
+	indicator := lipgloss.NewStyle().Faint(true).Render(
+		fmt.Sprintf("  ▼ %d more", hidden))
+	result := make([]string, maxLines)
+	copy(result, lines[:maxLines-1])
+	result[maxLines-1] = indicator
+	return result
+}
+
 // viewMultiPane renders the btop-style 2-column dashboard.
 func (m *Model) viewMultiPane() string {
 dim := lipgloss.NewStyle().Faint(true)
@@ -369,9 +434,9 @@ if availHeight < 12 { availHeight = 12 }
 
 focusColor := lipgloss.AdaptiveColor{Light: "30", Dark: "73"}
 
-// ── LEFT COLUMN ──
+// ── BUILD ALL CONTENT LINES FIRST (no truncation yet) ──
 
-// Active sessions panel (primary — what you care about most)
+// Active sessions
 activeSessions := m.activeSessions()
 var activeLines []string
 innerW := leftWidth - 6
@@ -394,14 +459,12 @@ if m.focus == PanelActive && i == m.cursors[PanelActive] {
 gutter = "▎ "
 titleRender = cursorStyle.Render(title)
 }
-// Line 1: icon + title + action
 left := fmt.Sprintf("%s%s %s", gutter, icon, titleRender)
 right := dim.Render(action)
 pad := innerW - lipgloss.Width(left) - lipgloss.Width(right)
 if pad < 1 { pad = 1 }
 activeLines = append(activeLines, left + strings.Repeat(" ", pad) + right)
 
-// Line 2: duration + tokens + repo (dim metadata)
 var meta []string
 if !s.CreatedAt.IsZero() {
 meta = append(meta, "⏱ "+formatDuration(time.Since(s.CreatedAt)))
@@ -416,14 +479,8 @@ activeLines = append(activeLines, gutter + "  " + dim.Render(strings.Join(meta, 
 if len(activeLines) == 0 {
 activeLines = append(activeLines, dim.Render("  no active sessions"))
 }
-activeHeight := len(activeLines)
-maxActive := availHeight / 2
-if activeHeight > maxActive { activeHeight = maxActive; activeLines = activeLines[:maxActive] }
-if activeHeight < 2 { activeHeight = 2 }
-activeTitle := fmt.Sprintf("Active (%d)", len(activeSessions))
-activePanel := renderPanelFocused(activeTitle, strings.Join(activeLines, "\n"), leftWidth, activeHeight, m.focus == PanelActive, focusColor)
 
-// Attention panel
+// Attention
 var attnLines []string
 for i, item := range m.attention {
 title := item.Session.Title
@@ -448,94 +505,8 @@ attnLines = append(attnLines, left + strings.Repeat(" ", pad) + right)
 if len(attnLines) == 0 {
 attnLines = append(attnLines, dim.Render("  all clear ✨"))
 }
-attnHeight := len(attnLines)
-maxAttn := availHeight / 4
-if attnHeight > maxAttn { attnHeight = maxAttn; attnLines = attnLines[:maxAttn] }
-if attnHeight < 1 { attnHeight = 1 }
-attnTitle := fmt.Sprintf("Attention (%d)", len(m.attention))
-attnPanel := renderPanelFocused(attnTitle, strings.Join(attnLines, "\n"), leftWidth, attnHeight, m.focus == PanelAttention, focusColor)
 
-// Idle sessions panel
-idleSessions := m.idleSessions()
-var idleLines []string
-for i, s := range idleSessions {
-title := s.Title
-maxT := innerW * 2 / 3
-if maxT < 10 { maxT = 10 }
-if len(title) > maxT { title = title[:maxT-1] + "…" }
-gutter := "  "
-titleRender := sessionStyle.Render(title)
-if m.focus == PanelIdle && i == m.cursors[PanelIdle] {
-gutter = "▎ "
-titleRender = cursorStyle.Render(title)
-}
-ago := formatAge(s.UpdatedAt)
-repo := shortRepo(s.Repository)
-left := fmt.Sprintf("%s💤 %s", gutter, titleRender)
-right := dim.Render(fmt.Sprintf("%s  %s", repo, ago))
-pad := innerW - lipgloss.Width(left) - lipgloss.Width(right)
-if pad < 1 { pad = 1 }
-idleLines = append(idleLines, left + strings.Repeat(" ", pad) + right)
-}
-// Attention
-var idlePanel string
-if len(idleLines) > 0 {
-idleHeight := len(idleLines)
-maxIdle := availHeight / 4
-if idleHeight > maxIdle { idleHeight = maxIdle; idleLines = idleLines[:maxIdle] }
-idlePanel = renderPanelFocused(fmt.Sprintf("Idle (%d)", len(idleSessions)), strings.Join(idleLines, "\n"), rightWidth, idleHeight, m.focus == PanelIdle, focusColor)
-}
-
-// ── RIGHT COLUMN ──
-
-// Fleet summary panel
-var fleetLines []string
-summaryParts := []string{}
-if m.stats.Active > 0 { summaryParts = append(summaryParts, fmt.Sprintf("● %d active", m.stats.Active)) }
-if m.stats.Idle > 0 { summaryParts = append(summaryParts, fmt.Sprintf("💤 %d idle", m.stats.Idle)) }
-if m.stats.NeedsInput > 0 { summaryParts = append(summaryParts, fmt.Sprintf("✋ %d input", m.stats.NeedsInput)) }
-if m.stats.Done > 0 { summaryParts = append(summaryParts, fmt.Sprintf("✅ %d done", m.stats.Done)) }
-if m.stats.Failed > 0 { summaryParts = append(summaryParts, fmt.Sprintf("❌ %d fail", m.stats.Failed)) }
-totalTokens := int64(0)
-for _, s := range m.sessions {
-if s.Telemetry != nil { totalTokens += s.Telemetry.InputTokens }
-}
-if totalTokens > 0 {
-summaryParts = append(summaryParts, fmt.Sprintf("🪙 %s", data.FormatTokenCount(totalTokens)))
-}
-fleetLines = append(fleetLines, strings.Join(summaryParts, "  "))
-barWidth := rightWidth - 6
-if barWidth > 50 { barWidth = 50 }
-if barWidth > 0 && m.stats.Total > 0 {
-fleetLines = append(fleetLines, m.renderBar(barWidth))
-}
-// Today stats
-todayDone, todayTokens := m.todayStats()
-if todayDone > 0 || todayTokens > 0 {
-var todayParts []string
-if todayDone > 0 { todayParts = append(todayParts, fmt.Sprintf("✅ %d completed", todayDone)) }
-if todayTokens > 0 { todayParts = append(todayParts, fmt.Sprintf("🪙 %s", data.FormatTokenCount(todayTokens))) }
-fleetLines = append(fleetLines, dim.Render("today: " + strings.Join(todayParts, "  ")))
-}
-fleetHeight := len(fleetLines)
-if fleetHeight < 2 { fleetHeight = 2 }
-fleetPanel := renderPanel("Fleet", strings.Join(fleetLines, "\n"), rightWidth, fleetHeight)
-
-// Repos panel
-var repoLines []string
-rInnerW := rightWidth - 6
-for i, r := range m.repos {
-selected := (m.focus == PanelRepos) && i == m.cursors[PanelRepos]
-repoLines = append(repoLines, m.renderRepoRow(r, selected, rInnerW))
-}
-repoHeight := len(repoLines)
-maxRepo := availHeight / 2
-if maxRepo < 3 { maxRepo = 3 }
-if repoHeight > maxRepo { repoHeight = maxRepo; repoLines = repoLines[:maxRepo] }
-if repoHeight < 1 { repoHeight = 1 }
-repoPanel := renderPanelFocused("Repos", strings.Join(repoLines, "\n"), rightWidth, repoHeight, m.focus == PanelRepos, focusColor)
-
-// Recent completions (left column, below Active)
+// Recent completions
 recentDone := m.recentCompletions(8)
 var recentLines []string
 recentInnerW := leftWidth - 6
@@ -559,24 +530,156 @@ recentLines = append(recentLines, fmt.Sprintf("%s%s %s%s  %s", gutter, icon, tit
 if len(recentLines) == 0 {
 recentLines = append(recentLines, dim.Render("  no completions yet"))
 }
-recentHeight := len(recentLines)
-if recentHeight < 1 { recentHeight = 1 }
-maxRecent := availHeight / 3
-if recentHeight > maxRecent { recentHeight = maxRecent; recentLines = recentLines[:maxRecent] }
-recentPanel := renderPanelFocused("Recent", strings.Join(recentLines, "\n"), leftWidth, recentHeight, m.focus == PanelRecent, focusColor)
+
+// Idle sessions
+idleSessions := m.idleSessions()
+var idleLines []string
+for i, s := range idleSessions {
+title := s.Title
+maxT := innerW * 2 / 3
+if maxT < 10 { maxT = 10 }
+if len(title) > maxT { title = title[:maxT-1] + "…" }
+gutter := "  "
+titleRender := sessionStyle.Render(title)
+if m.focus == PanelIdle && i == m.cursors[PanelIdle] {
+gutter = "▎ "
+titleRender = cursorStyle.Render(title)
+}
+ago := formatAge(s.UpdatedAt)
+repo := shortRepo(s.Repository)
+left := fmt.Sprintf("%s💤 %s", gutter, titleRender)
+right := dim.Render(fmt.Sprintf("%s  %s", repo, ago))
+pad := innerW - lipgloss.Width(left) - lipgloss.Width(right)
+if pad < 1 { pad = 1 }
+idleLines = append(idleLines, left + strings.Repeat(" ", pad) + right)
+}
+
+// Fleet summary
+var fleetLines []string
+summaryParts := []string{}
+if m.stats.Active > 0 { summaryParts = append(summaryParts, fmt.Sprintf("● %d active", m.stats.Active)) }
+if m.stats.Idle > 0 { summaryParts = append(summaryParts, fmt.Sprintf("💤 %d idle", m.stats.Idle)) }
+if m.stats.NeedsInput > 0 { summaryParts = append(summaryParts, fmt.Sprintf("✋ %d input", m.stats.NeedsInput)) }
+if m.stats.Done > 0 { summaryParts = append(summaryParts, fmt.Sprintf("✅ %d done", m.stats.Done)) }
+if m.stats.Failed > 0 { summaryParts = append(summaryParts, fmt.Sprintf("❌ %d fail", m.stats.Failed)) }
+totalTokens := int64(0)
+for _, s := range m.sessions {
+if s.Telemetry != nil { totalTokens += s.Telemetry.InputTokens }
+}
+if totalTokens > 0 {
+summaryParts = append(summaryParts, fmt.Sprintf("🪙 %s", data.FormatTokenCount(totalTokens)))
+}
+fleetLines = append(fleetLines, strings.Join(summaryParts, "  "))
+barWidth := rightWidth - 6
+if barWidth > 50 { barWidth = 50 }
+if barWidth > 0 && m.stats.Total > 0 {
+fleetLines = append(fleetLines, m.renderBar(barWidth))
+}
+todayDone, todayTokens := m.todayStats()
+if todayDone > 0 || todayTokens > 0 {
+var todayParts []string
+if todayDone > 0 { todayParts = append(todayParts, fmt.Sprintf("✅ %d completed", todayDone)) }
+if todayTokens > 0 { todayParts = append(todayParts, fmt.Sprintf("🪙 %s", data.FormatTokenCount(todayTokens))) }
+fleetLines = append(fleetLines, dim.Render("today: " + strings.Join(todayParts, "  ")))
+}
+
+// Repos
+var repoLines []string
+rInnerW := rightWidth - 6
+for i, r := range m.repos {
+selected := (m.focus == PanelRepos) && i == m.cursors[PanelRepos]
+repoLines = append(repoLines, m.renderRepoRow(r, selected, rInnerW))
+}
+
+// ── BUDGET-BASED HEIGHT ALLOCATION ──
+//
+// Left column: Active, Recent, Attention (3 panels)
+// Right column: Fleet, Repos, Idle (2–3 panels)
+//
+// Each panel costs panelChrome (3) lines of overhead beyond its content.
+// We subtract total chrome from availHeight to get the content budget,
+// then distribute proportionally based on actual content needs.
+
+leftPanelCount := 3 // Active, Recent, Attention
+rightPanelCount := 2 // Fleet, Repos
+hasIdle := len(idleLines) > 0
+if hasIdle { rightPanelCount = 3 }
+
+leftContentBudget := availHeight - (leftPanelCount * panelChrome)
+if leftContentBudget < leftPanelCount { leftContentBudget = leftPanelCount }
+rightContentBudget := availHeight - (rightPanelCount * panelChrome)
+if rightContentBudget < rightPanelCount { rightContentBudget = rightPanelCount }
+
+// Allocate left column: Active (priority) → Recent → Attention
+leftRequested := []int{len(activeLines), len(recentLines), len(attnLines)}
+leftAlloc := allocateBudget(leftRequested, leftContentBudget, 1)
+activeLines = truncateWithIndicator(activeLines, leftAlloc[0], len(activeSessions))
+recentLines = truncateWithIndicator(recentLines, leftAlloc[1], len(recentDone))
+attnLines = truncateWithIndicator(attnLines, leftAlloc[2], len(m.attention))
+
+// Allocate right column: Fleet (fixed) → Repos → Idle
+if hasIdle {
+rightRequested := []int{len(fleetLines), len(repoLines), len(idleLines)}
+rightAlloc := allocateBudget(rightRequested, rightContentBudget, 1)
+fleetLines = truncateWithIndicator(fleetLines, rightAlloc[0], len(fleetLines))
+repoLines = truncateWithIndicator(repoLines, rightAlloc[1], len(m.repos))
+idleLines = truncateWithIndicator(idleLines, rightAlloc[2], len(idleSessions))
+} else {
+rightRequested := []int{len(fleetLines), len(repoLines)}
+rightAlloc := allocateBudget(rightRequested, rightContentBudget, 1)
+fleetLines = truncateWithIndicator(fleetLines, rightAlloc[0], len(fleetLines))
+repoLines = truncateWithIndicator(repoLines, rightAlloc[1], len(m.repos))
+}
+
+// ── RENDER PANELS ──
+
+activePanel := renderPanelFocused(
+fmt.Sprintf("Active (%d)", len(activeSessions)),
+strings.Join(activeLines, "\n"), leftWidth, len(activeLines),
+m.focus == PanelActive, focusColor)
+
+recentPanel := renderPanelFocused("Recent",
+strings.Join(recentLines, "\n"), leftWidth, len(recentLines),
+m.focus == PanelRecent, focusColor)
+
+attnPanel := renderPanelFocused(
+fmt.Sprintf("Attention (%d)", len(m.attention)),
+strings.Join(attnLines, "\n"), leftWidth, len(attnLines),
+m.focus == PanelAttention, focusColor)
+
+fleetPanel := renderPanel("Fleet", strings.Join(fleetLines, "\n"), rightWidth, len(fleetLines))
+
+repoPanel := renderPanelFocused("Repos",
+strings.Join(repoLines, "\n"), rightWidth, len(repoLines),
+m.focus == PanelRepos, focusColor)
+
+var idlePanel string
+if hasIdle {
+idlePanel = renderPanelFocused(
+fmt.Sprintf("Idle (%d)", len(idleSessions)),
+strings.Join(idleLines, "\n"), rightWidth, len(idleLines),
+m.focus == PanelIdle, focusColor)
+}
 
 // ── ASSEMBLE COLUMNS ──
-// Left: Active → Recent → Attention
 leftCol := lipgloss.JoinVertical(lipgloss.Left, activePanel, recentPanel, attnPanel)
 
-// Right: Fleet → Repos → Idle
 rightPanels := []string{fleetPanel, repoPanel}
-if len(idleLines) > 0 {
+if hasIdle {
 rightPanels = append(rightPanels, idlePanel)
 }
 rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
-return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol)
+result := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol)
+
+// Safety clamp: ensure we never exceed the available height.
+lines := strings.Split(result, "\n")
+if len(lines) > availHeight {
+lines = lines[:availHeight]
+result = strings.Join(lines, "\n")
+}
+
+return result
 }
 
 // shortRepo extracts just the repo name from "owner/repo".

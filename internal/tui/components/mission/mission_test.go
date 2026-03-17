@@ -1,6 +1,7 @@
 package mission
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -308,5 +309,105 @@ func TestSetSize(t *testing.T) {
 	m.SetSize(120, 40)
 	if m.width != 120 || m.height != 40 {
 		t.Fatalf("expected 120x40, got %dx%d", m.width, m.height)
+	}
+}
+
+func TestAllocateBudget_EverythingFits(t *testing.T) {
+	requested := []int{3, 2, 1}
+	alloc := allocateBudget(requested, 10, 1)
+	// Total requested = 6, budget = 10 → everything fits
+	for i, r := range requested {
+		if alloc[i] != r {
+			t.Fatalf("panel %d: expected %d, got %d", i, r, alloc[i])
+		}
+	}
+}
+
+func TestAllocateBudget_Proportional(t *testing.T) {
+	requested := []int{20, 10, 10}
+	alloc := allocateBudget(requested, 12, 1)
+	total := 0
+	for _, a := range alloc {
+		total += a
+		if a < 1 {
+			t.Fatalf("allocation below minimum: %d", a)
+		}
+	}
+	if total > 12 {
+		t.Fatalf("total allocation %d exceeds budget 12", total)
+	}
+	// Active panel should get the most since it requested the most
+	if alloc[0] <= alloc[1] || alloc[0] <= alloc[2] {
+		t.Fatalf("expected panel 0 to get most space, got %v", alloc)
+	}
+}
+
+func TestAllocateBudget_MinLines(t *testing.T) {
+	requested := []int{1, 1, 100}
+	alloc := allocateBudget(requested, 6, 1)
+	for i, a := range alloc {
+		if a < 1 {
+			t.Fatalf("panel %d below minimum: %d", i, a)
+		}
+	}
+}
+
+func TestTruncateWithIndicator_NoTruncation(t *testing.T) {
+	lines := []string{"a", "b", "c"}
+	result := truncateWithIndicator(lines, 5, 3)
+	if len(result) != 3 {
+		t.Fatalf("expected 3 lines, got %d", len(result))
+	}
+}
+
+func TestTruncateWithIndicator_Truncates(t *testing.T) {
+	lines := []string{"a", "b", "c", "d", "e"}
+	result := truncateWithIndicator(lines, 3, 5)
+	if len(result) != 3 {
+		t.Fatalf("expected 3 lines, got %d", len(result))
+	}
+	last := result[2]
+	if !strings.Contains(last, "more") {
+		t.Fatalf("expected overflow indicator, got %q", last)
+	}
+}
+
+func TestViewMultiPane_FitsHeight(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(140, 30)
+
+	// Create many sessions to trigger overflow
+	now := time.Now()
+	var sessions []data.Session
+	for i := 0; i < 50; i++ {
+		sessions = append(sessions, data.Session{
+			ID:         fmt.Sprintf("s%d", i),
+			Status:     "completed",
+			Title:      fmt.Sprintf("Session %d", i),
+			Repository: fmt.Sprintf("owner/repo-%d", i%10),
+			UpdatedAt:  now.Add(-time.Duration(i) * time.Hour),
+		})
+	}
+	// Add some active and idle sessions
+	sessions = append(sessions, data.Session{
+		ID: "active1", Status: "running", Title: "Active task",
+		Repository: "owner/repo-0", UpdatedAt: now,
+	})
+	for i := 0; i < 20; i++ {
+		sessions = append(sessions, data.Session{
+			ID:         fmt.Sprintf("idle%d", i),
+			Status:     "running",
+			Title:      fmt.Sprintf("Idle session %d", i),
+			Repository: fmt.Sprintf("owner/repo-%d", i%5),
+			UpdatedAt:  now.Add(-time.Hour), // idle = active status but old
+		})
+	}
+	m.SetSessions(sessions)
+
+	view := m.View()
+	lineCount := strings.Count(view, "\n") + 1
+	maxAllowed := 30 - 6 // availHeight
+	if lineCount > maxAllowed {
+		t.Fatalf("view has %d lines, exceeds max allowed %d", lineCount, maxAllowed)
 	}
 }

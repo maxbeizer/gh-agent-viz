@@ -534,9 +534,10 @@ recentLines = append(recentLines, dim.Render("  no completions yet"))
 // Idle sessions
 idleSessions := m.idleSessions()
 var idleLines []string
+rInnerW := rightWidth - 6
 for i, s := range idleSessions {
 title := s.Title
-maxT := innerW * 2 / 3
+maxT := rInnerW * 2 / 3
 if maxT < 10 { maxT = 10 }
 if len(title) > maxT { title = title[:maxT-1] + "…" }
 gutter := "  "
@@ -549,7 +550,7 @@ ago := formatAge(s.UpdatedAt)
 repo := shortRepo(s.Repository)
 left := fmt.Sprintf("%s💤 %s", gutter, titleRender)
 right := dim.Render(fmt.Sprintf("%s  %s", repo, ago))
-pad := innerW - lipgloss.Width(left) - lipgloss.Width(right)
+pad := rInnerW - lipgloss.Width(left) - lipgloss.Width(right)
 if pad < 1 { pad = 1 }
 idleLines = append(idleLines, left + strings.Repeat(" ", pad) + right)
 }
@@ -585,7 +586,6 @@ fleetLines = append(fleetLines, dim.Render("today: " + strings.Join(todayParts, 
 
 // Repos
 var repoLines []string
-rInnerW := rightWidth - 6
 for i, r := range m.repos {
 selected := (m.focus == PanelRepos) && i == m.cursors[PanelRepos]
 repoLines = append(repoLines, m.renderRepoRow(r, selected, rInnerW))
@@ -673,9 +673,12 @@ rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 result := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol)
 
 // Safety clamp: ensure we never exceed the available height.
+// Use lipgloss.Height for accurate visual height (accounts for wrapping).
+if lipgloss.Height(result) > availHeight {
 lines := strings.Split(result, "\n")
 if len(lines) > availHeight {
 lines = lines[:availHeight]
+}
 result = strings.Join(lines, "\n")
 }
 

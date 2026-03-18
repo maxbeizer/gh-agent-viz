@@ -1084,7 +1084,7 @@ if max > 0 && m.cursors[i] >= max { m.cursors[i] = max - 1 }
 func (m *Model) activeSessions() []data.Session {
 var active []data.Session
 for _, s := range m.sessions {
-if data.SessionIsActiveNotIdle(s) || strings.EqualFold(strings.TrimSpace(s.Status), "needs-input") {
+if data.SessionIsActiveNotIdle(s) {
 active = append(active, s)
 }
 }

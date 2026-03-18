@@ -312,6 +312,47 @@ func TestSetSize(t *testing.T) {
 	}
 }
 
+func TestActiveCountMatchesStats(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(140, 30)
+	now := time.Now()
+	sessions := []data.Session{
+		// needs-input session (stale) — should NOT be counted as active
+		{ID: "1", Status: "needs-input", Title: "Waiting for input", UpdatedAt: now.Add(-time.Hour)},
+		// running session (recent) — should be counted as active
+		{ID: "2", Status: "running", Title: "Working", UpdatedAt: now},
+		// completed session
+		{ID: "3", Status: "completed", Title: "Done task", UpdatedAt: now.Add(-2 * time.Hour)},
+	}
+	m.SetSessions(sessions)
+
+	activeCount := len(m.activeSessions())
+	statsActive := m.stats.Active
+
+	if activeCount != statsActive {
+		t.Fatalf("active panel count (%d) != stats bar count (%d)", activeCount, statsActive)
+	}
+}
+
+func TestNeedsInputNotInActivePanel(t *testing.T) {
+	m := newTestModel()
+	now := time.Now()
+	sessions := []data.Session{
+		{ID: "1", Status: "needs-input", Title: "Stale input", UpdatedAt: now.Add(-time.Hour)},
+	}
+	m.SetSessions(sessions)
+
+	if len(m.activeSessions()) != 0 {
+		t.Fatal("needs-input session should not appear in active panel")
+	}
+	if m.stats.NeedsInput != 1 {
+		t.Fatalf("expected 1 needs-input in stats, got %d", m.stats.NeedsInput)
+	}
+	if len(m.attention) != 1 {
+		t.Fatalf("expected needs-input in attention panel, got %d items", len(m.attention))
+	}
+}
+
 func TestAllocateBudget_EverythingFits(t *testing.T) {
 	requested := []int{3, 2, 1}
 	alloc := allocateBudget(requested, 10, 1)

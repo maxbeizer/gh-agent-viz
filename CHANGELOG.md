@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [v0.8.1] - 2026-03-18
+
+### Fixed
+
+- Active panel count now matches the fleet summary bar — needs-input sessions are no longer double-counted as "active" (they appear in Attention instead)
+
 ## [v0.8.0] - 2026-03-17
 
 ### Fixed

@@ -9,7 +9,7 @@ import (
 
 func newTestModel(title string, filter *string) Model {
 	s := lipgloss.NewStyle()
-	return New(s, s, s, s, title, filter, false)
+	return New(s, s, s, s, title, filter, false, "v0.8.2")
 }
 
 func TestNew(t *testing.T) {
@@ -94,7 +94,7 @@ func TestView_EndsWithNewline(t *testing.T) {
 
 func newTestModelWithBanner(title string, filter *string, useAscii bool) Model {
 	s := lipgloss.NewStyle()
-	m := New(s, s, s, s, title, filter, useAscii)
+	m := New(s, s, s, s, title, filter, useAscii, "v0.8.2")
 	m.SetSize(80, 24)
 	return m
 }

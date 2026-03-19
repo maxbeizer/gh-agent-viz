@@ -42,6 +42,8 @@ type Model struct {
 	tabCount       lipgloss.Style
 	title          string
 	tagline        string
+	version        string
+	upgradeVersion string // non-empty when a newer version is available
 	filter         *string
 	counts         FilterCounts
 	useAsciiHeader bool
@@ -59,7 +61,7 @@ const bannerWidth = 27
 const minHeightForBanner = 15
 
 // New creates a new header model
-func New(titleStyle, tabActive, tabInactive, tabCount lipgloss.Style, title string, filter *string, useAsciiHeader bool) Model {
+func New(titleStyle, tabActive, tabInactive, tabCount lipgloss.Style, title string, filter *string, useAsciiHeader bool, version string) Model {
 	return Model{
 		titleStyle:     titleStyle,
 		tabActive:      tabActive,
@@ -67,11 +69,17 @@ func New(titleStyle, tabActive, tabInactive, tabCount lipgloss.Style, title stri
 		tabCount:       tabCount,
 		title:          title,
 		tagline:        taglines[rand.Intn(len(taglines))],
+		version:        version,
 		filter:         filter,
 		useAsciiHeader: useAsciiHeader,
 		width:          80,
 		height:         24,
 	}
+}
+
+// SetUpgradeVersion sets the latest available version for the upgrade nudge.
+func (m *Model) SetUpgradeVersion(v string) {
+	m.upgradeVersion = v
 }
 
 // SetSize updates the terminal dimensions for responsive layout
@@ -131,13 +139,19 @@ func (m Model) View() string {
 			Bold(true).
 			Foreground(m.titleStyle.GetForeground())
 		styledBanner := bannerStyle.Render(Banner)
+
+		// Build info block: tagline + version
+		var infoParts []string
 		if m.tagline != "" {
 			tagStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.AdaptiveColor{Light: "245", Dark: "250"}).
 				Italic(true)
-			tagBlock := tagStyle.Render(m.tagline)
-			styledBanner = lipgloss.JoinHorizontal(lipgloss.Center, styledBanner, "  ", tagBlock)
+			infoParts = append(infoParts, tagStyle.Render(m.tagline))
 		}
+		infoParts = append(infoParts, m.renderVersionBadge())
+		infoBlock := strings.Join(infoParts, "\n")
+
+		styledBanner = lipgloss.JoinHorizontal(lipgloss.Center, styledBanner, "  ", infoBlock)
 		return styledBanner + "\n" + tabLine + "\n" + separator + "\n"
 	}
 
@@ -161,12 +175,16 @@ func (m Model) ViewBannerOnly() string {
 			Bold(true).
 			Foreground(m.titleStyle.GetForeground())
 		styledBanner := bannerStyle.Render(Banner)
+
+		var infoParts []string
 		if m.tagline != "" {
 			tagStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.AdaptiveColor{Light: "245", Dark: "250"}).
 				Italic(true)
-			styledBanner = lipgloss.JoinHorizontal(lipgloss.Center, styledBanner, "  ", tagStyle.Render(m.tagline))
+			infoParts = append(infoParts, tagStyle.Render(m.tagline))
 		}
+		infoParts = append(infoParts, m.renderVersionBadge())
+		styledBanner = lipgloss.JoinHorizontal(lipgloss.Center, styledBanner, "  ", strings.Join(infoParts, "\n"))
 		return styledBanner + "\n" + separator + "\n"
 	}
 
@@ -177,4 +195,20 @@ func (m Model) ViewBannerOnly() string {
 	}
 
 	return separator + "\n"
+}
+
+// renderVersionBadge returns the version label, with an upgrade nudge if available.
+func (m Model) renderVersionBadge() string {
+	if m.version == "" {
+		return ""
+	}
+	versionStyle := lipgloss.NewStyle().Faint(true)
+	badge := versionStyle.Render("v" + strings.TrimPrefix(m.version, "v"))
+
+	if m.upgradeVersion != "" && m.upgradeVersion != m.version {
+		upgradeStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "214", Dark: "214"})
+		badge += "  " + upgradeStyle.Render("⬆ "+m.upgradeVersion+" available")
+	}
+	return badge
 }

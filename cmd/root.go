@@ -31,7 +31,7 @@ terminal UI for visualizing and managing GitHub Copilot coding agent sessions.
 		data.SetDebug(debugFlag)
 
 		// Create the Bubble Tea program
-		model := tui.NewModel(repoFlag, debugFlag, demoFlag, snapshotFlag)
+		model := tui.NewModel(repoFlag, debugFlag, demoFlag, snapshotFlag, Version)
 		p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseAllMotion())
 
 		// Run the program

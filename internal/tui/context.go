@@ -20,6 +20,7 @@ type ProgramContext struct {
 	Height       int
 	Error        error
 	Debug        bool
+	Version      string
 	StatusFilter string // "all", "attention", "active", "completed", "failed"
 	Counts       FilterCounts
 }

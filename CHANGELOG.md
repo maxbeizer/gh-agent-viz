@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [v0.9.0] - 2026-03-19
+
+### Added
+
+- Version display in header banner next to tagline
+- Automatic upgrade check on startup — shows amber "⬆ vX.Y.Z available" nudge when a newer release exists
+
+### Fixed
+
+- Mission control and kanban now always have current session data when switching views
+
 ## [v0.8.2] - 2026-03-19
 
 ### Fixed

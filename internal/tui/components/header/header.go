@@ -205,10 +205,12 @@ func (m Model) renderVersionBadge() string {
 	versionStyle := lipgloss.NewStyle().Faint(true)
 	badge := versionStyle.Render("v" + strings.TrimPrefix(m.version, "v"))
 
-	if m.upgradeVersion != "" && m.upgradeVersion != m.version {
+	current := strings.TrimPrefix(m.version, "v")
+	latest := strings.TrimPrefix(m.upgradeVersion, "v")
+	if latest != "" && latest != current {
 		upgradeStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Light: "214", Dark: "214"})
-		badge += "  " + upgradeStyle.Render("⬆ "+m.upgradeVersion+" available")
+		badge += "  " + upgradeStyle.Render("⬆ v"+latest+" available")
 	}
 	return badge
 }

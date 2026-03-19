@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [v0.8.2] - 2026-03-19
+
+### Fixed
+
+- Mission control and kanban now always have current session data when switching views — previously showed stale/empty data if loaded on a different view
+
 ## [v0.8.1] - 2026-03-18
 
 ### Fixed

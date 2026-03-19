@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -530,7 +531,13 @@ func (m Model) viewLoading() string {
 		Italic(true).
 		Render(m.loadTagline)
 
-	block := lipgloss.JoinVertical(lipgloss.Center, "", logo, "", spinnerLine, "")
+	versionLine := ""
+	if m.ctx.Version != "" {
+		versionLine = lipgloss.NewStyle().Faint(true).
+			Render("v" + strings.TrimPrefix(m.ctx.Version, "v"))
+	}
+
+	block := lipgloss.JoinVertical(lipgloss.Center, "", logo, versionLine, "", spinnerLine, "")
 
 	return lipgloss.Place(
 		m.ctx.Width, m.ctx.Height,

@@ -273,13 +273,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		m.taskList.SetLoading(false)
 		m.taskList.SetTasks(msg.tasks)
-		// Only push to the active secondary view
-		switch m.viewMode {
-		case ViewModeKanban:
-			m.kanban.SetSessions(msg.allSessions)
-		case ViewModeMission:
-			m.mission.SetSessions(msg.allSessions)
-		default:
+		// Always push sessions to all views so they're current when switched to.
+		m.kanban.SetSessions(msg.allSessions)
+		m.mission.SetSessions(msg.allSessions)
+		if m.viewMode != ViewModeKanban && m.viewMode != ViewModeMission {
 			m.taskDetail.SetAllSessions(msg.allSessions)
 		}
 

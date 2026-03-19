@@ -224,7 +224,12 @@ func (m Model) refreshCmd() tea.Cmd {
 }
 
 func (m Model) animationTickCmd() tea.Cmd {
-	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg {
+	// Use a slower tick when nothing needs animating (no active sessions, no toasts).
+	interval := 500 * time.Millisecond
+	if m.ctx.Counts.Active > 0 || m.toast.HasToasts() {
+		interval = 100 * time.Millisecond
+	}
+	return tea.Tick(interval, func(time.Time) tea.Msg {
 		return animationTickMsg{}
 	})
 }

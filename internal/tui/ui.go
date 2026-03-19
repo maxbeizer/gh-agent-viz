@@ -81,9 +81,10 @@ type Model struct {
 }
 
 // NewModel creates a new TUI model
-func NewModel(repo string, debug bool, demo bool, snapshotPath string) Model {
+func NewModel(repo string, debug bool, demo bool, snapshotPath string, version string) Model {
 	ctx := NewProgramContext()
 	ctx.Debug = debug
+	ctx.Version = version
 	cfg, err := config.Load("")
 	if err == nil {
 		ctx.Config = cfg
@@ -145,7 +146,7 @@ func NewModel(repo string, debug bool, demo bool, snapshotPath string) Model {
 		ctx:         ctx,
 		theme:       theme,
 		keys:        keys,
-		header:      header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter, ctx.Config.AsciiHeaderEnabled()),
+		header:      header.New(theme.Title, theme.TabActive, theme.TabInactive, theme.TabCount, "⚡ Agent Sessions", &ctx.StatusFilter, ctx.Config.AsciiHeaderEnabled(), ctx.Version),
 		footer:      footer.New(theme.Footer, footerKeys),
 		help:        help.New(),
 		taskList:       tasklist.NewWithStore(theme.Title, theme.TableHeader, theme.TableRow, theme.TableRowSelected, theme.SectionHeader, StatusIcon, animIconFunc, dismissedStore),
@@ -179,6 +180,7 @@ func (m Model) Init() tea.Cmd {
 		m.loadSpinner.Tick,
 		m.fetchLocalSessions,  // Phase 1: fast, shows content immediately
 		m.fetchAgentTasks,     // Phase 2: runs concurrently, returns when API responds
+		checkLatestVersion,    // Non-blocking: check for updates
 	}
 	if m.ctx.Config.AnimationsEnabled() {
 		cmds = append(cmds, m.animationTickCmd())
@@ -363,6 +365,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case logPollResultMsg:
 		if msg.err == nil {
 			m.logView.AppendOrReplace(msg.log)
+		}
+		return m, nil
+
+	case latestVersionMsg:
+		if msg.version != "" {
+			m.header.SetUpgradeVersion(msg.version)
 		}
 		return m, nil
 

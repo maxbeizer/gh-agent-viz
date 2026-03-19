@@ -67,6 +67,10 @@ type errMsg struct {
 	err error
 }
 
+type latestVersionMsg struct {
+	version string // e.g., "v0.8.2"
+}
+
 type conversationLoadedMsg struct {
 	messages []conversation.ChatMessage
 }
@@ -470,4 +474,17 @@ func (m Model) fetchGitDiff(workDir string) tea.Cmd {
 		}
 		return gitDiffLoadedMsg{result}
 	}
+}
+
+// checkLatestVersion queries GitHub for the latest release tag.
+func checkLatestVersion() tea.Msg {
+	out, err := exec.Command("gh", "api",
+		"repos/maxbeizer/gh-agent-viz/releases/latest",
+		"--jq", ".tag_name",
+	).Output()
+	if err != nil {
+		return latestVersionMsg{} // silently ignore
+	}
+	tag := strings.TrimSpace(string(out))
+	return latestVersionMsg{version: tag}
 }

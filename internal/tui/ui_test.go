@@ -48,7 +48,7 @@ func TestResumeSessionErr_ValidNeedsInputSession(t *testing.T) {
 }
 
 func TestResumeSession_ValidSessionReturnsCmd(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 
 	task := &data.Session{
 		ID:     "test-session-123",
@@ -163,7 +163,7 @@ func TestResumeSessionErr_NormalizesStatusCase(t *testing.T) {
 }
 
 func TestResumeSession_DetailViewResume(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.taskList.SetTasks([]data.Session{
 		{
 			ID:     "local-1",
@@ -182,7 +182,7 @@ func TestResumeSession_DetailViewResume(t *testing.T) {
 }
 
 func TestResumeSession_LogViewResume(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.taskList.SetTasks([]data.Session{
 		{
 			ID:     "local-1",
@@ -201,7 +201,7 @@ func TestResumeSession_LogViewResume(t *testing.T) {
 }
 
 func TestUpdateFooterHints_DetailViewShowsResumeForResumableSession(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.viewMode = ViewModeDetail
 	m.taskList.SetTasks([]data.Session{
 		{
@@ -224,7 +224,7 @@ func TestUpdateFooterHints_DetailViewShowsResumeForResumableSession(t *testing.T
 }
 
 func TestCycleFilterForwardAndBackward(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	// New order: attention → active → completed → failed → all
 	m.ctx.StatusFilter = "attention"
 
@@ -250,7 +250,7 @@ func TestCycleFilterForwardAndBackward(t *testing.T) {
 }
 
 func TestHandleListKeys_AJumpsToAttention(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.ctx.StatusFilter = "active" // start on a different tab
 
 	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
@@ -264,7 +264,7 @@ func TestHandleListKeys_AJumpsToAttention(t *testing.T) {
 }
 
 func TestHandleListKeys_AJumpsToAttentionFromAttention(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.ctx.StatusFilter = "attention"
 
 	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
@@ -278,7 +278,7 @@ func TestHandleListKeys_AJumpsToAttentionFromAttention(t *testing.T) {
 }
 
 func TestHandleListKeys_LocalSessionLogSwitchesToLogView(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.taskList.SetTasks([]data.Session{
 		{
 			ID:         "local-1",
@@ -301,7 +301,7 @@ func TestHandleListKeys_LocalSessionLogSwitchesToLogView(t *testing.T) {
 }
 
 func TestView_NotReadyShowsStartupText(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	view := m.View()
 	if view != "Loading sessions..." {
 		t.Fatalf("expected startup text, got %q", view)
@@ -309,7 +309,7 @@ func TestView_NotReadyShowsStartupText(t *testing.T) {
 }
 
 func TestUpdateFooterHints_LocalSessionShowsOnlyAvailableActions(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.viewMode = ViewModeList
 	m.taskList.SetTasks([]data.Session{
 		{
@@ -332,7 +332,7 @@ func TestUpdateFooterHints_LocalSessionShowsOnlyAvailableActions(t *testing.T) {
 }
 
 func TestUpdateFooterHints_AgentSessionWithoutPRHidesOpenPRHint(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.viewMode = ViewModeList
 	m.taskList.SetTasks([]data.Session{
 		{
@@ -356,7 +356,7 @@ func TestUpdateFooterHints_AgentSessionWithoutPRHidesOpenPRHint(t *testing.T) {
 }
 
 func TestHandleLogKeys_FTogglesFollowMode(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.taskList.SetTasks([]data.Session{
 		{
 			ID:     "agent-1",
@@ -383,7 +383,7 @@ func TestHandleLogKeys_FTogglesFollowMode(t *testing.T) {
 }
 
 func TestHandleLogKeys_ScrollUpPausesFollowMode(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.viewMode = ViewModeLog
 	m.logView.SetLive(true)
 	m.logView.SetFollowMode(true)
@@ -396,7 +396,7 @@ func TestHandleLogKeys_ScrollUpPausesFollowMode(t *testing.T) {
 }
 
 func TestHandleLogKeys_GotoBottomEnablesFollowMode(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.viewMode = ViewModeLog
 	m.logView.SetLive(true)
 	m.logView.SetFollowMode(false)
@@ -409,7 +409,7 @@ func TestHandleLogKeys_GotoBottomEnablesFollowMode(t *testing.T) {
 }
 
 func TestHandleLogKeys_EscClearsLiveMode(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.viewMode = ViewModeLog
 	m.logView.SetLive(true)
 	m.logView.SetFollowMode(true)
@@ -439,7 +439,7 @@ func TestIsSessionRunning(t *testing.T) {
 }
 
 func TestView_LoadingScreenShownBeforeDataLoads(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	// Simulate terminal sizing (sets ready = true)
 	m.ready = true
 	m.ctx.Width = 80
@@ -466,7 +466,7 @@ func TestView_LoadingScreenShownBeforeDataLoads(t *testing.T) {
 }
 
 func TestView_LoadingScreenTransitionsAfterInitialLoad(t *testing.T) {
-	m := NewModel("", false, true, "") // demo mode for simplicity
+	m := NewModel("", false, true, "", "dev") // demo mode for simplicity
 	m.ready = true
 	m.ctx.Width = 120
 	m.ctx.Height = 40
@@ -488,7 +488,7 @@ func TestLoadingTaglines_NotEmpty(t *testing.T) {
 }
 
 func TestHandleListKeys_GOpensGitActivity(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.taskList.SetTasks([]data.Session{
 		{
 			ID:      "local-1",
@@ -510,7 +510,7 @@ func TestHandleListKeys_GOpensGitActivity(t *testing.T) {
 }
 
 func TestHandleListKeys_GToastsForNonLocalSession(t *testing.T) {
-	m := NewModel("", false, false, "")
+	m := NewModel("", false, false, "", "dev")
 	m.taskList.SetTasks([]data.Session{
 		{
 			ID:     "agent-1",

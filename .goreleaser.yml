@@ -1,34 +1,23 @@
-version: 2
+project_name: gh-extension-template
 
 builds:
-  - id: gh-agent-viz
-    main: ./gh-agent-viz.go
-    binary: gh-agent-viz
-    env:
-      - CGO_ENABLED=0
-    ldflags:
-      - -s -w -X github.com/maxbeizer/gh-agent-viz/cmd.Version={{.Version}}
+  - binary: gh-extension-template
     goos:
-      - linux
       - darwin
+      - linux
       - windows
     goarch:
       - amd64
       - arm64
+    ldflags:
+      - -s -w
 
 archives:
-  - id: default
-    formats:
-      - binary
-    name_template: "{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}-{{ .Arch }}"
+  - format: binary
+    name_template: "{{ .ProjectName }}_{{ .Os }}-{{ .Arch }}"
 
-checksum:
-  name_template: "checksums.txt"
+release:
+  prerelease: auto
 
 changelog:
   sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^chore:"

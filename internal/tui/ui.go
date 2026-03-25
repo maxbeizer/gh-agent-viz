@@ -6,10 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 	"github.com/maxbeizer/gh-agent-viz/internal/config"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/conversation"
@@ -132,7 +133,7 @@ func NewModel(repo string, debug bool, demo bool, snapshotPath string, version s
 	// Loading screen spinner
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
-	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
+	sp.Style = lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")})
 	tagline := loadingTaglines[rand.Intn(len(loadingTaglines))]
 
 	// Determine default view mode
@@ -232,7 +233,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 
 	case tea.MouseMsg:
@@ -435,14 +436,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the TUI
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	var v tea.View
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+
 	if !m.ready {
-		return "Loading sessions..."
+		v.SetContent("Loading sessions...")
+		return v
 	}
 
 	// Show loading screen until initial data load completes
 	if !m.initialLoadDone {
-		return m.viewLoading()
+		v.SetContent(m.viewLoading())
+		return v
 	}
 
 	// Update footer hints based on current context
@@ -502,7 +509,7 @@ func (m Model) View() string {
 	searchView := ""
 	if m.searchActive || m.searchQuery != "" {
 		searchStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"}).
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")}).
 			Bold(true)
 		queryDisplay := m.searchQuery
 		if m.searchActive {
@@ -518,7 +525,8 @@ func (m Model) View() string {
 		result = m.help.View()
 	}
 
-	return result
+	v.SetContent(result)
+	return v
 }
 
 // loadingTaglines are randomly selected for the loading screen.
@@ -537,11 +545,11 @@ var loadingTaglines = []string{
 func (m Model) viewLoading() string {
 	logo := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"}).
+		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")}).
 		Render("⚡ Agent Viz")
 
 	spinnerLine := m.loadSpinner.View() + " " + lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "242", Dark: "245"}).
+		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("242"), Dark: lipgloss.Color("245")}).
 		Italic(true).
 		Render(m.loadTagline)
 
@@ -602,7 +610,7 @@ func (m Model) writeSnapshot() {
 			Width:  m.ctx.Width,
 			Height: m.ctx.Height,
 		},
-		RenderedOutput: m.View(),
+		RenderedOutput: m.View().Content,
 		SessionCount:   len(m.allSessions),
 		FilterCounts: data.SnapshotCounts{
 			All:       m.ctx.Counts.All,

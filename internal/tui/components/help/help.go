@@ -3,7 +3,8 @@ package help
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 )
 
 // Model represents the help overlay state.
@@ -40,11 +41,11 @@ func (m Model) View() string {
 		return ""
 	}
 
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "55", Dark: "99"})
-	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "42"}).Bold(true)
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "240", Dark: "252"})
-	sectionStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "27", Dark: "63"}).MarginBottom(1)
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "241"}).Italic(true)
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(compat.AdaptiveColor{Light: lipgloss.Color("55"), Dark: lipgloss.Color("99")})
+	keyStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("28"), Dark: lipgloss.Color("42")}).Bold(true)
+	descStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("240"), Dark: lipgloss.Color("252")})
+	sectionStyle := lipgloss.NewStyle().Bold(true).Foreground(compat.AdaptiveColor{Light: lipgloss.Color("27"), Dark: lipgloss.Color("63")}).MarginBottom(1)
+	dimStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("244"), Dark: lipgloss.Color("241")}).Italic(true)
 
 	formatKey := func(k, desc string) string {
 		return keyStyle.Render(k) + "  " + descStyle.Render(desc)
@@ -111,7 +112,7 @@ func (m Model) View() string {
 
 	boxStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.AdaptiveColor{Light: "249", Dark: "238"}).
+		BorderForeground(compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("238")}).
 		Padding(1, 3).
 		Width(colWidth*2 + 8)
 

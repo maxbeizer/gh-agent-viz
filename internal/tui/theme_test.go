@@ -7,17 +7,15 @@ import (
 
 func TestStatusIcon_Running(t *testing.T) {
 	icon := StatusIcon("running")
-	expected := "●"
-	if icon != expected {
-		t.Errorf("expected icon '%s' for running status, got '%s'", expected, icon)
+	if !strings.Contains(icon, "●") {
+		t.Errorf("expected icon to contain '●' for running status, got '%s'", icon)
 	}
 }
 
 func TestStatusIcon_Queued(t *testing.T) {
 	icon := StatusIcon("queued")
-	expected := "○"
-	if icon != expected {
-		t.Errorf("expected icon '%s' for queued status, got '%s'", expected, icon)
+	if !strings.Contains(icon, "○") {
+		t.Errorf("expected icon to contain '○' for queued status, got '%s'", icon)
 	}
 }
 

@@ -4,23 +4,24 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/diffview"
 )
 
 // Styles for rendering
 var (
-	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
-	statsStyle  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "242", Dark: "245"})
+	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")})
+	statsStyle  = lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("242"), Dark: lipgloss.Color("245")})
 	addStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))  // green
 	delStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("196")) // red
 	hunkStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("45")).Faint(true)
 	headerStyle = lipgloss.NewStyle().Bold(true)
-	sepStyle    = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "249", Dark: "238"})
-	emptyStyle  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "245"}).Italic(true)
+	sepStyle    = lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("238")})
+	emptyStyle  = lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("244"), Dark: lipgloss.Color("245")}).Italic(true)
 )
 
 // Model represents the git activity view component
@@ -36,7 +37,7 @@ type Model struct {
 
 // New creates a new git activity model
 func New(width, height int) Model {
-	vp := viewport.New(width, height)
+	vp := viewport.New(viewport.WithWidth(width), viewport.WithHeight(height))
 	return Model{
 		viewport: vp,
 		width:    width,
@@ -49,8 +50,8 @@ func New(width, height int) Model {
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
-	m.viewport.Width = width
-	m.viewport.Height = height
+	m.viewport.SetWidth(width)
+	m.viewport.SetHeight(height)
 	if m.ready {
 		m.renderContent()
 	}
@@ -145,20 +146,20 @@ func (m *Model) renderContent() {
 
 // ScrollUp scrolls up one line
 func (m *Model) ScrollUp() {
-	m.viewport.LineUp(1)
+	m.viewport.ScrollUp(1)
 }
 
 // ScrollDown scrolls down one line
 func (m *Model) ScrollDown() {
-	m.viewport.LineDown(1)
+	m.viewport.ScrollDown(1)
 }
 
 // HalfPageUp scrolls up half a page
 func (m *Model) HalfPageUp() {
-	m.viewport.HalfViewUp()
+	m.viewport.HalfPageUp()
 }
 
 // HalfPageDown scrolls down half a page
 func (m *Model) HalfPageDown() {
-	m.viewport.HalfViewDown()
+	m.viewport.HalfPageDown()
 }

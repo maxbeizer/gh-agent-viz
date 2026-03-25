@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 func TestRenderMarkdown_Heading(t *testing.T) {
@@ -69,11 +69,11 @@ func TestSetSize_ReRendersContent(t *testing.T) {
 	m.SetSize(40, 12)
 	contentAfter := m.content
 
-	if m.viewport.Width != 40 {
-		t.Errorf("expected viewport width 40, got: %d", m.viewport.Width)
+	if m.viewport.Width() != 40 {
+		t.Errorf("expected viewport width 40, got: %d", m.viewport.Width())
 	}
-	if m.viewport.Height != 12 {
-		t.Errorf("expected viewport height 12, got: %d", m.viewport.Height)
+	if m.viewport.Height() != 12 {
+		t.Errorf("expected viewport height 12, got: %d", m.viewport.Height())
 	}
 	// Content should be re-rendered (may differ due to different wrap width)
 	if !strings.Contains(contentAfter, "Title") {
@@ -87,8 +87,8 @@ func TestSetSize_NoContent(t *testing.T) {
 	m := New(lipgloss.NewStyle(), 80, 24)
 	// SetSize with no content should not panic
 	m.SetSize(40, 12)
-	if m.viewport.Width != 40 {
-		t.Errorf("expected viewport width 40, got: %d", m.viewport.Width)
+	if m.viewport.Width() != 40 {
+		t.Errorf("expected viewport width 40, got: %d", m.viewport.Width())
 	}
 }
 

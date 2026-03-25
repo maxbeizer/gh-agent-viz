@@ -2,12 +2,14 @@ package tasklist
 
 import (
 	"fmt"
+	"image/color"
 	"sort"
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
@@ -233,7 +235,7 @@ func (m Model) renderRow(sessionIdx int, session data.Session, selected bool, wi
 	// PR tag rendered separately so it's visible (not faint)
 	if hasPRBranch(session) {
 		prTag := lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "73"}).
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("30"), Dark: lipgloss.Color("73")}).
 			Render(" PR")
 		meta = dimStyle.Render(metaText) + prTag
 	}
@@ -948,7 +950,7 @@ func (m Model) renderGroupedListWith(groupBy string) string {
 }
 
 // statusColor returns a lipgloss.Color for the given session status.
-func (m Model) statusColor(status string) lipgloss.Color {
+func (m Model) statusColor(status string) color.Color {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "running":
 		return lipgloss.Color("42")

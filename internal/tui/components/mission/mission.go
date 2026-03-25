@@ -6,7 +6,8 @@ import (
 "strings"
 "time"
 
-"github.com/charmbracelet/lipgloss"
+"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 "github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
@@ -364,8 +365,8 @@ return m.viewMultiPane()
 
 // renderPanel returns a bordered panel with a title header line above the box.
 func renderPanel(title string, content string, width, _ int) string {
-borderColor := lipgloss.AdaptiveColor{Light: "249", Dark: "240"}
-titleColor := lipgloss.AdaptiveColor{Light: "24", Dark: "75"}
+borderColor := compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("240")}
+titleColor := compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")}
 
 titleRendered := lipgloss.NewStyle().
 Bold(true).
@@ -498,7 +499,7 @@ func windowLines(lines []string, scrollOffset, maxLines, totalItems, linesPerIte
 // viewMultiPane renders the btop-style 2-column dashboard.
 func (m *Model) viewMultiPane() string {
 dim := lipgloss.NewStyle().Faint(true)
-sessionStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
+sessionStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("236"), Dark: lipgloss.Color("252")})
 cursorStyle := lipgloss.NewStyle().Bold(true)
 
 totalWidth := m.width - 2
@@ -508,7 +509,7 @@ rightWidth := totalWidth - leftWidth
 availHeight := m.height - 6
 if availHeight < 12 { availHeight = 12 }
 
-focusColor := lipgloss.AdaptiveColor{Light: "30", Dark: "73"}
+focusColor := compat.AdaptiveColor{Light: lipgloss.Color("30"), Dark: lipgloss.Color("73")}
 
 // ── BUILD ALL CONTENT LINES FIRST (no truncation yet) ──
 
@@ -793,10 +794,10 @@ func (m *Model) viewSingleColumn() string {
 w := m.width - 4
 if w < 40 { w = 40 }
 
-sessionStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
+sessionStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("236"), Dark: lipgloss.Color("252")})
 cursorStyle := lipgloss.NewStyle().Bold(true)
 dim := lipgloss.NewStyle().Faint(true)
-tabActive := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "15", Dark: "15"}).Background(lipgloss.AdaptiveColor{Light: "24", Dark: "62"}).Padding(0, 1)
+tabActive := lipgloss.NewStyle().Bold(true).Foreground(compat.AdaptiveColor{Light: lipgloss.Color("15"), Dark: lipgloss.Color("15")}).Background(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("62")}).Padding(0, 1)
 tabInactive := lipgloss.NewStyle().Faint(true).Padding(0, 1)
 
 availHeight := m.height - 6
@@ -959,9 +960,9 @@ return strings.Join([]string{
 }
 
 // renderPanelFocused renders a panel with a highlighted border when focused.
-func renderPanelFocused(title string, content string, width, _ int, focused bool, focusColor lipgloss.AdaptiveColor) string {
-borderColor := lipgloss.AdaptiveColor{Light: "249", Dark: "240"}
-titleColor := lipgloss.AdaptiveColor{Light: "24", Dark: "75"}
+func renderPanelFocused(title string, content string, width, _ int, focused bool, focusColor compat.AdaptiveColor) string {
+borderColor := compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("240")}
+titleColor := compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")}
 if focused {
 borderColor = focusColor
 titleColor = focusColor

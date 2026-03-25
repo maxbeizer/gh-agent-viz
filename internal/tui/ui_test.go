@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
@@ -175,7 +175,7 @@ func TestResumeSession_DetailViewResume(t *testing.T) {
 	m.viewMode = ViewModeDetail
 
 	// Press 's' in detail view
-	_, cmd := m.handleDetailKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	_, cmd := m.handleDetailKeys(tea.KeyPressMsg{Code: 's', Text: "s"})
 	if cmd == nil {
 		t.Error("expected resume command to work in detail view")
 	}
@@ -194,7 +194,7 @@ func TestResumeSession_LogViewResume(t *testing.T) {
 	m.viewMode = ViewModeLog
 
 	// Press 's' in log view
-	_, cmd := m.handleLogKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	_, cmd := m.handleLogKeys(tea.KeyPressMsg{Code: 's', Text: "s"})
 	if cmd == nil {
 		t.Error("expected resume command to work in log view")
 	}
@@ -253,7 +253,7 @@ func TestHandleListKeys_AJumpsToAttention(t *testing.T) {
 	m := NewModel("", false, false, "", "dev")
 	m.ctx.StatusFilter = "active" // start on a different tab
 
-	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	updated, cmd := m.handleListKeys(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	if cmd == nil {
 		t.Fatal("expected fetch command when pressing 'a'")
 	}
@@ -267,7 +267,7 @@ func TestHandleListKeys_AJumpsToAttentionFromAttention(t *testing.T) {
 	m := NewModel("", false, false, "", "dev")
 	m.ctx.StatusFilter = "attention"
 
-	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	updated, cmd := m.handleListKeys(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	if cmd == nil {
 		t.Fatal("expected fetch command when pressing 'a'")
 	}
@@ -289,7 +289,7 @@ func TestHandleListKeys_LocalSessionLogSwitchesToLogView(t *testing.T) {
 		},
 	})
 
-	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	updated, cmd := m.handleListKeys(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	if cmd == nil {
 		t.Fatal("expected log fetch command for local session")
 	}
@@ -303,8 +303,8 @@ func TestHandleListKeys_LocalSessionLogSwitchesToLogView(t *testing.T) {
 func TestView_NotReadyShowsStartupText(t *testing.T) {
 	m := NewModel("", false, false, "", "dev")
 	view := m.View()
-	if view != "Loading sessions..." {
-		t.Fatalf("expected startup text, got %q", view)
+	if view.Content != "Loading sessions..." {
+		t.Fatalf("expected startup text, got %q", view.Content)
 	}
 }
 
@@ -369,13 +369,13 @@ func TestHandleLogKeys_FTogglesFollowMode(t *testing.T) {
 	m.logView.SetLive(true)
 	m.logView.SetFollowMode(false)
 
-	updated, _ := m.handleLogKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	updated, _ := m.handleLogKeys(tea.KeyPressMsg{Code: 'f', Text: "f"})
 	updatedModel := updated.(Model)
 	if !updatedModel.logView.FollowMode() {
 		t.Fatal("expected follow mode to be ON after pressing 'f'")
 	}
 
-	updated2, _ := updatedModel.handleLogKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	updated2, _ := updatedModel.handleLogKeys(tea.KeyPressMsg{Code: 'f', Text: "f"})
 	updatedModel2 := updated2.(Model)
 	if updatedModel2.logView.FollowMode() {
 		t.Fatal("expected follow mode to be OFF after pressing 'f' again")
@@ -388,7 +388,7 @@ func TestHandleLogKeys_ScrollUpPausesFollowMode(t *testing.T) {
 	m.logView.SetLive(true)
 	m.logView.SetFollowMode(true)
 
-	updated, _ := m.handleLogKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	updated, _ := m.handleLogKeys(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	updatedModel := updated.(Model)
 	if updatedModel.logView.FollowMode() {
 		t.Fatal("expected follow mode to be OFF after scrolling up")
@@ -401,7 +401,7 @@ func TestHandleLogKeys_GotoBottomEnablesFollowMode(t *testing.T) {
 	m.logView.SetLive(true)
 	m.logView.SetFollowMode(false)
 
-	updated, _ := m.handleLogKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	updated, _ := m.handleLogKeys(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	updatedModel := updated.(Model)
 	if !updatedModel.logView.FollowMode() {
 		t.Fatal("expected follow mode to be ON after G (goto bottom)")
@@ -414,7 +414,7 @@ func TestHandleLogKeys_EscClearsLiveMode(t *testing.T) {
 	m.logView.SetLive(true)
 	m.logView.SetFollowMode(true)
 
-	updated, _ := m.handleLogKeys(tea.KeyMsg{Type: tea.KeyEscape})
+	updated, _ := m.handleLogKeys(tea.KeyPressMsg{Code: tea.KeyEscape})
 	updatedModel := updated.(Model)
 	if updatedModel.logView.IsLive() {
 		t.Fatal("expected live mode to be OFF after esc")
@@ -446,22 +446,22 @@ func TestView_LoadingScreenShownBeforeDataLoads(t *testing.T) {
 	m.ctx.Height = 24
 
 	view := m.View()
-	if strings.Contains(view, "Agent Sessions") {
+	if strings.Contains(view.Content, "Agent Sessions") {
 		t.Fatal("expected loading screen, not the main UI")
 	}
 	// Should contain the spinner/tagline content
 	found := false
 	for _, tagline := range loadingTaglines {
-		if strings.Contains(view, tagline) {
+		if strings.Contains(view.Content, tagline) {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatalf("expected loading screen to contain a tagline, got: %q", view)
+		t.Fatalf("expected loading screen to contain a tagline, got: %q", view.Content)
 	}
-	if !strings.Contains(view, "Agent Viz") {
-		t.Fatalf("expected loading screen to contain branding, got: %q", view)
+	if !strings.Contains(view.Content, "Agent Viz") {
+		t.Fatalf("expected loading screen to contain branding, got: %q", view.Content)
 	}
 }
 
@@ -475,7 +475,7 @@ func TestView_LoadingScreenTransitionsAfterInitialLoad(t *testing.T) {
 	view := m.View()
 	// Should NOT show loading screen
 	for _, tagline := range loadingTaglines {
-		if strings.Contains(view, tagline) {
+		if strings.Contains(view.Content, tagline) {
 			t.Fatalf("loading screen should not show after initialLoadDone, found tagline: %q", tagline)
 		}
 	}
@@ -499,7 +499,7 @@ func TestHandleListKeys_GOpensGitActivity(t *testing.T) {
 		},
 	})
 
-	updated, cmd := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	updated, cmd := m.handleListKeys(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	if cmd == nil {
 		t.Fatal("expected git diff fetch command for G key")
 	}
@@ -520,7 +520,7 @@ func TestHandleListKeys_GToastsForNonLocalSession(t *testing.T) {
 		},
 	})
 
-	updated, _ := m.handleListKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	updated, _ := m.handleListKeys(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	updatedModel := updated.(Model)
 	if updatedModel.viewMode == ViewModeGitActivity {
 		t.Fatal("should not switch to git activity for non-local session")

@@ -5,9 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 )
 
 // MessageRole identifies who sent a chat message.
@@ -38,7 +39,7 @@ type Model struct {
 
 // New creates a new conversation view model.
 func New(width, height int) Model {
-	vp := viewport.New(width, height)
+	vp := viewport.New(viewport.WithWidth(width), viewport.WithHeight(height))
 	return Model{
 		viewport: vp,
 		width:    width,
@@ -56,8 +57,8 @@ func (m *Model) SetMessages(messages []ChatMessage) {
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
-	m.viewport.Width = width
-	m.viewport.Height = height
+	m.viewport.SetWidth(width)
+	m.viewport.SetHeight(height)
 	if m.ready {
 		m.renderContent()
 	}
@@ -144,7 +145,7 @@ var (
 			BorderRight(false).
 			BorderTop(false).
 			BorderBottom(false).
-			BorderForeground(lipgloss.AdaptiveColor{Light: "27", Dark: "69"}).
+			BorderForeground(compat.AdaptiveColor{Light: lipgloss.Color("27"), Dark: lipgloss.Color("69")}).
 			PaddingLeft(1)
 
 	agentBorderStyle = lipgloss.NewStyle().
@@ -153,7 +154,7 @@ var (
 				BorderRight(true).
 				BorderTop(false).
 				BorderBottom(false).
-				BorderForeground(lipgloss.AdaptiveColor{Light: "28", Dark: "42"}).
+				BorderForeground(compat.AdaptiveColor{Light: lipgloss.Color("28"), Dark: lipgloss.Color("42")}).
 				PaddingRight(1)
 
 	headerStyle = lipgloss.NewStyle().Bold(true)

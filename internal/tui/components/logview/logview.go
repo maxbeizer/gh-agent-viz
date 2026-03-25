@@ -3,10 +3,10 @@ package logview
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // maxLogBytes caps the raw log content retained in memory.
@@ -43,7 +43,7 @@ type Model struct {
 
 // New creates a new log view model
 func New(titleStyle lipgloss.Style, width, height int) Model {
-	vp := viewport.New(width, height)
+	vp := viewport.New(viewport.WithWidth(width), viewport.WithHeight(height))
 	return Model{
 		titleStyle: titleStyle,
 		viewport:   vp,
@@ -104,8 +104,8 @@ func (m *Model) SetContent(content string) {
 
 // SetSize updates the viewport size
 func (m *Model) SetSize(width, height int) {
-	m.viewport.Width = width
-	m.viewport.Height = height
+	m.viewport.SetWidth(width)
+	m.viewport.SetHeight(height)
 	if m.rawContent != "" {
 		rendered := m.renderWithCache(m.rawContent)
 		m.content = rendered
@@ -137,7 +137,7 @@ func renderMarkdown(content string, width int) string {
 // renderWithCache renders markdown using a cached glamour renderer,
 // re-creating it only when the viewport width changes.
 func (m *Model) renderWithCache(content string) string {
-	width := m.viewport.Width
+	width := m.viewport.Width()
 	if width <= 0 {
 		width = 80
 	}
@@ -191,14 +191,14 @@ func (m *Model) HalfPageUp() {
 
 // LineDown scrolls down one line
 func (m *Model) LineDown() {
-	if m.viewport.YOffset < m.lineCount-m.viewport.Height {
+	if m.viewport.YOffset() < m.lineCount-m.viewport.Height() {
 		m.viewport.ScrollDown(1)
 	}
 }
 
 // LineUp scrolls up one line
 func (m *Model) LineUp() {
-	if m.viewport.YOffset > 0 {
+	if m.viewport.YOffset() > 0 {
 		m.viewport.ScrollUp(1)
 	}
 }

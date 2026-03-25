@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui"
 	"github.com/spf13/cobra"
@@ -32,7 +32,7 @@ terminal UI for visualizing and managing GitHub Copilot coding agent sessions.
 
 		// Create the Bubble Tea program
 		model := tui.NewModel(repoFlag, debugFlag, demoFlag, snapshotFlag, Version)
-		p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
+		p := tea.NewProgram(model)
 
 		// Run the program
 		if _, err := p.Run(); err != nil {

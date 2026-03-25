@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
@@ -43,18 +44,18 @@ func (m *Model) SetWidth(width int) {
 func (m Model) View() string {
 	var parts []string
 
-	activeStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "42"})
-	urgentStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "160", Dark: "203"})
-	warningStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "172", Dark: "214"})
-	doneStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "72"})
-	tokenStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "245"})
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "249", Dark: "240"})
+	activeStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("28"), Dark: lipgloss.Color("42")})
+	urgentStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("160"), Dark: lipgloss.Color("203")})
+	warningStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("172"), Dark: lipgloss.Color("214")})
+	doneStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("30"), Dark: lipgloss.Color("72")})
+	tokenStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("244"), Dark: lipgloss.Color("245")})
+	dimStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("240")})
 
 	if m.counts.Active > 0 {
 		parts = append(parts, activeStyle.Render(fmt.Sprintf("● %d active", m.counts.Active)))
 	}
 	if m.counts.Idle > 0 {
-		idleStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "245"})
+		idleStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("244"), Dark: lipgloss.Color("245")})
 		parts = append(parts, idleStyle.Render(fmt.Sprintf("💤 %d idle", m.counts.Idle)))
 	}
 	if m.counts.Attention > 0 {

@@ -5,7 +5,8 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 )
 
 // taglines displayed randomly on startup
@@ -131,7 +132,7 @@ func (m Model) View() string {
 	tabLine := tabBar
 
 	separator := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "249", Dark: "240"}).
+		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("240")}).
 		Render(strings.Repeat("━", m.width))
 
 	if m.showBanner() {
@@ -144,7 +145,7 @@ func (m Model) View() string {
 		var infoParts []string
 		if m.tagline != "" {
 			tagStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.AdaptiveColor{Light: "245", Dark: "250"}).
+				Foreground(compat.AdaptiveColor{Light: lipgloss.Color("245"), Dark: lipgloss.Color("250")}).
 				Italic(true)
 			infoParts = append(infoParts, tagStyle.Render(m.tagline))
 		}
@@ -167,7 +168,7 @@ func (m Model) View() string {
 // ViewBannerOnly renders just the banner and tagline without the tab bar.
 func (m Model) ViewBannerOnly() string {
 	separator := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "249", Dark: "240"}).
+		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("240")}).
 		Render(strings.Repeat("━", m.width))
 
 	if m.showBanner() {
@@ -179,7 +180,7 @@ func (m Model) ViewBannerOnly() string {
 		var infoParts []string
 		if m.tagline != "" {
 			tagStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.AdaptiveColor{Light: "245", Dark: "250"}).
+				Foreground(compat.AdaptiveColor{Light: lipgloss.Color("245"), Dark: lipgloss.Color("250")}).
 				Italic(true)
 			infoParts = append(infoParts, tagStyle.Render(m.tagline))
 		}
@@ -209,7 +210,7 @@ func (m Model) renderVersionBadge() string {
 	latest := strings.TrimPrefix(m.upgradeVersion, "v")
 	if latest != "" && latest != current {
 		upgradeStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "214", Dark: "214"})
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("214"), Dark: lipgloss.Color("214")})
 		badge += "  " + upgradeStyle.Render("⬆ v"+latest+" available")
 	}
 	return badge

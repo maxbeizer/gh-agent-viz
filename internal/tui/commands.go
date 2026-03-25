@@ -5,7 +5,7 @@ import (
 	"os/exec"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/conversation"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/diffview"

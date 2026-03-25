@@ -1,7 +1,8 @@
 package tui
 
 import (
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 )
 
@@ -112,60 +113,60 @@ func newDefaultTheme() *Theme {
 	}
 }
 
-// newAdaptiveDefaultTheme uses lipgloss.AdaptiveColor so the palette
+// newAdaptiveDefaultTheme uses compat.AdaptiveColor so the palette
 // automatically adjusts to light and dark terminals.
 // Color philosophy: teal/cyan for structure, warm amber for actions,
 // distinct status colors, and clear hierarchy via weight not just color.
 func newAdaptiveDefaultTheme() *Theme {
 	return &Theme{
 		name:            "default",
-		StatusRunning:   lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "42"}),
-		StatusQueued:    lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "178", Dark: "222"}),
-		StatusCompleted: lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "72"}),
-		StatusFailed:    lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "160", Dark: "203"}),
+		StatusRunning:   lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("28"), Dark: lipgloss.Color("42")}),
+		StatusQueued:    lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("178"), Dark: lipgloss.Color("222")}),
+		StatusCompleted: lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("30"), Dark: lipgloss.Color("72")}),
+		StatusFailed:    lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("160"), Dark: lipgloss.Color("203")}),
 		TableHeader: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"}).
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")}).
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderBottom(true).
-			BorderForeground(lipgloss.AdaptiveColor{Light: "249", Dark: "238"}),
+			BorderForeground(compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("238")}),
 		TableRow: lipgloss.NewStyle().
 			Padding(0, 1).
-			Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"}),
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("236"), Dark: lipgloss.Color("252")}),
 		TableRowSelected: lipgloss.NewStyle().
 			Padding(0, 1).
-			Foreground(lipgloss.AdaptiveColor{Light: "0", Dark: "255"}).
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("0"), Dark: lipgloss.Color("255")}).
 			Bold(true),
 		Border: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.AdaptiveColor{Light: "249", Dark: "240"}),
+			BorderForeground(compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("240")}),
 		Title: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"}).
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")}).
 			Padding(0, 1),
 		Footer: lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "245"}).
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("244"), Dark: lipgloss.Color("245")}).
 			Padding(0, 1),
 		TabActive: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.AdaptiveColor{Light: "15", Dark: "230"}).
-			Background(lipgloss.AdaptiveColor{Light: "24", Dark: "24"}).
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("15"), Dark: lipgloss.Color("230")}).
+			Background(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("24")}).
 			Padding(0, 2),
 		TabInactive: lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "242", Dark: "248"}).
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("242"), Dark: lipgloss.Color("248")}).
 			Padding(0, 2),
 		TabCount: lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "245"}),
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("244"), Dark: lipgloss.Color("245")}),
 		FocusBorder: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.AdaptiveColor{Light: "30", Dark: "73"}),
+			BorderForeground(compat.AdaptiveColor{Light: lipgloss.Color("30"), Dark: lipgloss.Color("73")}),
 		RowGutter: lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "249", Dark: "239"}),
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("239")}),
 		RowGutterSel: lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "73"}).
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("30"), Dark: lipgloss.Color("73")}).
 			Bold(true),
 		SectionHeader: lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "73"}).
+			Foreground(compat.AdaptiveColor{Light: lipgloss.Color("30"), Dark: lipgloss.Color("73")}).
 			Bold(true).
 			Padding(0, 1),
 	}

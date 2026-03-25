@@ -5,19 +5,19 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/mission"
 )
 
 // handleKeyPress processes keyboard input
-func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// When help overlay is visible, only ? and esc close it; ignore everything else
 	if m.help.Visible() {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		if msg.String() == "?" || msg.Type == tea.KeyEscape {
+		if msg.String() == "?" || msg.Code == tea.KeyEscape {
 			m.help.Toggle()
 		}
 		return m, nil
@@ -29,7 +29,7 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		switch msg.Type {
+		switch msg.Code {
 		case tea.KeyEscape:
 			m.searchActive = false
 			m.searchQuery = ""
@@ -46,8 +46,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		default:
-			if msg.Type == tea.KeyRunes {
-				m.searchQuery += string(msg.Runes)
+			if len(msg.Text) > 0 {
+				m.searchQuery += msg.Text
 				m.recomputeAndDisplay(m.visibleSessions())
 				return m, nil
 			}
@@ -112,7 +112,7 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleListKeys handles keys in list view mode
-func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.viewMode = ViewModeMission
@@ -200,7 +200,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "g":
 		m.taskList.CycleGroupBy()
 		return m, nil
-	case " ":
+	case "space":
 		if m.taskList.IsGrouped() {
 			m.taskList.ToggleGroupExpand()
 			return m, nil
@@ -257,7 +257,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleDetailKeys handles keys in detail view mode
-func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleDetailKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.viewMode = ViewModeMission
@@ -324,7 +324,7 @@ func (m Model) handleDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleDiffKeys handles keys in diff view mode
-func (m Model) handleDiffKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleDiffKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.viewMode = ViewModeMission
@@ -340,7 +340,7 @@ func (m Model) handleDiffKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleGitActivityKeys handles keys in git activity view mode
-func (m Model) handleGitActivityKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleGitActivityKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.viewMode = ViewModeMission
@@ -363,7 +363,7 @@ func (m Model) handleGitActivityKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.viewMode = ViewModeMission
@@ -440,7 +440,7 @@ func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleKanbanKeys handles keys in kanban view mode
-func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKanbanKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "K":
 		m.viewMode = ViewModeMission
@@ -500,7 +500,7 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleToolTimelineKeys handles keys in tool timeline view mode
-func (m Model) handleToolTimelineKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleToolTimelineKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.viewMode = ViewModeDetail
@@ -517,7 +517,7 @@ func (m Model) handleToolTimelineKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleMissionKeys handles keys in mission control view mode
-func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleMissionKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
 		m.mission.MoveCursor(1)
@@ -573,7 +573,7 @@ func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleActiveKeys handles keys in active sessions view mode
-func (m Model) handleActiveKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleActiveKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "A":
 		m.viewMode = ViewModeMission
@@ -634,60 +634,60 @@ func (m Model) handleActiveKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleMouse processes mouse events for scrolling and navigation.
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	switch msg.Button {
-	case tea.MouseButtonWheelUp:
-		switch m.viewMode {
-		case ViewModeList:
-			m.taskList.MoveCursor(-3)
-		case ViewModeKanban:
-			m.kanban.MoveRow(-1)
-		case ViewModeMission:
-			m.mission.MoveCursor(-1)
-		case ViewModeActive:
-			m.activeView.MoveCursor(-1)
-		case ViewModeLog:
-			if m.showConversation {
-				m.conversationView.LineUp()
-				m.conversationView.LineUp()
-				m.conversationView.LineUp()
-			} else {
-				m.logView.SetFollowMode(false)
-				m.logView.LineUp()
-				m.logView.LineUp()
-				m.logView.LineUp()
+	switch msg := msg.(type) {
+	case tea.MouseWheelMsg:
+		if msg.Button == tea.MouseWheelUp {
+			switch m.viewMode {
+			case ViewModeList:
+				m.taskList.MoveCursor(-3)
+			case ViewModeKanban:
+				m.kanban.MoveRow(-1)
+			case ViewModeMission:
+				m.mission.MoveCursor(-1)
+			case ViewModeActive:
+				m.activeView.MoveCursor(-1)
+			case ViewModeLog:
+				if m.showConversation {
+					m.conversationView.LineUp()
+					m.conversationView.LineUp()
+					m.conversationView.LineUp()
+				} else {
+					m.logView.SetFollowMode(false)
+					m.logView.LineUp()
+					m.logView.LineUp()
+					m.logView.LineUp()
+				}
+			}
+		} else if msg.Button == tea.MouseWheelDown {
+			switch m.viewMode {
+			case ViewModeList:
+				m.taskList.MoveCursor(3)
+			case ViewModeKanban:
+				m.kanban.MoveRow(1)
+			case ViewModeMission:
+				m.mission.MoveCursor(1)
+			case ViewModeActive:
+				m.activeView.MoveCursor(1)
+			case ViewModeLog:
+				if m.showConversation {
+					m.conversationView.LineDown()
+					m.conversationView.LineDown()
+					m.conversationView.LineDown()
+				} else {
+					m.logView.SetFollowMode(false)
+					m.logView.LineDown()
+					m.logView.LineDown()
+					m.logView.LineDown()
+				}
 			}
 		}
-	case tea.MouseButtonWheelDown:
-		switch m.viewMode {
-		case ViewModeList:
-			m.taskList.MoveCursor(3)
-		case ViewModeKanban:
-			m.kanban.MoveRow(1)
-		case ViewModeMission:
-			m.mission.MoveCursor(1)
-		case ViewModeActive:
-			m.activeView.MoveCursor(1)
-		case ViewModeLog:
-			if m.showConversation {
-				m.conversationView.LineDown()
-				m.conversationView.LineDown()
-				m.conversationView.LineDown()
-			} else {
-				m.logView.SetFollowMode(false)
-				m.logView.LineDown()
-				m.logView.LineDown()
-				m.logView.LineDown()
-			}
-		}
-	case tea.MouseButtonLeft:
-		if msg.Action == tea.MouseActionPress && m.viewMode == ViewModeMission {
-			// Click left half → Active or Attention panel
-			// Click right half → Repos panel
+	case tea.MouseClickMsg:
+		if msg.Button == tea.MouseLeft && m.viewMode == ViewModeMission {
+			mouse := msg.Mouse()
 			midX := m.ctx.Width / 2
-			if msg.X < midX {
-				// Top half of left = Active, bottom half = Attention
+			if mouse.X < midX {
 				leftMid := m.ctx.Height / 2
-				if msg.Y < leftMid {
+				if mouse.Y < leftMid {
 					m.mission.SetFocus(mission.PanelActive)
 				} else {
 					m.mission.SetFocus(mission.PanelAttention)

@@ -6,7 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/mission"
 )
@@ -222,7 +223,7 @@ func (m *Model) View() string {
 
 	dim := lipgloss.NewStyle().Faint(true)
 	titleStyle := lipgloss.NewStyle().Bold(true).
-		Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
+		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")})
 
 	budget := m.height - headerLines - footerReserve
 	if budget < 4 {
@@ -272,11 +273,11 @@ func (m *Model) View() string {
 func (m *Model) renderCard(s data.Session, focused bool) string {
 	dim := lipgloss.NewStyle().Faint(true)
 	sessionStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
+		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("236"), Dark: lipgloss.Color("252")})
 	boldStyle := lipgloss.NewStyle().Bold(true).
-		Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
+		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("236"), Dark: lipgloss.Color("252")})
 	hintStyle := lipgloss.NewStyle().Faint(true).
-		Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "241"})
+		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("244"), Dark: lipgloss.Color("241")})
 
 	icon := m.statusIcon(s.Status)
 	if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
@@ -360,9 +361,9 @@ func (m *Model) renderCard(s data.Session, focused bool) string {
 func (m *Model) viewEmpty() string {
 	dim := lipgloss.NewStyle().Faint(true)
 	titleStyle := lipgloss.NewStyle().Bold(true).
-		Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
+		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")})
 	sessionStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "236", Dark: "252"})
+		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("236"), Dark: lipgloss.Color("252")})
 
 	var lines []string
 	lines = append(lines, titleStyle.Render("  ⚡ Active Sessions"))

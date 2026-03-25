@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // FileDiff represents a single file's diff content
@@ -38,7 +38,7 @@ var (
 
 // New creates a new diff view model
 func New(width, height int) Model {
-	vp := viewport.New(width, height)
+	vp := viewport.New(viewport.WithWidth(width), viewport.WithHeight(height))
 	return Model{
 		viewport: vp,
 		width:    width,
@@ -65,8 +65,8 @@ func (m *Model) SetLoading() {
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
-	m.viewport.Width = width
-	m.viewport.Height = height
+	m.viewport.SetWidth(width)
+	m.viewport.SetHeight(height)
 	if m.ready {
 		m.viewport.SetContent(m.renderDiffs())
 	}

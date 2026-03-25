@@ -181,6 +181,20 @@ func (m *Model) updateFooterHints() {
 			m.keys.ExitApp,
 		}
 		m.footer.SetHints(gitHints)
+	case ViewModeActive:
+		activeHints := []key.Binding{
+			m.keys.NavigateBack,
+			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "navigate")),
+			m.keys.SelectTask,
+			m.keys.OpenInBrowser,
+			m.keys.ShowLogs,
+			key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy ID")),
+			m.keys.DismissSession,
+			m.keys.RefreshData,
+			m.keys.ShowHelp,
+			m.keys.ExitApp,
+		}
+		m.footer.SetHints(activeHints)
 	}
 }
 
@@ -433,6 +447,8 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 		m.kanban.SetSessions(visible)
 	case ViewModeMission:
 		m.mission.SetSessions(visible)
+	case ViewModeActive:
+		m.activeView.SetSessions(visible)
 	default:
 		m.taskDetail.SetAllSessions(visible)
 	}

@@ -20,6 +20,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/kanban"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/logview"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/mission"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/activeview"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/diffview"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/taskdetail"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/tasklist"
@@ -40,6 +41,7 @@ const (
 	ViewModeMission
 	ViewModeDiff
 	ViewModeGitActivity
+	ViewModeActive
 )
 
 // Model represents the main TUI application state
@@ -58,6 +60,7 @@ type Model struct {
 	toolTimeline   tooltimeline.Model
 	conversationView conversation.Model
 	mission        mission.Model
+	activeView     activeview.Model
 	gitActivity    gitactivity.Model
 	dismissedStore *data.DismissedStore
 	statsBar       statsbar.Model
@@ -139,6 +142,8 @@ func NewModel(repo string, debug bool, demo bool, snapshotPath string, version s
 		defaultView = ViewModeList
 	case "kanban":
 		defaultView = ViewModeKanban
+	case "active":
+		defaultView = ViewModeActive
 	case "dashboard", "mission", "":
 		defaultView = ViewModeMission
 	}
@@ -158,6 +163,7 @@ func NewModel(repo string, debug bool, demo bool, snapshotPath string, version s
 		toolTimeline:   tooltimeline.New(80, 20),
 		conversationView: conversation.New(80, 20),
 		mission:        mission.New(theme.Title, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
+		activeView:     activeview.New(StatusIcon, animIconFunc),
 		gitActivity:    gitactivity.New(80, 20),
 		dismissedStore: dismissedStore,
 		statsBar:       statsbar.New(),
@@ -222,6 +228,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.diffView.SetSize(m.ctx.Width-4, m.ctx.Height-8)
 		m.gitActivity.SetSize(m.ctx.Width-4, m.ctx.Height-8)
 		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-4)
 		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
 
@@ -351,6 +358,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.toast.Tick()
 		m.kanban.SetAnimFrame(m.animFrame)
 		m.mission.SetAnimFrame(m.animFrame)
+		m.activeView.SetAnimFrame(m.animFrame)
 		return m, m.animationTickCmd()
 
 	case logPollTickMsg:
@@ -383,6 +391,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		// Show errors as toasts — they auto-dismiss and don't disrupt the view
 		m.toast.Push("⚠️", "Error", msg.err.Error())
+		return m, nil
+
+	case clipboardCopiedMsg:
+		m.toast.Push("📋", "Copied", msg.value)
 		return m, nil
 	}
 
@@ -468,6 +480,8 @@ func (m Model) View() string {
 		mainView = m.toolTimeline.View()
 	case ViewModeMission:
 		mainView = m.mission.View()
+	case ViewModeActive:
+		mainView = m.activeView.View()
 	case ViewModeDiff:
 		mainView = m.diffView.View()
 	case ViewModeGitActivity:

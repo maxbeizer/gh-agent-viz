@@ -80,7 +80,7 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// / activates search in navigable views
 	if msg.String() == "/" {
-		if m.viewMode == ViewModeList || m.viewMode == ViewModeKanban || m.viewMode == ViewModeMission {
+		if m.viewMode == ViewModeList || m.viewMode == ViewModeKanban || m.viewMode == ViewModeMission || m.viewMode == ViewModeActive {
 			m.searchActive = true
 			m.searchQuery = ""
 			return m, nil
@@ -102,6 +102,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleToolTimelineKeys(msg)
 	case ViewModeMission:
 		return m.handleMissionKeys(msg)
+	case ViewModeActive:
+		return m.handleActiveKeys(msg)
 	case ViewModeGitActivity:
 		return m.handleGitActivityKeys(msg)
 	}
@@ -212,6 +214,11 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
 		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		return m, nil
+	case "A":
+		m.viewMode = ViewModeActive
+		m.activeView.SetSessions(m.visibleSessions())
+		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-4)
 		return m, nil
 	case "!":
 		return m, m.openSessionRepo()
@@ -484,6 +491,10 @@ func (m Model) handleKanbanKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "r":
 		return m, m.fetchTasks
+	case "A":
+		m.viewMode = ViewModeActive
+		m.activeView.SetSessions(m.visibleSessions())
+		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-4)
 	}
 	return m, nil
 }
@@ -551,8 +562,72 @@ func (m Model) handleMissionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.viewMode = ViewModeKanban
 		m.kanban.SetSessions(m.visibleSessions())
 		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
+	case "A":
+		m.viewMode = ViewModeActive
+		m.activeView.SetSessions(m.visibleSessions())
+		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-4)
 	case "r":
 		return m, m.fetchTasks
+	}
+	return m, nil
+}
+
+// handleActiveKeys handles keys in active sessions view mode
+func (m Model) handleActiveKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "A":
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+	case "j", "down":
+		m.activeView.MoveCursor(1)
+	case "k", "up":
+		m.activeView.MoveCursor(-1)
+	case "enter":
+		session := m.activeView.SelectedSession()
+		if session != nil {
+			if session.Source == data.SourceLocalCopilot {
+				m.ctx.Error = nil
+				m.viewMode = ViewModeDetail
+				m.taskDetail.SetTask(session)
+				return m, nil
+			}
+			m.viewMode = ViewModeDetail
+			return m, m.fetchTaskDetail(session.ID, session.Repository)
+		}
+	case "o":
+		session := m.activeView.SelectedSession()
+		if session != nil {
+			return m, m.openTaskPR(session)
+		}
+	case "l":
+		session := m.activeView.SelectedSession()
+		if session != nil {
+			m.viewMode = ViewModeLog
+			if isSessionRunning(session) {
+				m.logView.SetLive(true)
+				m.logView.SetFollowMode(true)
+				return m, tea.Batch(m.fetchTaskLog(session.ID, session.Repository), m.logPollTick())
+			}
+			return m, m.fetchTaskLog(session.ID, session.Repository)
+		}
+	case "c":
+		session := m.activeView.SelectedSession()
+		if session != nil {
+			return m, m.copyToClipboard(session.ID)
+		}
+	case "x":
+		m.activeView.DismissSelected()
+	case "r":
+		return m, m.fetchTasks
+	case "K":
+		m.viewMode = ViewModeKanban
+		m.kanban.SetSessions(m.visibleSessions())
+		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
+	case "M":
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
 	}
 	return m, nil
 }
@@ -568,6 +643,8 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.kanban.MoveRow(-1)
 		case ViewModeMission:
 			m.mission.MoveCursor(-1)
+		case ViewModeActive:
+			m.activeView.MoveCursor(-1)
 		case ViewModeLog:
 			if m.showConversation {
 				m.conversationView.LineUp()
@@ -588,6 +665,8 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.kanban.MoveRow(1)
 		case ViewModeMission:
 			m.mission.MoveCursor(1)
+		case ViewModeActive:
+			m.activeView.MoveCursor(1)
 		case ViewModeLog:
 			if m.showConversation {
 				m.conversationView.LineDown()

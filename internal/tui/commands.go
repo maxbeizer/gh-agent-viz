@@ -488,3 +488,25 @@ func checkLatestVersion() tea.Msg {
 	tag := strings.TrimSpace(string(out))
 	return latestVersionMsg{version: tag}
 }
+
+// clipboardCopiedMsg signals that a value was copied to the clipboard.
+type clipboardCopiedMsg struct {
+	value string
+}
+
+// copyToClipboard copies text to the system clipboard.
+func (m Model) copyToClipboard(text string) tea.Cmd {
+	return func() tea.Msg {
+		cmd := exec.Command("pbcopy")
+		cmd.Stdin = strings.NewReader(text)
+		if err := cmd.Run(); err != nil {
+			// Fallback for Linux
+			cmd = exec.Command("xclip", "-selection", "clipboard")
+			cmd.Stdin = strings.NewReader(text)
+			if err := cmd.Run(); err != nil {
+				return errMsg{fmt.Errorf("clipboard copy failed: %w", err)}
+			}
+		}
+		return clipboardCopiedMsg{value: text}
+	}
+}

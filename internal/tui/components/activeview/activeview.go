@@ -148,34 +148,73 @@ func (m *Model) clampCursor() {
 	}
 }
 
-// unfocusedCardHeight is the number of lines per unfocused card (3 content + 1 blank separator).
-const unfocusedCardHeight = 4
-
-// focusedCardHeight is the number of lines per focused card (5 content + 1 blank separator).
-const focusedCardHeight = 6
-
-func (m *Model) visibleCardCount() int {
-	if m.height <= 0 {
-		return 1
+// cardLineCount returns the number of lines a card will consume (including trailing spacer).
+func (m *Model) cardLineCount(s data.Session, focused bool) int {
+	lines := 3 // title + meta + action
+	if focused {
+		// Extra detail line (time/tokens/model) if any available
+		hasTime := !s.CreatedAt.IsZero()
+		hasTokens := s.Telemetry != nil && s.Telemetry.InputTokens > 0
+		hasModel := s.Telemetry != nil && s.Telemetry.Model != ""
+		if hasTime || hasTokens || hasModel {
+			lines++
+		}
+		lines++ // action hints line
 	}
-	// Rough estimate: assume mostly unfocused cards + one focused.
-	return (m.height + unfocusedCardHeight - 1) / unfocusedCardHeight
+	lines++ // spacer
+	return lines
 }
 
+// headerLines is the number of lines consumed by the view header (title + blank).
+const headerLines = 2
+
+// footerReserve is lines reserved for scroll indicator + breathing room.
+const footerReserve = 2
+
 func (m *Model) ensureCursorVisible() {
-	visible := m.visibleCardCount()
+	if len(m.sessions) == 0 {
+		m.scrollOffset = 0
+		return
+	}
+
+	// Scroll up if cursor is above viewport
 	if m.cursor < m.scrollOffset {
 		m.scrollOffset = m.cursor
 	}
-	if m.cursor >= m.scrollOffset+visible {
-		m.scrollOffset = m.cursor - visible + 1
+
+	// Scroll down if cursor is below viewport — walk cards from scrollOffset
+	// and see if the cursor card fits.
+	for {
+		budget := m.height - headerLines - footerReserve
+		used := 0
+		cursorVisible := false
+		for i := m.scrollOffset; i < len(m.sessions); i++ {
+			h := m.cardLineCount(m.sessions[i], i == m.cursor)
+			if used+h > budget && used > 0 {
+				break
+			}
+			used += h
+			if i == m.cursor {
+				cursorVisible = true
+				break
+			}
+		}
+		if cursorVisible {
+			break
+		}
+		m.scrollOffset++
+		if m.scrollOffset >= len(m.sessions) {
+			m.scrollOffset = len(m.sessions) - 1
+			break
+		}
 	}
+
 	if m.scrollOffset < 0 {
 		m.scrollOffset = 0
 	}
 }
 
-// View renders the active sessions view.
+// View renders the active sessions view, constrained to the terminal height.
 func (m *Model) View() string {
 	if len(m.sessions) == 0 {
 		return m.viewEmpty()
@@ -185,30 +224,46 @@ func (m *Model) View() string {
 	titleStyle := lipgloss.NewStyle().Bold(true).
 		Foreground(lipgloss.AdaptiveColor{Light: "24", Dark: "75"})
 
-	// Header line
+	budget := m.height - headerLines - footerReserve
+	if budget < 4 {
+		budget = 4
+	}
+
+	// Header
 	countLabel := fmt.Sprintf("%d active", len(m.sessions))
 	headerLine := titleStyle.Render("  ⚡ Active Sessions") + "  " + dim.Render(countLabel)
 
 	var lines []string
 	lines = append(lines, headerLine, "")
 
-	maxCards := m.visibleCardCount()
-	end := m.scrollOffset + maxCards + 1 // render one extra for partial visibility
-	if end > len(m.sessions) {
-		end = len(m.sessions)
-	}
-
-	for i := m.scrollOffset; i < end; i++ {
+	// Render cards until we run out of vertical budget
+	used := 0
+	lastRendered := m.scrollOffset - 1
+	for i := m.scrollOffset; i < len(m.sessions); i++ {
 		focused := i == m.cursor
+		h := m.cardLineCount(m.sessions[i], focused)
+		if used+h > budget && used > 0 {
+			break
+		}
 		card := m.renderCard(m.sessions[i], focused)
 		lines = append(lines, card)
-		lines = append(lines, "") // spacer between cards
+		lines = append(lines, "") // spacer
+		used += h
+		lastRendered = i
 	}
 
-	// Scroll indicator
-	if m.scrollOffset > 0 || end < len(m.sessions) {
-		indicator := dim.Render(fmt.Sprintf("  %d/%d", m.cursor+1, len(m.sessions)))
-		lines = append(lines, indicator)
+	// Scroll position indicator
+	above := m.scrollOffset
+	below := len(m.sessions) - lastRendered - 1
+	if above > 0 || below > 0 {
+		parts := []string{fmt.Sprintf("  %d/%d", m.cursor+1, len(m.sessions))}
+		if above > 0 {
+			parts = append(parts, fmt.Sprintf("↑%d above", above))
+		}
+		if below > 0 {
+			parts = append(parts, fmt.Sprintf("↓%d below", below))
+		}
+		lines = append(lines, dim.Render(strings.Join(parts, "  ")))
 	}
 
 	return strings.Join(lines, "\n")
@@ -249,20 +304,26 @@ func (m *Model) renderCard(s data.Session, focused bool) string {
 	}
 	line1 := fmt.Sprintf("%s%s %s", gutter, icon, title)
 
-	// Line 2: repo • PR • elapsed • tokens
+	// Line 2: repo • branch • PR
 	var meta []string
 	repo := shortRepo(s.Repository)
 	if repo != "" {
 		meta = append(meta, repo)
 	}
+	if s.Branch != "" && !data.IsDefaultBranch(s.Branch) {
+		branch := s.Branch
+		maxBranch := m.width/3
+		if maxBranch < 20 { maxBranch = 20 }
+		if len(branch) > maxBranch {
+			branch = branch[:maxBranch-1] + "…"
+		}
+		meta = append(meta, branch)
+	}
+	if s.WorkDir != "" && s.Branch == "" {
+		meta = append(meta, s.WorkDir)
+	}
 	if s.PRNumber > 0 {
 		meta = append(meta, fmt.Sprintf("PR #%d", s.PRNumber))
-	}
-	if !s.CreatedAt.IsZero() {
-		meta = append(meta, formatDuration(time.Since(s.CreatedAt)))
-	}
-	if s.Telemetry != nil && s.Telemetry.InputTokens > 0 {
-		meta = append(meta, data.FormatTokenCount(s.Telemetry.InputTokens)+" tokens")
 	}
 	line2 := gutter + "   " + dim.Render(strings.Join(meta, "  •  "))
 
@@ -275,11 +336,14 @@ func (m *Model) renderCard(s data.Session, focused bool) string {
 	// Expanded lines for focused card
 	if focused {
 		var extras []string
-		if s.Branch != "" && !data.IsDefaultBranch(s.Branch) {
-			extras = append(extras, "branch: "+s.Branch)
+		if !s.CreatedAt.IsZero() {
+			extras = append(extras, formatDuration(time.Since(s.CreatedAt)))
+		}
+		if s.Telemetry != nil && s.Telemetry.InputTokens > 0 {
+			extras = append(extras, data.FormatTokenCount(s.Telemetry.InputTokens)+" tokens")
 		}
 		if s.Telemetry != nil && s.Telemetry.Model != "" {
-			extras = append(extras, "model: "+s.Telemetry.Model)
+			extras = append(extras, s.Telemetry.Model)
 		}
 		if len(extras) > 0 {
 			line4 := gutter + "   " + dim.Render(strings.Join(extras, "  •  "))

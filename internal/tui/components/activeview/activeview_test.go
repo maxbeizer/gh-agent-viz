@@ -1,6 +1,7 @@
 package activeview
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -232,4 +233,72 @@ func TestDismiss_PersistsAcrossSetSessions(t *testing.T) {
 			t.Error("dismissed session should not reappear after SetSessions")
 		}
 	}
+}
+
+func TestView_RespectsHeightConstraint(t *testing.T) {
+m := New(plainIcon, nil)
+m.SetSize(80, 20)
+
+now := time.Now()
+var sessions []data.Session
+for i := 0; i < 20; i++ {
+sessions = append(sessions, data.Session{
+ID:        fmt.Sprintf("s%d", i),
+Status:    "running",
+Title:     fmt.Sprintf("Task %d", i),
+UpdatedAt: now,
+})
+}
+m.SetSessions(sessions)
+
+view := m.View()
+lineCount := strings.Count(view, "\n") + 1
+if lineCount > 20 {
+t.Errorf("view should fit in 20 lines, got %d lines", lineCount)
+}
+}
+
+func TestView_ScrollIndicator(t *testing.T) {
+m := New(plainIcon, nil)
+m.SetSize(80, 20)
+
+now := time.Now()
+var sessions []data.Session
+for i := 0; i < 10; i++ {
+sessions = append(sessions, data.Session{
+ID:        fmt.Sprintf("s%d", i),
+Status:    "running",
+Title:     fmt.Sprintf("Task %d", i),
+UpdatedAt: now,
+})
+}
+m.SetSessions(sessions)
+
+view := m.View()
+if !strings.Contains(view, "below") {
+t.Error("should show scroll indicator when sessions don't all fit")
+}
+}
+
+func TestView_ShowsRepoBranch(t *testing.T) {
+m := New(plainIcon, nil)
+m.SetSize(120, 40)
+m.SetSessions([]data.Session{
+{
+ID:         "1",
+Status:     "running",
+Title:      "Fix auth",
+Repository: "github/github",
+Branch:     "feature/auth-fix",
+UpdatedAt:  time.Now(),
+},
+})
+
+view := m.View()
+if !strings.Contains(view, "github/github") {
+t.Error("card should show repository")
+}
+if !strings.Contains(view, "feature/auth-fix") {
+t.Error("card should show branch on line 2")
+}
 }

@@ -518,6 +518,20 @@ func (m Model) View() tea.View {
 		searchView = searchStyle.Render(fmt.Sprintf("  🔍 Filter: %s", queryDisplay)) + "\n"
 	}
 
+	// Compute chrome heights to pin footer at bottom
+	chromeHeight := lipgloss.Height(chrome)
+	footerHeight := lipgloss.Height(footerView)
+	toastHeight := lipgloss.Height(toastView)
+	searchHeight := lipgloss.Height(searchView)
+
+	// Pad mainView so footer is pinned to the bottom of the terminal
+	mainHeight := lipgloss.Height(mainView)
+	targetMainHeight := m.ctx.Height - chromeHeight - footerHeight - toastHeight - searchHeight
+	if targetMainHeight > mainHeight {
+		padding := targetMainHeight - mainHeight
+		mainView += strings.Repeat("\n", padding)
+	}
+
 	result := chrome + mainView + toastView + searchView + footerView
 
 	// Overlay help panel when visible

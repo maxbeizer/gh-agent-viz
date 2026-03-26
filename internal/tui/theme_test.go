@@ -72,7 +72,7 @@ func TestNewTheme(t *testing.T) {
 	if theme == nil {
 		t.Fatal("expected non-nil theme")
 	}
-	if theme.ThemeName() != "default" {
+	if theme.ThemeName() != "catppuccin-mocha" {
 		t.Errorf("expected theme name 'default', got %q", theme.ThemeName())
 	}
 }
@@ -105,8 +105,8 @@ func TestNewThemeFromConfig_EmptyFallsBackToDefault(t *testing.T) {
 	if theme == nil {
 		t.Fatal("expected non-nil theme")
 	}
-	if theme.ThemeName() != "default" {
-		t.Errorf("expected fallback theme name 'default', got %q", theme.ThemeName())
+	if theme.ThemeName() != "catppuccin-mocha" {
+		t.Errorf("expected fallback theme name 'catppuccin-mocha', got %q", theme.ThemeName())
 	}
 }
 
@@ -115,8 +115,8 @@ func TestNewThemeFromConfig_UnknownFallsBackToDefault(t *testing.T) {
 	if theme == nil {
 		t.Fatal("expected non-nil theme")
 	}
-	if theme.ThemeName() != "default" {
-		t.Errorf("expected fallback theme name 'default', got %q", theme.ThemeName())
+	if theme.ThemeName() != "catppuccin-mocha" {
+		t.Errorf("expected fallback theme name 'catppuccin-mocha', got %q", theme.ThemeName())
 	}
 }
 

@@ -35,16 +35,16 @@ func (t *Theme) ThemeName() string {
 	return t.name
 }
 
-// NewTheme creates the default theme using ANSI color numbers.
+// NewTheme creates the default theme (Catppuccin Mocha).
 func NewTheme() *Theme {
-	return newDefaultTheme()
+	return newCatppuccinMochaTheme()
 }
 
-// NewThemeFromConfig returns the theme matching themeName, or the adaptive
-// default when the name is empty or unrecognised.
+// NewThemeFromConfig returns the theme matching themeName, or catppuccin-mocha
+// as the default when the name is empty or unrecognised.
 func NewThemeFromConfig(themeName string) *Theme {
 	switch themeName {
-	case "catppuccin-mocha":
+	case "catppuccin-mocha", "":
 		return newCatppuccinMochaTheme()
 	case "dracula":
 		return newDraculaTheme()
@@ -53,9 +53,9 @@ func NewThemeFromConfig(themeName string) *Theme {
 	case "solarized-light":
 		return newSolarizedLightTheme()
 	case "default":
-		return newDefaultTheme()
-	default:
 		return newAdaptiveDefaultTheme()
+	default:
+		return newCatppuccinMochaTheme()
 	}
 }
 

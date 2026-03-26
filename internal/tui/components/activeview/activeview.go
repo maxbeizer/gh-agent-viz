@@ -2,7 +2,6 @@ package activeview
 
 import (
 	"fmt"
-	"image/color"
 	"sort"
 	"strings"
 	"time"
@@ -184,8 +183,11 @@ func (m *Model) ensureCursorVisible() {
 
 // panelContentHeight returns usable lines inside a bordered panel.
 func (m *Model) panelContentHeight() int {
-	// Total height minus: 1 hint bar line, 2 border lines per panel
-	h := m.height - 3
+	// Total height minus chrome:
+	// 1 panel title line
+	// 2 border lines (top + bottom of rounded border)
+	// 1 powerline footer line
+	h := m.height - 4
 	if h < 4 {
 		h = 4
 	}
@@ -213,12 +215,6 @@ var (
 	colorRed      = lipgloss.Color("#f38ba8")
 	colorMauve    = lipgloss.Color("#cba6f7")
 	colorTeal     = lipgloss.Color("#94e2d5")
-)
-
-// Powerline separator characters
-const (
-	sepRight = "\ue0b0" // 
-	sepLeft  = "\ue0b2" // 
 )
 
 // ── View ──
@@ -285,7 +281,7 @@ func (m *Model) viewHorizontal() string {
 	detailPanel := m.renderDetailPanel(detailW, contentH)
 
 	main := lipgloss.JoinHorizontal(lipgloss.Top, listPanel, detailPanel)
-	return main + "\n" + m.renderHintBar()
+	return main
 }
 
 func (m *Model) viewVertical() string {
@@ -299,7 +295,7 @@ func (m *Model) viewVertical() string {
 	listPanel := m.renderListPanel(m.width, listH)
 	detailPanel := m.renderDetailPanel(m.width, detailH)
 
-	return listPanel + "\n" + detailPanel + "\n" + m.renderHintBar()
+	return listPanel + "\n" + detailPanel
 }
 
 func (m *Model) renderListPanel(width, contentHeight int) string {
@@ -550,113 +546,6 @@ func (m *Model) fetchLogTail(s data.Session, maxLines int) []string {
 	return entries
 }
 
-// powerlineSegment holds a segment's content and colors.
-type powerlineSegment struct {
-	text string
-	fg   color.Color
-	bg   color.Color
-}
-
-func (m *Model) renderHintBar() string {
-	// Left side: view mode badge
-	leftSegs := []powerlineSegment{
-		{text: " ⚡ Active ", fg: colorBase, bg: colorMauve},
-	}
-
-	// Add status summary
-	s := m.SelectedSession()
-	if s != nil {
-		statusText := fmt.Sprintf(" %s ", s.Status)
-		statusBg := colorTeal
-		st := strings.ToLower(strings.TrimSpace(s.Status))
-		if st == "failed" {
-			statusBg = colorRed
-		} else if st == "needs-input" {
-			statusBg = colorYellow
-		}
-		leftSegs = append(leftSegs, powerlineSegment{
-			text: statusText, fg: colorBase, bg: statusBg,
-		})
-	}
-
-	// Right side: key hints
-	rightSegs := []powerlineSegment{
-		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("j/k") + " nav ", fg: colorText, bg: colorSurface1},
-		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("enter") + " details ", fg: colorText, bg: colorSurface1},
-		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("o") + " PR ", fg: colorText, bg: colorSurface2},
-		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("l") + " logs ", fg: colorText, bg: colorSurface2},
-		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("x") + " dismiss ", fg: colorText, bg: colorSurface2},
-		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("?") + " help ", fg: colorText, bg: colorMauve},
-	}
-
-	left := renderPowerlineLeft(leftSegs)
-	right := renderPowerlineRight(rightSegs)
-
-	leftW := lipgloss.Width(left)
-	rightW := lipgloss.Width(right)
-	gap := m.width - leftW - rightW
-	if gap < 0 {
-		gap = 0
-	}
-
-	mid := lipgloss.NewStyle().
-		Background(colorBase).
-		Width(gap).
-		Render("")
-
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, mid, right)
-}
-
-func renderPowerlineLeft(segs []powerlineSegment) string {
-	if len(segs) == 0 {
-		return ""
-	}
-	var result string
-	for i, seg := range segs {
-		body := lipgloss.NewStyle().
-			Foreground(seg.fg).
-			Background(seg.bg).
-			Render(seg.text)
-		result += body
-
-		nextBg := colorBase
-		if i+1 < len(segs) {
-			nextBg = segs[i+1].bg
-		}
-		arrow := lipgloss.NewStyle().
-			Foreground(seg.bg).
-			Background(nextBg).
-			Render(sepRight)
-		result += arrow
-	}
-	return result
-}
-
-func renderPowerlineRight(segs []powerlineSegment) string {
-	if len(segs) == 0 {
-		return ""
-	}
-	var result string
-	for i, seg := range segs {
-		prevBg := colorBase
-		if i > 0 {
-			prevBg = segs[i-1].bg
-		}
-		arrow := lipgloss.NewStyle().
-			Foreground(seg.bg).
-			Background(prevBg).
-			Render(sepLeft)
-		result += arrow
-
-		body := lipgloss.NewStyle().
-			Foreground(seg.fg).
-			Background(seg.bg).
-			Render(seg.text)
-		result += body
-	}
-	return result
-}
-
 func (m *Model) viewEmpty() string {
 	dim := lipgloss.NewStyle().Foreground(colorOverlay0)
 	panelTitle := lipgloss.NewStyle().Bold(true).Foreground(colorLavender)
@@ -696,7 +585,7 @@ func (m *Model) viewEmpty() string {
 		Height(contentH).
 		Render(strings.Join(content, "\n"))
 
-	return panelTitle.Render(" Active Sessions ") + "\n" + box + "\n" + m.renderHintBar()
+	return panelTitle.Render(" Active Sessions ") + "\n" + box
 }
 
 func (m *Model) recentCompletions(n int) []data.Session {

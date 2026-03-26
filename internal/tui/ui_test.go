@@ -203,6 +203,7 @@ func TestResumeSession_LogViewResume(t *testing.T) {
 func TestUpdateFooterHints_DetailViewShowsResumeForResumableSession(t *testing.T) {
 	m := NewModel("", false, false, "", "dev")
 	m.viewMode = ViewModeDetail
+	m.footer.SetWidth(120)
 	m.taskList.SetTasks([]data.Session{
 		{
 			ID:     "local-1",
@@ -214,11 +215,10 @@ func TestUpdateFooterHints_DetailViewShowsResumeForResumableSession(t *testing.T
 
 	m.updateFooterHints()
 	footerView := m.footer.View()
-	// Simplified footer now shows logs instead of resume; advanced hints moved to ? overlay
 	if !strings.Contains(footerView, "logs") {
 		t.Fatalf("expected logs hint in detail view footer, got: %s", footerView)
 	}
-	if !strings.Contains(footerView, "? help") {
+	if !strings.Contains(footerView, "help") {
 		t.Fatalf("expected help hint in detail view footer, got: %s", footerView)
 	}
 }
@@ -311,6 +311,7 @@ func TestView_NotReadyShowsStartupText(t *testing.T) {
 func TestUpdateFooterHints_LocalSessionShowsOnlyAvailableActions(t *testing.T) {
 	m := NewModel("", false, false, "", "dev")
 	m.viewMode = ViewModeList
+	m.footer.SetWidth(120)
 	m.taskList.SetTasks([]data.Session{
 		{
 			ID:     "local-1",
@@ -322,18 +323,18 @@ func TestUpdateFooterHints_LocalSessionShowsOnlyAvailableActions(t *testing.T) {
 
 	m.updateFooterHints()
 	footerView := m.footer.View()
-	// Simplified footer shows fixed hints; context-dependent hints moved to ? overlay
-	if !strings.Contains(footerView, "? help") {
-		t.Fatalf("expected help hint in list view footer, got: %s", footerView)
-	}
 	if !strings.Contains(footerView, "navigate") {
 		t.Fatalf("expected navigate hint in list view footer, got: %s", footerView)
+	}
+	if !strings.Contains(footerView, "details") {
+		t.Fatalf("expected details hint in list view footer, got: %s", footerView)
 	}
 }
 
 func TestUpdateFooterHints_AgentSessionWithoutPRHidesOpenPRHint(t *testing.T) {
 	m := NewModel("", false, false, "", "dev")
 	m.viewMode = ViewModeList
+	m.footer.SetWidth(120)
 	m.taskList.SetTasks([]data.Session{
 		{
 			ID:         "agent-1",
@@ -346,12 +347,11 @@ func TestUpdateFooterHints_AgentSessionWithoutPRHidesOpenPRHint(t *testing.T) {
 
 	m.updateFooterHints()
 	footerView := m.footer.View()
-	// Simplified footer no longer shows context-dependent hints like open PR
 	if strings.Contains(footerView, "open PR") {
-		t.Fatalf("expected open PR hint to be hidden in simplified footer, got: %s", footerView)
+		t.Fatalf("expected open PR hint to be hidden, got: %s", footerView)
 	}
-	if !strings.Contains(footerView, "? help") {
-		t.Fatalf("expected help hint in list view footer, got: %s", footerView)
+	if !strings.Contains(footerView, "navigate") {
+		t.Fatalf("expected navigate hint in list view footer, got: %s", footerView)
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
+	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/footer"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/statsbar"
 )
@@ -91,6 +92,8 @@ func (m *Model) updateSplitLayout() {
 func (m *Model) updateFooterHints() {
 	switch m.viewMode {
 	case ViewModeList:
+		m.footer.SetBadge(" 📋 List ", footer.BadgeBgList())
+		m.footer.ClearStatus()
 		hints := []key.Binding{
 			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "navigate")),
 			m.keys.SelectTask,
@@ -103,6 +106,8 @@ func (m *Model) updateFooterHints() {
 		}
 		m.footer.SetHints(hints)
 	case ViewModeDetail:
+		m.footer.SetBadge(" 🔍 Detail ", footer.BadgeBgDetail())
+		m.footer.ClearStatus()
 		hints := []key.Binding{
 			m.keys.NavigateBack,
 			m.keys.ShowLogs,
@@ -111,17 +116,17 @@ func (m *Model) updateFooterHints() {
 		if session != nil && session.Source == data.SourceLocalCopilot && session.HasLog {
 			hints = append(hints, key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tools")))
 		}
-		// Show diff hint when session has a PR
 		if canShowDiff(session) {
 			hints = append(hints, m.keys.ShowDiff)
 		}
-		// Show git activity hint for local sessions with a working directory
 		if session != nil && session.Source == data.SourceLocalCopilot && session.WorkDir != "" {
 			hints = append(hints, m.keys.ShowGitActivity)
 		}
 		hints = append(hints, m.keys.ShowHelp, m.keys.ExitApp)
 		m.footer.SetHints(hints)
 	case ViewModeLog:
+		m.footer.SetBadge(" 📜 Logs ", footer.BadgeBgLog())
+		m.footer.ClearStatus()
 		logHints := []key.Binding{
 			m.keys.NavigateBack,
 			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "scroll")),
@@ -134,6 +139,8 @@ func (m *Model) updateFooterHints() {
 		logHints = append(logHints, m.keys.ShowHelp, m.keys.ExitApp)
 		m.footer.SetHints(logHints)
 	case ViewModeKanban:
+		m.footer.SetBadge(" 📊 Kanban ", footer.BadgeBgKanban())
+		m.footer.ClearStatus()
 		kanbanHints := []key.Binding{
 			m.keys.NavigateBack,
 			key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "column")),
@@ -145,6 +152,8 @@ func (m *Model) updateFooterHints() {
 		}
 		m.footer.SetHints(kanbanHints)
 	case ViewModeToolTimeline:
+		m.footer.SetBadge(" 🔧 Timeline ", footer.BadgeBgDetail())
+		m.footer.ClearStatus()
 		timelineHints := []key.Binding{
 			m.keys.NavigateBack,
 			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "scroll")),
@@ -153,6 +162,8 @@ func (m *Model) updateFooterHints() {
 		}
 		m.footer.SetHints(timelineHints)
 	case ViewModeMission:
+		m.footer.SetBadge(" 🚀 Mission ", footer.BadgeBgMission())
+		m.footer.ClearStatus()
 		missionHints := []key.Binding{
 			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "navigate")),
 			key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "panel")),
@@ -165,6 +176,8 @@ func (m *Model) updateFooterHints() {
 		}
 		m.footer.SetHints(missionHints)
 	case ViewModeDiff:
+		m.footer.SetBadge(" 📝 Diff ", footer.BadgeBgDetail())
+		m.footer.ClearStatus()
 		diffHints := []key.Binding{
 			m.keys.NavigateBack,
 			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "scroll")),
@@ -173,6 +186,8 @@ func (m *Model) updateFooterHints() {
 		}
 		m.footer.SetHints(diffHints)
 	case ViewModeGitActivity:
+		m.footer.SetBadge(" 🌿 Git ", footer.BadgeBgDetail())
+		m.footer.ClearStatus()
 		gitHints := []key.Binding{
 			m.keys.NavigateBack,
 			key.NewBinding(key.WithKeys("↑/↓"), key.WithHelp("↑/↓", "scroll")),
@@ -182,6 +197,21 @@ func (m *Model) updateFooterHints() {
 		}
 		m.footer.SetHints(gitHints)
 	case ViewModeActive:
+		m.footer.SetBadge(" ⚡ Active ", footer.BadgeBgActive())
+		// Set status from selected session
+		s := m.activeView.SelectedSession()
+		if s != nil {
+			st := strings.ToLower(strings.TrimSpace(s.Status))
+			statusBg := footer.StatusBgRunning()
+			if st == "failed" {
+				statusBg = footer.StatusBgFailed()
+			} else if st == "needs-input" {
+				statusBg = footer.StatusBgNeedsInput()
+			}
+			m.footer.SetStatus(fmt.Sprintf(" %s ", s.Status), statusBg)
+		} else {
+			m.footer.ClearStatus()
+		}
 		activeHints := []key.Binding{
 			m.keys.NavigateBack,
 			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "navigate")),

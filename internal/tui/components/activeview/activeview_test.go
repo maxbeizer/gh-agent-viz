@@ -185,19 +185,6 @@ t.Error("detail should show branch")
 }
 }
 
-func TestView_HintBar(t *testing.T) {
-m := New(plainIcon, nil)
-m.SetSize(120, 40)
-m.SetSessions(makeSessions())
-view := m.View()
-if !strings.Contains(view, "nav") {
-t.Error("should show keybinding hints")
-}
-if !strings.Contains(view, "PR") {
-t.Error("should show PR hint")
-}
-}
-
 func TestRecentCompletions_Limit(t *testing.T) {
 m := New(plainIcon, nil)
 now := time.Now()

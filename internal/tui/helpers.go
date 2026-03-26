@@ -85,7 +85,7 @@ func (m *Model) updateSplitLayout() {
 		m.taskList.SetSize(m.ctx.Width, m.ctx.Height)
 		m.taskList.SetSplitMode(false)
 	}
-	m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
+	m.kanban.SetSize(m.ctx.Width, m.ctx.Height-6)
 }
 
 // updateFooterHints updates footer hints based on current view mode and state

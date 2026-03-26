@@ -117,7 +117,7 @@ func (m Model) handleListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
-		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 	case "j", "down":
 		m.taskList.MoveCursor(1)
 	case "k", "up":
@@ -208,17 +208,17 @@ func (m Model) handleListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "K":
 		m.viewMode = ViewModeKanban
 		m.kanban.SetSessions(m.visibleSessions())
-		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-6)
 		return m, nil
 	case "M":
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
-		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 		return m, nil
 	case "A":
 		m.viewMode = ViewModeActive
 		m.activeView.SetSessions(m.visibleSessions())
-		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-6)
 		return m, nil
 	case "!":
 		return m, m.openSessionRepo()
@@ -262,7 +262,7 @@ func (m Model) handleDetailKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
-		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 	case "l":
 		session := m.taskList.SelectedTask()
 		if session != nil {
@@ -329,7 +329,7 @@ func (m Model) handleDiffKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
-		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 		return m, nil
 	}
 
@@ -345,7 +345,7 @@ func (m Model) handleGitActivityKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
-		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 		return m, nil
 	case "r":
 		// Manual refresh
@@ -368,7 +368,7 @@ func (m Model) handleLogKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
-		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 		m.logView.SetLive(false)
 		m.logView.SetFollowMode(false)
 		m.showConversation = false
@@ -445,7 +445,7 @@ func (m Model) handleKanbanKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc", "K":
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
-		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 	case "h", "left":
 		m.kanban.MoveColumn(-1)
 	case "l", "right":
@@ -494,7 +494,7 @@ func (m Model) handleKanbanKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "A":
 		m.viewMode = ViewModeActive
 		m.activeView.SetSessions(m.visibleSessions())
-		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-6)
 	}
 	return m, nil
 }
@@ -561,11 +561,11 @@ func (m Model) handleMissionKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "K":
 		m.viewMode = ViewModeKanban
 		m.kanban.SetSessions(m.visibleSessions())
-		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-6)
 	case "A":
 		m.viewMode = ViewModeActive
 		m.activeView.SetSessions(m.visibleSessions())
-		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-6)
 	case "r":
 		return m, m.fetchTasks
 	}
@@ -578,7 +578,7 @@ func (m Model) handleActiveKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc", "A":
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
-		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 	case "j", "down":
 		m.activeView.MoveCursor(1)
 	case "k", "up":
@@ -623,11 +623,11 @@ func (m Model) handleActiveKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "K":
 		m.viewMode = ViewModeKanban
 		m.kanban.SetSessions(m.visibleSessions())
-		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-6)
 	case "M":
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
-		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 	}
 	return m, nil
 }

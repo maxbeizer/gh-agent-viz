@@ -223,14 +223,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case resizeDebouncedMsg:
-		m.logView.SetSize(m.ctx.Width-4, m.ctx.Height-8)
-		m.toolTimeline.SetSize(m.ctx.Width-4, m.ctx.Height-8)
-		m.conversationView.SetSize(m.ctx.Width-4, m.ctx.Height-8)
-		m.diffView.SetSize(m.ctx.Width-4, m.ctx.Height-8)
-		m.gitActivity.SetSize(m.ctx.Width-4, m.ctx.Height-8)
-		m.mission.SetSize(m.ctx.Width, m.ctx.Height-4)
-		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-4)
-		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-4)
+		// Reserve space for header chrome (4 lines) + footer (2 lines)
+		m.logView.SetSize(m.ctx.Width-4, m.ctx.Height-10)
+		m.toolTimeline.SetSize(m.ctx.Width-4, m.ctx.Height-10)
+		m.conversationView.SetSize(m.ctx.Width-4, m.ctx.Height-10)
+		m.diffView.SetSize(m.ctx.Width-4, m.ctx.Height-10)
+		m.gitActivity.SetSize(m.ctx.Width-4, m.ctx.Height-10)
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
+		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-6)
+		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-6)
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -518,21 +519,24 @@ func (m Model) View() tea.View {
 		searchView = searchStyle.Render(fmt.Sprintf("  🔍 Filter: %s", queryDisplay)) + "\n"
 	}
 
-	// Compute chrome heights to pin footer at bottom
-	chromeHeight := lipgloss.Height(chrome)
-	footerHeight := lipgloss.Height(footerView)
-	toastHeight := lipgloss.Height(toastView)
-	searchHeight := lipgloss.Height(searchView)
+	// Assemble content without footer
+	body := chrome + mainView + toastView + searchView
 
-	// Pad mainView so footer is pinned to the bottom of the terminal
-	mainHeight := lipgloss.Height(mainView)
-	targetMainHeight := m.ctx.Height - chromeHeight - footerHeight - toastHeight - searchHeight
-	if targetMainHeight > mainHeight {
-		padding := targetMainHeight - mainHeight
-		mainView += strings.Repeat("\n", padding)
+	// Pin footer to bottom by placing the body at the top of the full terminal
+	// height minus the footer, then appending footer below
+	bodyHeight := lipgloss.Height(body)
+	footerHeight := lipgloss.Height(footerView)
+	availForBody := m.ctx.Height - footerHeight
+	if availForBody < 1 {
+		availForBody = 1
 	}
 
-	result := chrome + mainView + toastView + searchView + footerView
+	// Pad body to fill available space, pushing footer to the bottom
+	if bodyHeight < availForBody {
+		body = lipgloss.PlaceVertical(availForBody, lipgloss.Top, body)
+	}
+
+	result := body + footerView
 
 	// Overlay help panel when visible
 	if m.help.Visible() {

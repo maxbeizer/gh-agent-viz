@@ -12,7 +12,7 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/mission"
 )
 
-// Model represents the active sessions focused view.
+// Model represents the active sessions focused view (lazygit-style split panels).
 type Model struct {
 	sessions     []data.Session // filtered to active/needs-input/failed only
 	allSessions  []data.Session // unfiltered, for "just finished" fallback
@@ -51,8 +51,7 @@ func (m *Model) SetAnimFrame(frame int) {
 	m.animFrame = frame
 }
 
-// isActiveForView returns true for sessions that belong in this view:
-// running, queued, active, needs-input, or failed.
+// isActiveForView returns true for sessions that belong in this view.
 func isActiveForView(s data.Session) bool {
 	status := strings.ToLower(strings.TrimSpace(s.Status))
 	return data.StatusIsActive(s.Status) ||
@@ -72,7 +71,6 @@ func (m *Model) SetSessions(sessions []data.Session) {
 			m.sessions = append(m.sessions, s)
 		}
 	}
-	// Sort: needs-input first, then failed, then by most recently updated.
 	sort.SliceStable(m.sessions, func(i, j int) bool {
 		si := strings.ToLower(strings.TrimSpace(m.sessions[i].Status))
 		sj := strings.ToLower(strings.TrimSpace(m.sessions[j].Status))
@@ -86,7 +84,6 @@ func (m *Model) SetSessions(sessions []data.Session) {
 	m.clampCursor()
 }
 
-// statusPriority returns sort priority (lower = higher priority).
 func statusPriority(status string) int {
 	switch status {
 	case "needs-input":
@@ -129,7 +126,6 @@ func (m *Model) DismissSelected() {
 		return
 	}
 	m.dismissedIDs[s.ID] = struct{}{}
-	// Remove from slice.
 	updated := make([]data.Session, 0, len(m.sessions)-1)
 	for _, session := range m.sessions {
 		if session.ID != s.ID {
@@ -149,163 +145,189 @@ func (m *Model) clampCursor() {
 	}
 }
 
-// cardLineCount returns the number of lines a card will consume (including trailing spacer).
-func (m *Model) cardLineCount(s data.Session, focused bool) int {
-	lines := 3 // title + meta + action
-	if focused {
-		// Extra detail line (time/tokens/model) if any available
-		hasTime := !s.CreatedAt.IsZero()
-		hasTokens := s.Telemetry != nil && s.Telemetry.InputTokens > 0
-		hasModel := s.Telemetry != nil && s.Telemetry.Model != ""
-		if hasTime || hasTokens || hasModel {
-			lines++
-		}
-		lines++ // action hints line
+// listItemHeight is the number of lines per session row (2 content lines).
+const listItemHeight = 2
+
+func (m *Model) visibleListItems(listHeight int) int {
+	if listHeight <= 0 {
+		return 1
 	}
-	lines++ // spacer
-	return lines
+	return listHeight / listItemHeight
 }
-
-// headerLines is the number of lines consumed by the view header (title + blank).
-const headerLines = 2
-
-// footerReserve is lines reserved for scroll indicator + breathing room.
-const footerReserve = 2
 
 func (m *Model) ensureCursorVisible() {
 	if len(m.sessions) == 0 {
 		m.scrollOffset = 0
 		return
 	}
-
-	// Scroll up if cursor is above viewport
+	// Panel chrome: 2 border lines + 1 title line
+	listHeight := m.panelContentHeight()
+	visible := m.visibleListItems(listHeight)
+	if visible < 1 {
+		visible = 1
+	}
 	if m.cursor < m.scrollOffset {
 		m.scrollOffset = m.cursor
 	}
-
-	// Scroll down if cursor is below viewport — walk cards from scrollOffset
-	// and see if the cursor card fits.
-	for {
-		budget := m.height - headerLines - footerReserve
-		used := 0
-		cursorVisible := false
-		for i := m.scrollOffset; i < len(m.sessions); i++ {
-			h := m.cardLineCount(m.sessions[i], i == m.cursor)
-			if used+h > budget && used > 0 {
-				break
-			}
-			used += h
-			if i == m.cursor {
-				cursorVisible = true
-				break
-			}
-		}
-		if cursorVisible {
-			break
-		}
-		m.scrollOffset++
-		if m.scrollOffset >= len(m.sessions) {
-			m.scrollOffset = len(m.sessions) - 1
-			break
-		}
+	if m.cursor >= m.scrollOffset+visible {
+		m.scrollOffset = m.cursor - visible + 1
 	}
-
 	if m.scrollOffset < 0 {
 		m.scrollOffset = 0
 	}
 }
 
-// View renders the active sessions view, constrained to the terminal height.
+// panelContentHeight returns usable lines inside a bordered panel.
+func (m *Model) panelContentHeight() int {
+	// Total height minus: 1 hint bar line, 2 border lines per panel
+	h := m.height - 3
+	if h < 4 {
+		h = 4
+	}
+	return h
+}
+
+// useHorizontalLayout returns true when terminal is wide enough for side-by-side.
+func (m *Model) useHorizontalLayout() bool {
+	return m.width >= 100
+}
+
+// ── Styles ──
+
+var (
+	borderColor    = compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("238")}
+	titleColor     = compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")}
+	dimColor       = compat.AdaptiveColor{Light: lipgloss.Color("244"), Dark: lipgloss.Color("241")}
+	textColor      = compat.AdaptiveColor{Light: lipgloss.Color("236"), Dark: lipgloss.Color("252")}
+	selectedBg     = compat.AdaptiveColor{Light: lipgloss.Color("254"), Dark: lipgloss.Color("236")}
+	labelColor     = compat.AdaptiveColor{Light: lipgloss.Color("242"), Dark: lipgloss.Color("245")}
+	urgentColor    = compat.AdaptiveColor{Light: lipgloss.Color("196"), Dark: lipgloss.Color("203")}
+	activeColor    = compat.AdaptiveColor{Light: lipgloss.Color("28"), Dark: lipgloss.Color("42")}
+)
+
+// ── View ──
+
 func (m *Model) View() string {
 	if len(m.sessions) == 0 {
 		return m.viewEmpty()
 	}
 
-	dim := lipgloss.NewStyle().Faint(true)
-	titleStyle := lipgloss.NewStyle().Bold(true).
-		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")})
-
-	budget := m.height - headerLines - footerReserve
-	if budget < 4 {
-		budget = 4
+	if m.useHorizontalLayout() {
+		return m.viewHorizontal()
 	}
-
-	// Header
-	countLabel := fmt.Sprintf("%d active", len(m.sessions))
-	headerLine := titleStyle.Render("  ⚡ Active Sessions") + "  " + dim.Render(countLabel)
-
-	var lines []string
-	lines = append(lines, headerLine, "")
-
-	// Render cards until we run out of vertical budget
-	used := 0
-	lastRendered := m.scrollOffset - 1
-	for i := m.scrollOffset; i < len(m.sessions); i++ {
-		focused := i == m.cursor
-		h := m.cardLineCount(m.sessions[i], focused)
-		if used+h > budget && used > 0 {
-			break
-		}
-		card := m.renderCard(m.sessions[i], focused)
-		lines = append(lines, card)
-		lines = append(lines, "") // spacer
-		used += h
-		lastRendered = i
-	}
-
-	// Scroll position indicator
-	above := m.scrollOffset
-	below := len(m.sessions) - lastRendered - 1
-	if above > 0 || below > 0 {
-		parts := []string{fmt.Sprintf("  %d/%d", m.cursor+1, len(m.sessions))}
-		if above > 0 {
-			parts = append(parts, fmt.Sprintf("↑%d above", above))
-		}
-		if below > 0 {
-			parts = append(parts, fmt.Sprintf("↓%d below", below))
-		}
-		lines = append(lines, dim.Render(strings.Join(parts, "  ")))
-	}
-
-	return strings.Join(lines, "\n")
+	return m.viewVertical()
 }
 
-func (m *Model) renderCard(s data.Session, focused bool) string {
-	dim := lipgloss.NewStyle().Faint(true)
-	sessionStyle := lipgloss.NewStyle().
-		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("236"), Dark: lipgloss.Color("252")})
-	boldStyle := lipgloss.NewStyle().Bold(true).
-		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("236"), Dark: lipgloss.Color("252")})
-	hintStyle := lipgloss.NewStyle().Faint(true).
-		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("244"), Dark: lipgloss.Color("241")})
+func (m *Model) viewHorizontal() string {
+	totalW := m.width - 1
+	listW := totalW * 40 / 100
+	if listW < 30 {
+		listW = 30
+	}
+	detailW := totalW - listW
+
+	contentH := m.panelContentHeight()
+	listPanel := m.renderListPanel(listW, contentH)
+	detailPanel := m.renderDetailPanel(detailW, contentH)
+
+	main := lipgloss.JoinHorizontal(lipgloss.Top, listPanel, detailPanel)
+	return main + "\n" + m.renderHintBar()
+}
+
+func (m *Model) viewVertical() string {
+	contentH := m.panelContentHeight()
+	listH := contentH * 40 / 100
+	if listH < 4 {
+		listH = 4
+	}
+	detailH := contentH - listH
+
+	listPanel := m.renderListPanel(m.width, listH)
+	detailPanel := m.renderDetailPanel(m.width, detailH)
+
+	return listPanel + "\n" + detailPanel + "\n" + m.renderHintBar()
+}
+
+func (m *Model) renderListPanel(width, contentHeight int) string {
+	panelTitle := lipgloss.NewStyle().Bold(true).Foreground(titleColor)
+	dim := lipgloss.NewStyle().Foreground(dimColor)
+
+	title := fmt.Sprintf(" Sessions (%d) ", len(m.sessions))
+
+	innerW := width - 4 // border + padding
+	if innerW < 10 {
+		innerW = 10
+	}
+	visible := m.visibleListItems(contentHeight)
+	end := m.scrollOffset + visible
+	if end > len(m.sessions) {
+		end = len(m.sessions)
+	}
+
+	var rows []string
+	for i := m.scrollOffset; i < end; i++ {
+		s := m.sessions[i]
+		selected := i == m.cursor
+		rows = append(rows, m.renderListItem(s, selected, innerW))
+	}
+
+	// Pad remaining space with empty lines
+	rendered := len(rows) * listItemHeight
+	for rendered < contentHeight {
+		rows = append(rows, "")
+		rendered++
+	}
+
+	// Scroll indicator in title
+	scrollInfo := ""
+	if len(m.sessions) > visible {
+		scrollInfo = dim.Render(fmt.Sprintf(" %d/%d", m.cursor+1, len(m.sessions)))
+	}
+
+	content := strings.Join(rows, "\n")
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		Width(width - 2).
+		Height(contentHeight).
+		Render(content)
+
+	return panelTitle.Render(title) + scrollInfo + "\n" + box
+}
+
+func (m *Model) renderListItem(s data.Session, selected bool, innerW int) string {
+	dim := lipgloss.NewStyle().Foreground(dimColor)
+	text := lipgloss.NewStyle().Foreground(textColor)
 
 	icon := m.statusIcon(s.Status)
 	if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
 		icon = m.animStatusIcon(s.Status, m.animFrame)
 	}
 
-	gutter := "  "
-	if focused {
-		gutter = "▎ "
-	}
-
 	// Line 1: icon + title
 	title := s.Title
-	maxTitle := m.width - 10
-	if maxTitle < 20 {
-		maxTitle = 20
+	maxTitle := innerW - 4
+	if maxTitle < 10 {
+		maxTitle = 10
 	}
 	if len(title) > maxTitle {
 		title = title[:maxTitle-1] + "…"
 	}
-	if focused {
-		title = boldStyle.Render(title)
-	} else {
-		title = sessionStyle.Render(title)
-	}
-	line1 := fmt.Sprintf("%s%s %s", gutter, icon, title)
 
-	// Line 2: repo • branch • PR
+	line1Style := text
+	if selected {
+		line1Style = lipgloss.NewStyle().Bold(true).Foreground(textColor).Background(selectedBg)
+	}
+	line1 := fmt.Sprintf(" %s %s", icon, line1Style.Render(title))
+	if selected {
+		// Pad to full width for highlight bar
+		pad := innerW - lipgloss.Width(line1)
+		if pad > 0 {
+			line1 += line1Style.Render(strings.Repeat(" ", pad))
+		}
+	}
+
+	// Line 2: repo • branch
 	var meta []string
 	repo := shortRepo(s.Repository)
 	if repo != "" {
@@ -313,68 +335,197 @@ func (m *Model) renderCard(s data.Session, focused bool) string {
 	}
 	if s.Branch != "" && !data.IsDefaultBranch(s.Branch) {
 		branch := s.Branch
-		maxBranch := m.width/3
-		if maxBranch < 20 { maxBranch = 20 }
-		if len(branch) > maxBranch {
-			branch = branch[:maxBranch-1] + "…"
+		maxB := innerW / 2
+		if maxB < 15 {
+			maxB = 15
+		}
+		if len(branch) > maxB {
+			branch = branch[:maxB-1] + "…"
 		}
 		meta = append(meta, branch)
 	}
-	if s.WorkDir != "" && s.Branch == "" {
-		meta = append(meta, s.WorkDir)
+	line2 := "   " + dim.Render(strings.Join(meta, " • "))
+
+	return line1 + "\n" + line2
+}
+
+func (m *Model) renderDetailPanel(width, contentHeight int) string {
+	panelTitle := lipgloss.NewStyle().Bold(true).Foreground(titleColor)
+	title := " Detail "
+
+	s := m.SelectedSession()
+	var content string
+	if s == nil {
+		content = lipgloss.NewStyle().Foreground(dimColor).Render(" No session selected")
+	} else {
+		content = m.renderDetail(*s, width-4, contentHeight)
+	}
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		Width(width - 2).
+		Height(contentHeight).
+		Render(content)
+
+	return panelTitle.Render(title) + "\n" + box
+}
+
+func (m *Model) renderDetail(s data.Session, innerW, maxLines int) string {
+	dim := lipgloss.NewStyle().Foreground(dimColor)
+	label := lipgloss.NewStyle().Foreground(labelColor)
+	text := lipgloss.NewStyle().Foreground(textColor)
+	urgent := lipgloss.NewStyle().Bold(true).Foreground(urgentColor)
+	active := lipgloss.NewStyle().Foreground(activeColor)
+
+	var lines []string
+
+	// Status line with icon
+	icon := m.statusIcon(s.Status)
+	if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
+		icon = m.animStatusIcon(s.Status, m.animFrame)
+	}
+	statusStyle := active
+	st := strings.ToLower(strings.TrimSpace(s.Status))
+	if st == "needs-input" || st == "failed" {
+		statusStyle = urgent
+	}
+	lines = append(lines, fmt.Sprintf(" %s %s", icon, statusStyle.Render(s.Status)))
+	lines = append(lines, "")
+
+	// Metadata fields
+	addField := func(lbl, val string) {
+		if val != "" && len(lines) < maxLines-2 {
+			lines = append(lines, fmt.Sprintf(" %s %s", label.Render(lbl), text.Render(val)))
+		}
+	}
+
+	addField("repo:", shortRepo(s.Repository))
+	if s.Branch != "" && !data.IsDefaultBranch(s.Branch) {
+		addField("branch:", s.Branch)
+	}
+	if s.WorkDir != "" {
+		addField("workdir:", s.WorkDir)
 	}
 	if s.PRNumber > 0 {
-		meta = append(meta, fmt.Sprintf("PR #%d", s.PRNumber))
+		addField("PR:", fmt.Sprintf("#%d", s.PRNumber))
 	}
-	line2 := gutter + "   " + dim.Render(strings.Join(meta, "  •  "))
+	if !s.CreatedAt.IsZero() {
+		addField("elapsed:", formatDuration(time.Since(s.CreatedAt)))
+	}
+	if s.Telemetry != nil {
+		if s.Telemetry.Model != "" {
+			addField("model:", s.Telemetry.Model)
+		}
+		if s.Telemetry.InputTokens > 0 {
+			addField("tokens:", data.FormatTokenCount(s.Telemetry.InputTokens)+" in / "+data.FormatTokenCount(s.Telemetry.OutputTokens)+" out")
+		}
+	}
 
-	// Line 3: last action
+	lines = append(lines, "")
+
+	// Current activity
 	action := mission.DeriveLastAction(s)
-	line3 := gutter + "   " + dim.Render("▸ "+action)
+	lines = append(lines, " "+label.Render("activity:"))
+	lines = append(lines, " "+text.Render(action))
+	lines = append(lines, "")
 
-	lines := []string{line1, line2, line3}
-
-	// Expanded lines for focused card
-	if focused {
-		var extras []string
-		if !s.CreatedAt.IsZero() {
-			extras = append(extras, formatDuration(time.Since(s.CreatedAt)))
+	// Log tail — try to fill remaining space
+	remaining := maxLines - len(lines)
+	if remaining > 2 && s.Source == data.SourceLocalCopilot {
+		lines = append(lines, " "+label.Render("recent log:"))
+		logLines := m.fetchLogTail(s, remaining-1)
+		if len(logLines) > 0 {
+			for _, l := range logLines {
+				if len(l) > innerW-2 {
+					l = l[:innerW-3] + "…"
+				}
+				lines = append(lines, " "+dim.Render(l))
+			}
+		} else {
+			lines = append(lines, " "+dim.Render("(no log data)"))
 		}
-		if s.Telemetry != nil && s.Telemetry.InputTokens > 0 {
-			extras = append(extras, data.FormatTokenCount(s.Telemetry.InputTokens)+" tokens")
-		}
-		if s.Telemetry != nil && s.Telemetry.Model != "" {
-			extras = append(extras, s.Telemetry.Model)
-		}
-		if len(extras) > 0 {
-			line4 := gutter + "   " + dim.Render(strings.Join(extras, "  •  "))
-			lines = append(lines, line4)
-		}
-
-		hints := hintStyle.Render(gutter + "   [enter] details  [o] open PR  [l] logs  [c] copy ID  [x] dismiss")
-		lines = append(lines, hints)
 	}
 
 	return strings.Join(lines, "\n")
 }
 
+// fetchLogTail returns the last N meaningful events from the session log.
+func (m *Model) fetchLogTail(s data.Session, maxLines int) []string {
+	events, err := data.FetchSessionEvents(s.ID)
+	if err != nil || len(events) == 0 {
+		return nil
+	}
+
+	// Collect the last meaningful events
+	var entries []string
+	for _, ev := range events {
+		var line string
+		switch ev.Type {
+		case "tool.execution_start":
+			line = "🔧 " + ev.ToolName
+		case "tool.execution_end":
+			line = "✓ " + ev.ToolName + " done"
+		case "assistant.message":
+			msg := ev.Content
+			if len(msg) > 80 {
+				msg = msg[:77] + "..."
+			}
+			if msg != "" {
+				line = "💬 " + msg
+			}
+		case "user.message":
+			msg := ev.Content
+			if len(msg) > 60 {
+				msg = msg[:57] + "..."
+			}
+			if msg != "" {
+				line = "👤 " + msg
+			}
+		}
+		if line != "" {
+			entries = append(entries, line)
+		}
+	}
+
+	// Return the tail
+	if len(entries) > maxLines {
+		entries = entries[len(entries)-maxLines:]
+	}
+	return entries
+}
+
+func (m *Model) renderHintBar() string {
+	hint := lipgloss.NewStyle().Foreground(dimColor)
+	key := lipgloss.NewStyle().Bold(true).Foreground(textColor)
+
+	hints := []string{
+		key.Render("↑↓") + " navigate",
+		key.Render("enter") + " details",
+		key.Render("o") + " open PR",
+		key.Render("l") + " logs",
+		key.Render("c") + " copy ID",
+		key.Render("x") + " dismiss",
+		key.Render("esc") + " back",
+	}
+
+	joined := strings.Join(hints, hint.Render("  │  "))
+	return " " + joined
+}
+
 func (m *Model) viewEmpty() string {
-	dim := lipgloss.NewStyle().Faint(true)
-	titleStyle := lipgloss.NewStyle().Bold(true).
-		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")})
-	sessionStyle := lipgloss.NewStyle().
-		Foreground(compat.AdaptiveColor{Light: lipgloss.Color("236"), Dark: lipgloss.Color("252")})
+	dim := lipgloss.NewStyle().Foreground(dimColor)
+	panelTitle := lipgloss.NewStyle().Bold(true).Foreground(titleColor)
+	text := lipgloss.NewStyle().Foreground(textColor)
 
-	var lines []string
-	lines = append(lines, titleStyle.Render("  ⚡ Active Sessions"))
-	lines = append(lines, "")
-	lines = append(lines, dim.Render("  All quiet — no active sessions ✨"))
-	lines = append(lines, "")
+	var content []string
+	content = append(content, "")
+	content = append(content, dim.Render(" All quiet — no active sessions ✨"))
+	content = append(content, "")
 
-	// Show last 2-3 completions as "just finished"
 	recent := m.recentCompletions(3)
 	if len(recent) > 0 {
-		lines = append(lines, dim.Render("  Recently finished:"))
+		content = append(content, " "+lipgloss.NewStyle().Foreground(labelColor).Render("Just finished:"))
 		for _, s := range recent {
 			icon := "✅"
 			if strings.EqualFold(s.Status, "failed") {
@@ -389,12 +540,19 @@ func (m *Model) viewEmpty() string {
 			if s.PRNumber > 0 {
 				pr = dim.Render(fmt.Sprintf(" PR #%d", s.PRNumber))
 			}
-			lines = append(lines, fmt.Sprintf("  %s %s%s  %s",
-				icon, sessionStyle.Render(title), pr, dim.Render(ago)))
+			content = append(content, fmt.Sprintf(" %s %s%s  %s", icon, text.Render(title), pr, dim.Render(ago)))
 		}
 	}
 
-	return strings.Join(lines, "\n")
+	contentH := m.panelContentHeight()
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		Width(m.width - 2).
+		Height(contentH).
+		Render(strings.Join(content, "\n"))
+
+	return panelTitle.Render(" Active Sessions ") + "\n" + box + "\n" + m.renderHintBar()
 }
 
 func (m *Model) recentCompletions(n int) []data.Session {
@@ -414,7 +572,6 @@ func (m *Model) recentCompletions(n int) []data.Session {
 	return completed
 }
 
-// shortRepo trims "github.com/" prefix and returns just owner/repo.
 func shortRepo(repo string) string {
 	repo = strings.TrimSpace(repo)
 	if repo == "" {
@@ -425,7 +582,6 @@ func shortRepo(repo string) string {
 	return repo
 }
 
-// formatDuration formats a duration as "2m", "1h23m", "3d", etc.
 func formatDuration(d time.Duration) string {
 	if d < time.Minute {
 		return "<1m"
@@ -444,7 +600,6 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%dd", h/24)
 }
 
-// formatAge returns a human-readable "3m ago" style string.
 func formatAge(t time.Time) string {
 	if t.IsZero() {
 		return ""

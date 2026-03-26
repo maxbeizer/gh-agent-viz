@@ -218,6 +218,44 @@ func (m *Model) View() string {
 	return m.viewVertical()
 }
 
+// statusBreakdown returns a panel title like " 3 running · 2 failed · 1 waiting "
+func (m *Model) statusBreakdown() string {
+	var running, failed, waiting, queued, other int
+	for _, s := range m.sessions {
+		switch strings.ToLower(strings.TrimSpace(s.Status)) {
+		case "running", "active":
+			running++
+		case "failed":
+			failed++
+		case "needs-input":
+			waiting++
+		case "queued":
+			queued++
+		default:
+			other++
+		}
+	}
+	var parts []string
+	if running > 0 {
+		parts = append(parts, fmt.Sprintf("%d running", running))
+	}
+	if queued > 0 {
+		parts = append(parts, fmt.Sprintf("%d queued", queued))
+	}
+	if waiting > 0 {
+		parts = append(parts, fmt.Sprintf("%d waiting", waiting))
+	}
+	if failed > 0 {
+		parts = append(parts, fmt.Sprintf("%d failed", failed))
+	}
+	if other > 0 {
+		parts = append(parts, fmt.Sprintf("%d other", other))
+	}
+	if len(parts) == 0 {
+		return " Sessions "
+	}
+	return " " + strings.Join(parts, " · ") + " "
+}
 func (m *Model) viewHorizontal() string {
 	totalW := m.width - 1
 	listW := totalW * 40 / 100
@@ -252,7 +290,7 @@ func (m *Model) renderListPanel(width, contentHeight int) string {
 	panelTitle := lipgloss.NewStyle().Bold(true).Foreground(titleColor)
 	dim := lipgloss.NewStyle().Foreground(dimColor)
 
-	title := fmt.Sprintf(" Sessions (%d) ", len(m.sessions))
+	title := m.statusBreakdown()
 
 	innerW := width - 4 // border + padding
 	if innerW < 10 {

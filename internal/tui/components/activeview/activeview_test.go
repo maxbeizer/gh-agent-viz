@@ -153,8 +153,8 @@ if !m.useHorizontalLayout() {
 t.Error("expected horizontal layout at width 120")
 }
 view := m.View()
-if !strings.Contains(view, "Sessions") {
-t.Error("should show Sessions panel title")
+if !strings.Contains(view, "running") {
+t.Error("should show status breakdown in list panel")
 }
 if !strings.Contains(view, "Detail") {
 t.Error("should show Detail panel title")

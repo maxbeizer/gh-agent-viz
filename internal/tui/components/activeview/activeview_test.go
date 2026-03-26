@@ -268,3 +268,26 @@ if !strings.Contains(view, "1/10") {
 t.Error("should show scroll position indicator")
 }
 }
+
+func TestSetSessions_ExcludesIdleSessions(t *testing.T) {
+m := New(plainIcon, nil)
+now := time.Now()
+sessions := []data.Session{
+{ID: "1", Status: "running", Title: "Active", UpdatedAt: now},
+{ID: "2", Status: "running", Title: "Idle", UpdatedAt: now.Add(-30 * time.Minute)},
+{ID: "3", Status: "running", Title: "Very idle", UpdatedAt: now.Add(-2 * time.Hour)},
+{ID: "4", Status: "needs-input", Title: "Waiting", UpdatedAt: now.Add(-1 * time.Hour)},
+{ID: "5", Status: "failed", Title: "Failed", UpdatedAt: now.Add(-1 * time.Hour)},
+}
+m.SetSessions(sessions)
+// Should include: Active (running+recent), Waiting (needs-input), Failed
+// Should exclude: Idle and Very idle (running but stale >20min)
+if m.SessionCount() != 3 {
+t.Errorf("expected 3 sessions (active+waiting+failed), got %d", m.SessionCount())
+for i := 0; i < m.SessionCount(); i++ {
+m.cursor = i
+s := m.SelectedSession()
+t.Logf("  session %d: %s (%s)", i, s.Title, s.Status)
+}
+}
+}

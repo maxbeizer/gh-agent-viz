@@ -51,12 +51,17 @@ func (m *Model) SetAnimFrame(frame int) {
 	m.animFrame = frame
 }
 
-// isActiveForView returns true for sessions that belong in this view.
+// isActiveForView returns true for sessions that belong in this view:
+// actively working (not idle), needs-input, or recently failed.
+// Idle sessions (running but stale >20min) are excluded — this view is
+// "what are my agents doing right now."
 func isActiveForView(s data.Session) bool {
 	status := strings.ToLower(strings.TrimSpace(s.Status))
-	return data.StatusIsActive(s.Status) ||
-		status == "needs-input" ||
-		status == "failed"
+	if status == "needs-input" || status == "failed" {
+		return true
+	}
+	// Only include active sessions that are actually working (not idle)
+	return data.SessionIsActiveNotIdle(s)
 }
 
 // SetSessions filters and stores sessions for display.

@@ -2,12 +2,12 @@ package activeview
 
 import (
 	"fmt"
+	"image/color"
 	"sort"
 	"strings"
 	"time"
 
 	"charm.land/lipgloss/v2"
-	"charm.land/lipgloss/v2/compat"
 	"github.com/maxbeizer/gh-agent-viz/internal/data"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/mission"
 )
@@ -197,17 +197,28 @@ func (m *Model) useHorizontalLayout() bool {
 	return m.width >= 100
 }
 
-// ── Styles ──
+// ── Palette (Catppuccin Mocha-inspired, matching gh-inbox) ──
 
 var (
-	borderColor    = compat.AdaptiveColor{Light: lipgloss.Color("249"), Dark: lipgloss.Color("238")}
-	titleColor     = compat.AdaptiveColor{Light: lipgloss.Color("24"), Dark: lipgloss.Color("75")}
-	dimColor       = compat.AdaptiveColor{Light: lipgloss.Color("244"), Dark: lipgloss.Color("241")}
-	textColor      = compat.AdaptiveColor{Light: lipgloss.Color("236"), Dark: lipgloss.Color("252")}
-	selectedBg     = compat.AdaptiveColor{Light: lipgloss.Color("254"), Dark: lipgloss.Color("236")}
-	labelColor     = compat.AdaptiveColor{Light: lipgloss.Color("242"), Dark: lipgloss.Color("245")}
-	urgentColor    = compat.AdaptiveColor{Light: lipgloss.Color("196"), Dark: lipgloss.Color("203")}
-	activeColor    = compat.AdaptiveColor{Light: lipgloss.Color("28"), Dark: lipgloss.Color("42")}
+	colorBase     = lipgloss.Color("#1e1e2e")
+	colorSurface0 = lipgloss.Color("#313244")
+	colorSurface1 = lipgloss.Color("#45475a")
+	colorSurface2 = lipgloss.Color("#585b70")
+	colorOverlay0 = lipgloss.Color("#6c7086")
+	colorText     = lipgloss.Color("#cdd6f4")
+	colorSubtext0 = lipgloss.Color("#a6adc8")
+	colorLavender = lipgloss.Color("#b4befe")
+	colorGreen    = lipgloss.Color("#a6e3a1")
+	colorYellow   = lipgloss.Color("#f9e2af")
+	colorRed      = lipgloss.Color("#f38ba8")
+	colorMauve    = lipgloss.Color("#cba6f7")
+	colorTeal     = lipgloss.Color("#94e2d5")
+)
+
+// Powerline separator characters
+const (
+	sepRight = "\ue0b0" // 
+	sepLeft  = "\ue0b2" // 
 )
 
 // ── View ──
@@ -292,8 +303,8 @@ func (m *Model) viewVertical() string {
 }
 
 func (m *Model) renderListPanel(width, contentHeight int) string {
-	panelTitle := lipgloss.NewStyle().Bold(true).Foreground(titleColor)
-	dim := lipgloss.NewStyle().Foreground(dimColor)
+	panelTitle := lipgloss.NewStyle().Bold(true).Foreground(colorLavender)
+	dim := lipgloss.NewStyle().Foreground(colorOverlay0)
 
 	title := m.statusBreakdown()
 
@@ -330,7 +341,7 @@ func (m *Model) renderListPanel(width, contentHeight int) string {
 	content := strings.Join(rows, "\n")
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
+		BorderForeground(colorSurface1).
 		Width(width - 2).
 		Height(contentHeight).
 		Render(content)
@@ -339,8 +350,8 @@ func (m *Model) renderListPanel(width, contentHeight int) string {
 }
 
 func (m *Model) renderListItem(s data.Session, selected bool, innerW int) string {
-	dim := lipgloss.NewStyle().Foreground(dimColor)
-	text := lipgloss.NewStyle().Foreground(textColor)
+	dim := lipgloss.NewStyle().Foreground(colorOverlay0)
+	text := lipgloss.NewStyle().Foreground(colorText)
 
 	icon := m.statusIcon(s.Status)
 	if m.animStatusIcon != nil && data.SessionIsActiveNotIdle(s) {
@@ -359,11 +370,10 @@ func (m *Model) renderListItem(s data.Session, selected bool, innerW int) string
 
 	line1Style := text
 	if selected {
-		line1Style = lipgloss.NewStyle().Bold(true).Foreground(textColor).Background(selectedBg)
+		line1Style = lipgloss.NewStyle().Bold(true).Foreground(colorText).Background(colorSurface1)
 	}
 	line1 := fmt.Sprintf(" %s %s", icon, line1Style.Render(title))
 	if selected {
-		// Pad to full width for highlight bar
 		pad := innerW - lipgloss.Width(line1)
 		if pad > 0 {
 			line1 += line1Style.Render(strings.Repeat(" ", pad))
@@ -393,33 +403,35 @@ func (m *Model) renderListItem(s data.Session, selected bool, innerW int) string
 }
 
 func (m *Model) renderDetailPanel(width, contentHeight int) string {
-	panelTitle := lipgloss.NewStyle().Bold(true).Foreground(titleColor)
+	panelTitle := lipgloss.NewStyle().Bold(true).Foreground(colorLavender)
 	title := " Detail "
 
 	s := m.SelectedSession()
 	var content string
 	if s == nil {
-		content = lipgloss.NewStyle().Foreground(dimColor).Render(" No session selected")
+		content = lipgloss.NewStyle().Foreground(colorOverlay0).Render(" No session selected")
 	} else {
 		content = m.renderDetail(*s, width-4, contentHeight)
 	}
 
 	box := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
+		BorderLeft(true).
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(colorSurface1).
 		Width(width - 2).
 		Height(contentHeight).
+		Padding(0, 1).
 		Render(content)
 
 	return panelTitle.Render(title) + "\n" + box
 }
 
 func (m *Model) renderDetail(s data.Session, innerW, maxLines int) string {
-	dim := lipgloss.NewStyle().Foreground(dimColor)
-	label := lipgloss.NewStyle().Foreground(labelColor)
-	text := lipgloss.NewStyle().Foreground(textColor)
-	urgent := lipgloss.NewStyle().Bold(true).Foreground(urgentColor)
-	active := lipgloss.NewStyle().Foreground(activeColor)
+	dim := lipgloss.NewStyle().Foreground(colorOverlay0)
+	label := lipgloss.NewStyle().Foreground(colorSubtext0)
+	text := lipgloss.NewStyle().Foreground(colorText)
+	urgent := lipgloss.NewStyle().Bold(true).Foreground(colorRed)
+	active := lipgloss.NewStyle().Foreground(colorGreen)
 
 	var lines []string
 
@@ -538,28 +550,117 @@ func (m *Model) fetchLogTail(s data.Session, maxLines int) []string {
 	return entries
 }
 
-func (m *Model) renderHintBar() string {
-	hint := lipgloss.NewStyle().Foreground(dimColor)
-	key := lipgloss.NewStyle().Bold(true).Foreground(textColor)
+// powerlineSegment holds a segment's content and colors.
+type powerlineSegment struct {
+	text string
+	fg   color.Color
+	bg   color.Color
+}
 
-	hints := []string{
-		key.Render("↑↓") + " navigate",
-		key.Render("enter") + " details",
-		key.Render("o") + " open PR",
-		key.Render("l") + " logs",
-		key.Render("c") + " copy ID",
-		key.Render("x") + " dismiss",
-		key.Render("esc") + " back",
+func (m *Model) renderHintBar() string {
+	// Left side: view mode badge
+	leftSegs := []powerlineSegment{
+		{text: " ⚡ Active ", fg: colorBase, bg: colorMauve},
 	}
 
-	joined := strings.Join(hints, hint.Render("  │  "))
-	return " " + joined
+	// Add status summary
+	s := m.SelectedSession()
+	if s != nil {
+		statusText := fmt.Sprintf(" %s ", s.Status)
+		statusBg := colorTeal
+		st := strings.ToLower(strings.TrimSpace(s.Status))
+		if st == "failed" {
+			statusBg = colorRed
+		} else if st == "needs-input" {
+			statusBg = colorYellow
+		}
+		leftSegs = append(leftSegs, powerlineSegment{
+			text: statusText, fg: colorBase, bg: statusBg,
+		})
+	}
+
+	// Right side: key hints
+	rightSegs := []powerlineSegment{
+		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("j/k") + " nav ", fg: colorText, bg: colorSurface1},
+		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("enter") + " details ", fg: colorText, bg: colorSurface1},
+		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("o") + " PR ", fg: colorText, bg: colorSurface2},
+		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("l") + " logs ", fg: colorText, bg: colorSurface2},
+		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("x") + " dismiss ", fg: colorText, bg: colorSurface2},
+		{text: " " + lipgloss.NewStyle().Bold(true).Foreground(colorLavender).Render("?") + " help ", fg: colorText, bg: colorMauve},
+	}
+
+	left := renderPowerlineLeft(leftSegs)
+	right := renderPowerlineRight(rightSegs)
+
+	leftW := lipgloss.Width(left)
+	rightW := lipgloss.Width(right)
+	gap := m.width - leftW - rightW
+	if gap < 0 {
+		gap = 0
+	}
+
+	mid := lipgloss.NewStyle().
+		Background(colorBase).
+		Width(gap).
+		Render("")
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, mid, right)
+}
+
+func renderPowerlineLeft(segs []powerlineSegment) string {
+	if len(segs) == 0 {
+		return ""
+	}
+	var result string
+	for i, seg := range segs {
+		body := lipgloss.NewStyle().
+			Foreground(seg.fg).
+			Background(seg.bg).
+			Render(seg.text)
+		result += body
+
+		nextBg := colorBase
+		if i+1 < len(segs) {
+			nextBg = segs[i+1].bg
+		}
+		arrow := lipgloss.NewStyle().
+			Foreground(seg.bg).
+			Background(nextBg).
+			Render(sepRight)
+		result += arrow
+	}
+	return result
+}
+
+func renderPowerlineRight(segs []powerlineSegment) string {
+	if len(segs) == 0 {
+		return ""
+	}
+	var result string
+	for i, seg := range segs {
+		prevBg := colorBase
+		if i > 0 {
+			prevBg = segs[i-1].bg
+		}
+		arrow := lipgloss.NewStyle().
+			Foreground(seg.bg).
+			Background(prevBg).
+			Render(sepLeft)
+		result += arrow
+
+		body := lipgloss.NewStyle().
+			Foreground(seg.fg).
+			Background(seg.bg).
+			Render(seg.text)
+		result += body
+	}
+	return result
 }
 
 func (m *Model) viewEmpty() string {
-	dim := lipgloss.NewStyle().Foreground(dimColor)
-	panelTitle := lipgloss.NewStyle().Bold(true).Foreground(titleColor)
-	text := lipgloss.NewStyle().Foreground(textColor)
+	dim := lipgloss.NewStyle().Foreground(colorOverlay0)
+	panelTitle := lipgloss.NewStyle().Bold(true).Foreground(colorLavender)
+	text := lipgloss.NewStyle().Foreground(colorText)
 
 	var content []string
 	content = append(content, "")
@@ -568,7 +669,7 @@ func (m *Model) viewEmpty() string {
 
 	recent := m.recentCompletions(3)
 	if len(recent) > 0 {
-		content = append(content, " "+lipgloss.NewStyle().Foreground(labelColor).Render("Just finished:"))
+		content = append(content, " "+lipgloss.NewStyle().Foreground(colorSubtext0).Render("Just finished:"))
 		for _, s := range recent {
 			icon := "✅"
 			if strings.EqualFold(s.Status, "failed") {
@@ -590,7 +691,7 @@ func (m *Model) viewEmpty() string {
 	contentH := m.panelContentHeight()
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
+		BorderForeground(colorSurface1).
 		Width(m.width - 2).
 		Height(contentH).
 		Render(strings.Join(content, "\n"))

@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [v0.10.0] - 2026-03-27
+
+### Added
+
+- **Active Sessions view** — press `A` from any view to see a lazygit-style split panel focused on what your agents are doing right now
+  - Left panel: compact 2-line session list with status breakdown (e.g. "3 running · 1 failed · 1 waiting")
+  - Right panel: detail pane with metadata (repo, branch, PR, elapsed, model, tokens), current activity, and recent log tail from `events.jsonl`
+  - Responsive layout: side-by-side on wide terminals (≥100 cols), stacked on narrow
+  - Quick actions: `enter` details, `o` open PR, `l` logs, `c` copy session ID, `x` dismiss
+  - Only shows actively working sessions (not idle) plus needs-input and failed
+  - Configurable as default view via `defaultView: active` in `.gh-agent-viz.yml`
+- **Powerline footer** across all views — gh-inbox-inspired status bar with colored view badge (⚡ Active, 🚀 Mission, 📋 List, etc.) and compact keybinding hints
+- **Clipboard support** — copy session ID to clipboard (`c` key in active view)
+- `A` hotkey added to help overlay
+
+### Changed
+
+- **Default theme is now Catppuccin Mocha** — rich dark palette with lavender titles, surface-layered panels, and pastel accents. Previous theme available via `theme: default` in config.
+- **Upgraded to Charm v2 ecosystem**: Bubble Tea v2.0.2, Lip Gloss v2.0.2, Bubbles v2.0.0 (requires Go 1.25+)
+  - Declarative `View()` API (returns `tea.View` with AltScreen/MouseMode fields)
+  - Enhanced keyboard handling (`tea.KeyPressMsg`)
+  - Split mouse event types (`MouseWheelMsg`, `MouseClickMsg`)
+  - New cursed renderer for faster, smoother rendering
+
+### Fixed
+
+- Footer pinned to the bottom of the terminal in all views (no more floating footer)
+- Active view respects terminal height — proper scrolling with position indicator
+- Session count in active view matches stats bar (excludes idle sessions)
+
 ## [v0.9.3] - 2026-03-19
 
 ### Performance

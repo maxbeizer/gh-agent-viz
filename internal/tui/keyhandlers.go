@@ -332,8 +332,8 @@ func (m Model) handleDetailKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.lastFingerprint = "" // force recompute
 		m.lastSplitTaskID = ""
-		m.recomputeAndDisplay(m.visibleSessions())
 		m.viewMode = ViewModeMission
+		m.recomputeAndDisplay(m.visibleSessions())
 		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 	}
 	return m, nil

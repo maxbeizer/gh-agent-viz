@@ -400,7 +400,7 @@ func (m *Model) DismissByID(id string) {
 		m.dismissedStore.Add(id)
 	}
 	// Remove from current sessions
-	newSessions := make([]data.Session, 0, len(m.sessions)-1)
+	newSessions := make([]data.Session, 0, len(m.sessions))
 	for _, s := range m.sessions {
 		if s.ID != id {
 			newSessions = append(newSessions, s)

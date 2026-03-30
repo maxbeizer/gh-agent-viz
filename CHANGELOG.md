@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [v0.10.2] - 2026-03-30
+
+### Fixed
+
+- **Dismissed urgent sessions no longer linger** — dismissing a session from detail view now correctly removes it from all views (stats bar, mission Attention panel, counts) immediately.
+- **Dismiss works from detail view** — pressing `x` in detail view now dismisses the session you're viewing, not whatever the list cursor points at. Footer hints show the `x dismiss` binding.
+- **Fixed panic on dismiss** — dismissing a session that wasn't in the tasklist (e.g. entered detail from mission Attention panel) no longer causes a `makeslice: cap out of range` crash.
+- **Auto-undismiss on status change** — dismissed sessions that transition to `failed` or `needs-input` automatically resurface in the Attention panel. Explicitly dismissing an already-failed session keeps it dismissed.
+
+### Added
+
+- `Source` field in snapshot sessions for better debugging.
+- `DismissedStore.Remove()` method and `NewDismissedStoreFromPath()` constructor.
+
 ## [v0.10.1] - 2026-03-30
 
 ### Fixed

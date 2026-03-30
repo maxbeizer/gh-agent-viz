@@ -109,39 +109,49 @@ func TestMergeSessions_BelowCapUnchanged(t *testing.T) {
 	}
 }
 
-func TestMergeSessions_AutoUndismissUrgent(t *testing.T) {
+func TestMergeSessions_AutoUndismissOnStatusChange(t *testing.T) {
 	store := data.NewDismissedStoreFromPath(t.TempDir() + "/dismissed.json")
-	store.Add("urgent-session")
+	store.Add("transitioning-session")
+	store.Add("already-failed-session")
 	store.Add("normal-session")
 
 	m := &Model{
 		ctx:            NewProgramContext(),
 		dismissedStore: store,
-		prevSessions:   map[string]string{},
+		prevSessions: map[string]string{
+			"transitioning-session": "running",      // was running, will become failed → should undismiss
+			"already-failed-session": "failed",       // was already failed when dismissed → stays dismissed
+			"normal-session":        "completed",     // completed → stays dismissed
+		},
 	}
 
 	sessions := []data.Session{
-		{ID: "urgent-session", Status: "failed", UpdatedAt: time.Unix(3000, 0)},
-		{ID: "normal-session", Status: "completed", UpdatedAt: time.Unix(2000, 0)},
+		{ID: "transitioning-session", Status: "failed", UpdatedAt: time.Unix(3000, 0)},
+		{ID: "already-failed-session", Status: "failed", UpdatedAt: time.Unix(2000, 0)},
+		{ID: "normal-session", Status: "completed", UpdatedAt: time.Unix(1500, 0)},
 		{ID: "visible-session", Status: "running", UpdatedAt: time.Unix(1000, 0)},
 	}
 	m.mergeSessions(sessions)
 
-	// The urgent (failed) session should have been un-dismissed and be visible
 	ids := store.IDs()
-	if _, ok := ids["urgent-session"]; ok {
-		t.Error("expected urgent-session to be auto-undismissed")
+	// Session that transitioned to failed should be un-dismissed
+	if _, ok := ids["transitioning-session"]; ok {
+		t.Error("expected transitioning-session to be auto-undismissed (status changed running→failed)")
 	}
-	// The normal completed session should remain dismissed
+	// Session that was already failed when dismissed should stay dismissed
+	if _, ok := ids["already-failed-session"]; !ok {
+		t.Error("expected already-failed-session to remain dismissed (status unchanged)")
+	}
+	// Normal completed session stays dismissed
 	if _, ok := ids["normal-session"]; !ok {
 		t.Error("expected normal-session to remain dismissed")
 	}
 
-	// Check that the urgent session is in the visible set (ctx.Counts should include it)
+	// Only transitioning-session + visible-session should be visible
+	if m.ctx.Counts.All != 2 {
+		t.Errorf("expected 2 visible sessions, got %d", m.ctx.Counts.All)
+	}
 	if m.ctx.Counts.Attention != 1 {
 		t.Errorf("expected 1 attention count, got %d", m.ctx.Counts.Attention)
-	}
-	if m.ctx.Counts.All != 2 { // urgent + visible (normal is still dismissed)
-		t.Errorf("expected 2 visible sessions, got %d", m.ctx.Counts.All)
 	}
 }

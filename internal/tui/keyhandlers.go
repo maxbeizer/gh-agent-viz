@@ -171,9 +171,14 @@ func (m Model) handleListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case "x":
 		m.taskList.DismissSelected()
+		m.lastFingerprint = ""
+		m.lastSplitTaskID = ""
+		m.recomputeAndDisplay(m.visibleSessions())
 	case "X":
 		count := m.taskList.DismissCompleted()
 		if count > 0 {
+			m.lastFingerprint = ""
+			m.recomputeAndDisplay(m.visibleSessions())
 			m.toast.Push("🧹", "Dismissed", fmt.Sprintf("%d completed session(s) cleared", count))
 		} else {
 			m.toast.Push("ℹ️", "Nothing to dismiss", "no completed sessions found")
@@ -321,8 +326,10 @@ func (m Model) handleDetailKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case "x":
 		m.taskList.DismissSelected()
+		m.lastFingerprint = "" // force recompute
+		m.lastSplitTaskID = ""
+		m.recomputeAndDisplay(m.visibleSessions())
 		m.viewMode = ViewModeMission
-		m.mission.SetSessions(m.visibleSessions())
 		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 	}
 	return m, nil
@@ -623,6 +630,8 @@ func (m Model) handleActiveKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case "x":
 		m.activeView.DismissSelected()
+		m.lastFingerprint = ""
+		m.recomputeAndDisplay(m.visibleSessions())
 	case "r":
 		return m, m.fetchTasks
 	case "K":

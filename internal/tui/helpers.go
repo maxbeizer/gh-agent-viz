@@ -325,7 +325,9 @@ func (m *Model) mergeSessions(newSessions []data.Session) {
 		m.allSessions = m.allSessions[:maxSessions]
 	}
 
-	// Filter dismissed — but auto-undismiss sessions that now need attention
+	// Filter dismissed — but auto-undismiss sessions whose status changed
+	// to urgent since they were last seen (e.g. was "running", now "failed").
+	// Sessions explicitly dismissed while already urgent stay dismissed.
 	dismissedIDs := map[string]struct{}{}
 	if m.dismissedStore != nil {
 		dismissedIDs = m.dismissedStore.IDs()
@@ -333,12 +335,16 @@ func (m *Model) mergeSessions(newSessions []data.Session) {
 	visible := make([]data.Session, 0, len(m.allSessions))
 	for _, s := range m.allSessions {
 		if _, dismissed := dismissedIDs[s.ID]; dismissed {
-			// Resurface dismissed sessions that now need urgent attention
 			if data.SessionAttentionLevel(s) >= data.AttentionWarning {
-				if m.dismissedStore != nil {
-					m.dismissedStore.Remove(s.ID)
+				prevStatus, seen := m.prevSessions[s.ID]
+				statusChanged := seen && !strings.EqualFold(prevStatus, s.Status)
+				if statusChanged {
+					if m.dismissedStore != nil {
+						m.dismissedStore.Remove(s.ID)
+					}
+					visible = append(visible, s)
+					continue
 				}
-				visible = append(visible, s)
 			}
 			continue
 		}

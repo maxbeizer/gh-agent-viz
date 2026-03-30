@@ -729,29 +729,29 @@ repoLines = windowLines(repoLines, m.scrollOffsets[PanelRepos], rightContentBudg
 // ── RENDER PANELS ──
 
 activePanel := renderPanelFocused(
-fmt.Sprintf("Active (%d)", len(activeSessions)),
+fmt.Sprintf("❶ Active (%d)", len(activeSessions)),
 strings.Join(activeLines, "\n"), leftWidth, len(activeLines),
 m.focus == PanelActive, focusColor)
 
-recentPanel := renderPanelFocused("Recent",
+recentPanel := renderPanelFocused("❷ Recent",
 strings.Join(recentLines, "\n"), leftWidth, len(recentLines),
 m.focus == PanelRecent, focusColor)
 
 attnPanel := renderPanelFocused(
-fmt.Sprintf("Attention (%d)", len(m.attention)),
+fmt.Sprintf("❸ Attention (%d)", len(m.attention)),
 strings.Join(attnLines, "\n"), leftWidth, len(attnLines),
 m.focus == PanelAttention, focusColor)
 
 fleetPanel := renderPanel("Fleet", strings.Join(fleetLines, "\n"), rightWidth, len(fleetLines))
 
-repoPanel := renderPanelFocused("Repos",
+repoPanel := renderPanelFocused("❹ Repos",
 strings.Join(repoLines, "\n"), rightWidth, len(repoLines),
 m.focus == PanelRepos, focusColor)
 
 var idlePanel string
 if hasIdle {
 idlePanel = renderPanelFocused(
-fmt.Sprintf("Idle (%d)", len(idleSessions)),
+fmt.Sprintf("❺ Idle (%d)", len(idleSessions)),
 strings.Join(idleLines, "\n"), rightWidth, len(idleLines),
 m.focus == PanelIdle, focusColor)
 }
@@ -814,11 +814,11 @@ type tabDef struct {
 	label string
 }
 tabs := []tabDef{
-	{PanelActive, fmt.Sprintf("Active(%d)", len(activeSessions))},
-	{PanelRecent, fmt.Sprintf("Recent(%d)", len(recentDone))},
-	{PanelAttention, fmt.Sprintf("Attn(%d)", len(m.attention))},
-	{PanelRepos, fmt.Sprintf("Repos(%d)", len(m.repos))},
-	{PanelIdle, fmt.Sprintf("Idle(%d)", len(idleSessions))},
+	{PanelActive, fmt.Sprintf("❶ Active(%d)", len(activeSessions))},
+	{PanelRecent, fmt.Sprintf("❷ Recent(%d)", len(recentDone))},
+	{PanelAttention, fmt.Sprintf("❸ Attn(%d)", len(m.attention))},
+	{PanelRepos, fmt.Sprintf("❹ Repos(%d)", len(m.repos))},
+	{PanelIdle, fmt.Sprintf("❺ Idle(%d)", len(idleSessions))},
 }
 
 var tabParts []string

@@ -95,13 +95,13 @@ func (m Model) View() string {
 		})
 	}
 
-	// Right side: key hints
-	rightSegs := m.buildHintSegments()
-
 	left := renderPowerlineLeft(leftSegs)
+	leftW := lipgloss.Width(left)
+
+	// Right side: key hints (truncated to fit available space)
+	rightSegs := m.buildHintSegments(leftW)
 	right := renderPowerlineRight(rightSegs)
 
-	leftW := lipgloss.Width(left)
 	rightW := lipgloss.Width(right)
 	gap := m.width - leftW - rightW
 	if gap < 0 {
@@ -116,7 +116,7 @@ func (m Model) View() string {
 	return "\n" + lipgloss.JoinHorizontal(lipgloss.Top, left, mid, right)
 }
 
-func (m Model) buildHintSegments() []segment {
+func (m Model) buildHintSegments(leftWidth int) []segment {
 	if len(m.hints) == 0 {
 		return nil
 	}
@@ -144,12 +144,15 @@ func (m Model) buildHintSegments() []segment {
 		segs[len(segs)-1].bg = colorMauve
 	}
 
-	// Truncate hints that don't fit
+	// Truncate hints that don't fit — reserve space for the left badge + a small gap
 	totalW := 0
 	for _, s := range segs {
 		totalW += lipgloss.Width(s.text) + 1 // +1 for separator
 	}
-	maxRight := m.width / 2
+	maxRight := m.width - leftWidth - 4
+	if maxRight < 20 {
+		maxRight = 20
+	}
 	for totalW > maxRight && len(segs) > 2 {
 		dropped := segs[len(segs)-2]
 		totalW -= lipgloss.Width(dropped.text) + 1

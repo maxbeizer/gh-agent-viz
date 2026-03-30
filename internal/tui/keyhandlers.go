@@ -543,6 +543,16 @@ func (m Model) handleMissionKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.mission.CyclePanel(1)
 	case "shift+tab", "backtab":
 		m.mission.CyclePanel(-1)
+	case "1":
+		m.mission.SetFocus(mission.PanelActive)
+	case "2":
+		m.mission.SetFocus(mission.PanelRecent)
+	case "3":
+		m.mission.SetFocus(mission.PanelAttention)
+	case "4":
+		m.mission.SetFocus(mission.PanelRepos)
+	case "5":
+		m.mission.SetFocus(mission.PanelIdle)
 	case "enter":
 		// Drill into selected item based on focused panel
 		switch m.mission.Focus() {

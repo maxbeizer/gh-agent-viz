@@ -165,12 +165,9 @@ func (m *Model) updateFooterHints() {
 		m.footer.SetBadge(" 🚀 Mission ", footer.BadgeBgMission())
 		m.footer.ClearStatus()
 		missionHints := []key.Binding{
+			key.NewBinding(key.WithKeys("1-5"), key.WithHelp("1-5", "panel")),
 			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "navigate")),
-			key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "panel")),
 			m.keys.SelectTask,
-			m.keys.ToggleKanban,
-			m.keys.SearchFilter,
-			m.keys.RefreshData,
 			m.keys.ShowHelp,
 			m.keys.ExitApp,
 		}

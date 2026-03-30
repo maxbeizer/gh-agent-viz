@@ -207,6 +207,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.header.SetSize(msg.Width, msg.Height)
 		m.help.SetSize(msg.Width, msg.Height)
 		m.statsBar.SetWidth(msg.Width)
+		m.footer.SetWidth(msg.Width)
 		m.updateSplitLayout()
 		m.ready = true
 		// Debounce heavy component resizes (logview, diffview, etc.)

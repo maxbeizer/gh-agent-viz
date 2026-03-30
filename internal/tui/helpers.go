@@ -122,7 +122,7 @@ func (m *Model) updateFooterHints() {
 		if session != nil && session.Source == data.SourceLocalCopilot && session.WorkDir != "" {
 			hints = append(hints, m.keys.ShowGitActivity)
 		}
-		hints = append(hints, m.keys.ShowHelp, m.keys.ExitApp)
+		hints = append(hints, m.keys.DismissSession, m.keys.ShowHelp, m.keys.ExitApp)
 		m.footer.SetHints(hints)
 	case ViewModeLog:
 		m.footer.SetBadge(" 📜 Logs ", footer.BadgeBgLog())

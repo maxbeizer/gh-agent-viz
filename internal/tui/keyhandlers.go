@@ -319,6 +319,11 @@ func (m Model) handleDetailKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		} else if session != nil {
 			m.toast.Push("ℹ️", "Git Activity", "only available for local sessions with a working directory")
 		}
+	case "x":
+		m.taskList.DismissSelected()
+		m.viewMode = ViewModeMission
+		m.mission.SetSessions(m.visibleSessions())
+		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 	}
 	return m, nil
 }

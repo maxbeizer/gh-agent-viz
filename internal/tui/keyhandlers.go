@@ -325,7 +325,11 @@ func (m Model) handleDetailKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.toast.Push("ℹ️", "Git Activity", "only available for local sessions with a working directory")
 		}
 	case "x":
-		m.taskList.DismissSelected()
+		session := m.taskDetail.Session()
+		if session != nil && session.ID != "" && m.dismissedStore != nil {
+			m.dismissedStore.Add(session.ID)
+			m.taskList.DismissByID(session.ID)
+		}
 		m.lastFingerprint = "" // force recompute
 		m.lastSplitTaskID = ""
 		m.recomputeAndDisplay(m.visibleSessions())

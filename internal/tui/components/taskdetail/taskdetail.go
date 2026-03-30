@@ -112,6 +112,11 @@ func (m *Model) SetTask(session *data.Session) {
 	m.session = session
 }
 
+// Session returns the currently displayed session, or nil.
+func (m *Model) Session() *data.Session {
+	return m.session
+}
+
 // SetAllSessions updates the full session list for dependency graph rendering.
 func (m *Model) SetAllSessions(sessions []data.Session) {
 	m.allSessions = sessions

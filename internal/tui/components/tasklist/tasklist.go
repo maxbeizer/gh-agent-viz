@@ -390,14 +390,19 @@ func (m *Model) DismissSelected() {
 	if selected == nil || selected.ID == "" {
 		return
 	}
-	m.dismissedIDs[selected.ID] = struct{}{}
+	m.DismissByID(selected.ID)
+}
+
+// DismissByID removes a session by ID from the view and marks it dismissed.
+func (m *Model) DismissByID(id string) {
+	m.dismissedIDs[id] = struct{}{}
 	if m.dismissedStore != nil {
-		m.dismissedStore.Add(selected.ID)
+		m.dismissedStore.Add(id)
 	}
 	// Remove from current sessions
 	newSessions := make([]data.Session, 0, len(m.sessions)-1)
 	for _, s := range m.sessions {
-		if s.ID != selected.ID {
+		if s.ID != id {
 			newSessions = append(newSessions, s)
 		}
 	}

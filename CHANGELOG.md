@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [v0.10.1] - 2026-03-30
+
+### Fixed
+
+- **Reduced CPU usage** — animation tick loop now stops entirely when no sessions are active and no toasts are visible, instead of ticking indefinitely. Fast animation interval slowed from 100ms to 200ms.
+- **Split view caching** — detail pane in split view no longer recomputes dependency graph on every render; caches by selected session ID and invalidates on data refresh.
+
+### Added
+
+- `--profile <file>` flag — captures a CPU profile (pprof format) for the duration of the session. Analyze with `go tool pprof -http=:8080 <file>`.
+
 ## [v0.10.0] - 2026-03-27
 
 ### Added

@@ -71,7 +71,9 @@ type Model struct {
 	ready        bool
 	repo         string
 	refreshInt   time.Duration
-	animFrame    int
+	animFrame       int
+	animRunning     bool // true while the animation tick loop is active
+	lastSplitTaskID string // cached session ID for split view to avoid redundant SetTask
 	toast        toast.Model
 	prevSessions map[string]string // session ID → previous status
 	demo         bool
@@ -352,7 +354,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.fetchGitDiff(session.WorkDir), m.gitDiffPollTick())
 
 	case refreshTickMsg:
-		return m, tea.Batch(m.fetchTasks, m.refreshCmd())
+		cmds := []tea.Cmd{m.fetchTasks, m.refreshCmd()}
+		// Restart animation tick loop if it stopped and conditions now warrant it
+		if m.ctx.Config.AnimationsEnabled() && !m.animRunning && m.needsAnimation() {
+			m.animRunning = true
+			cmds = append(cmds, m.animationTickCmd())
+		}
+		return m, tea.Batch(cmds...)
 
 	case animationTickMsg:
 		m.animFrame++
@@ -361,7 +369,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.kanban.SetAnimFrame(m.animFrame)
 		m.mission.SetAnimFrame(m.animFrame)
 		m.activeView.SetAnimFrame(m.animFrame)
-		return m, m.animationTickCmd()
+		cmd := m.animationTickCmd()
+		m.animRunning = cmd != nil
+		return m, cmd
 
 	case logPollTickMsg:
 		if m.viewMode != ViewModeLog || !m.logView.IsLive() {
@@ -465,8 +475,9 @@ func (m Model) View() tea.View {
 	case ViewModeList:
 		if m.previewVisible() {
 			selected := m.taskList.SelectedTask()
-			if selected != nil {
+			if selected != nil && selected.ID != m.lastSplitTaskID {
 				m.taskDetail.SetTask(selected)
+				m.lastSplitTaskID = selected.ID
 			}
 			leftContent := m.taskList.View()
 			rightContent := m.taskDetail.ViewSplit()

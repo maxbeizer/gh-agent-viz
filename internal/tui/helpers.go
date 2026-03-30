@@ -267,13 +267,17 @@ func (m Model) refreshCmd() tea.Cmd {
 	})
 }
 
+func (m Model) needsAnimation() bool {
+	return m.ctx.Counts.Active > 0 || m.toast.HasToasts()
+}
+
 func (m Model) animationTickCmd() tea.Cmd {
-	// Use a slower tick when nothing needs animating (no active sessions, no toasts).
-	interval := 500 * time.Millisecond
-	if m.ctx.Counts.Active > 0 || m.toast.HasToasts() {
-		interval = 100 * time.Millisecond
+	// Stop the tick loop entirely when nothing needs animating.
+	// The loop is restarted by refreshTickMsg when conditions change.
+	if !m.needsAnimation() {
+		return nil
 	}
-	return tea.Tick(interval, func(time.Time) tea.Msg {
+	return tea.Tick(200*time.Millisecond, func(time.Time) tea.Msg {
 		return animationTickMsg{}
 	})
 }
@@ -294,6 +298,9 @@ func (m Model) gitDiffPollTick() tea.Cmd {
 // entries in-place and appending truly new ones, then recomputes counts
 // and applies the current filter.
 func (m *Model) mergeSessions(newSessions []data.Session) {
+	// Invalidate the split-view cache so updated data is reflected
+	m.lastSplitTaskID = ""
+
 	// Build index of existing sessions by ID
 	existingIdx := map[string]int{}
 	for i, s := range m.allSessions {

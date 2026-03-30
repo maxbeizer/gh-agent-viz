@@ -155,3 +155,74 @@ func TestDismissedStore_FileFormatIsJSON(t *testing.T) {
 		t.Errorf("unexpected file content: %v", ids)
 	}
 }
+
+func TestDismissedStore_Remove(t *testing.T) {
+	dir := t.TempDir()
+	s := &DismissedStore{
+		ids:  map[string]struct{}{},
+		path: filepath.Join(dir, "dismissed.json"),
+	}
+
+	s.Add("a")
+	s.Add("b")
+	s.Add("c")
+	s.Remove("b")
+
+	ids := s.IDs()
+	if len(ids) != 2 {
+		t.Fatalf("expected 2 IDs after remove, got %d", len(ids))
+	}
+	if _, ok := ids["b"]; ok {
+		t.Error("expected b to be removed")
+	}
+	if _, ok := ids["a"]; !ok {
+		t.Error("expected a to remain")
+	}
+}
+
+func TestDismissedStore_RemoveNonexistent(t *testing.T) {
+	dir := t.TempDir()
+	s := &DismissedStore{
+		ids:  map[string]struct{}{},
+		path: filepath.Join(dir, "dismissed.json"),
+	}
+
+	s.Add("a")
+	s.Remove("nonexistent") // should not panic or corrupt
+
+	ids := s.IDs()
+	if len(ids) != 1 {
+		t.Fatalf("expected 1 ID, got %d", len(ids))
+	}
+}
+
+func TestDismissedStore_RemovePersists(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "dismissed.json")
+
+	s1 := &DismissedStore{
+		ids:  map[string]struct{}{},
+		path: path,
+	}
+	s1.Add("keep")
+	s1.Add("remove-me")
+	s1.Remove("remove-me")
+
+	// Reload from disk
+	s2 := &DismissedStore{
+		ids:  map[string]struct{}{},
+		path: path,
+	}
+	s2.load()
+
+	ids := s2.IDs()
+	if len(ids) != 1 {
+		t.Fatalf("expected 1 ID after reload, got %d", len(ids))
+	}
+	if _, ok := ids["keep"]; !ok {
+		t.Error("expected 'keep' to survive reload")
+	}
+	if _, ok := ids["remove-me"]; ok {
+		t.Error("expected 'remove-me' to be gone after reload")
+	}
+}

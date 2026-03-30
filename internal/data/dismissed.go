@@ -19,7 +19,11 @@ type DismissedStore struct {
 // NewDismissedStore loads dismissed IDs from the default file.
 // If the file is missing or corrupt, starts with an empty set.
 func NewDismissedStore() *DismissedStore {
-	path := dismissedFilePath()
+	return NewDismissedStoreFromPath(dismissedFilePath())
+}
+
+// NewDismissedStoreFromPath loads dismissed IDs from the given file path.
+func NewDismissedStoreFromPath(path string) *DismissedStore {
 	s := &DismissedStore{
 		ids:  map[string]struct{}{},
 		path: path,
@@ -47,6 +51,17 @@ func (s *DismissedStore) Add(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.ids[id] = struct{}{}
+	s.save()
+}
+
+// Remove un-dismisses a session ID and persists to disk.
+func (s *DismissedStore) Remove(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.ids[id]; !ok {
+		return
+	}
+	delete(s.ids, id)
 	s.save()
 }
 

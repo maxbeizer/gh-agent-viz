@@ -630,6 +630,7 @@ func (m Model) writeSnapshot() {
 			Status:         s.Status,
 			Title:          s.Title,
 			Repository:     s.Repository,
+			Source:         s.Source,
 			AttentionLevel: data.SessionAttentionLevel(s).String(),
 		}
 	}

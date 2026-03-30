@@ -36,11 +36,12 @@ type SnapshotCounts struct {
 
 // SnapshotSession is a minimal session summary for the snapshot.
 type SnapshotSession struct {
-	ID             string `json:"id"`
-	Status         string `json:"status"`
-	Title          string `json:"title"`
-	Repository     string `json:"repository"`
-	AttentionLevel string `json:"attention_level"`
+	ID             string        `json:"id"`
+	Status         string        `json:"status"`
+	Title          string        `json:"title"`
+	Repository     string        `json:"repository"`
+	Source         SessionSource `json:"source"`
+	AttentionLevel string        `json:"attention_level"`
 }
 
 // WriteSnapshot serialises a Snapshot to path as indented JSON.

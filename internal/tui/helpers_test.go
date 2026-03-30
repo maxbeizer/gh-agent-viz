@@ -108,3 +108,40 @@ func TestMergeSessions_BelowCapUnchanged(t *testing.T) {
 		t.Fatalf("expected 2 sessions, got %d", len(m.allSessions))
 	}
 }
+
+func TestMergeSessions_AutoUndismissUrgent(t *testing.T) {
+	store := data.NewDismissedStoreFromPath(t.TempDir() + "/dismissed.json")
+	store.Add("urgent-session")
+	store.Add("normal-session")
+
+	m := &Model{
+		ctx:            NewProgramContext(),
+		dismissedStore: store,
+		prevSessions:   map[string]string{},
+	}
+
+	sessions := []data.Session{
+		{ID: "urgent-session", Status: "failed", UpdatedAt: time.Unix(3000, 0)},
+		{ID: "normal-session", Status: "completed", UpdatedAt: time.Unix(2000, 0)},
+		{ID: "visible-session", Status: "running", UpdatedAt: time.Unix(1000, 0)},
+	}
+	m.mergeSessions(sessions)
+
+	// The urgent (failed) session should have been un-dismissed and be visible
+	ids := store.IDs()
+	if _, ok := ids["urgent-session"]; ok {
+		t.Error("expected urgent-session to be auto-undismissed")
+	}
+	// The normal completed session should remain dismissed
+	if _, ok := ids["normal-session"]; !ok {
+		t.Error("expected normal-session to remain dismissed")
+	}
+
+	// Check that the urgent session is in the visible set (ctx.Counts should include it)
+	if m.ctx.Counts.Attention != 1 {
+		t.Errorf("expected 1 attention count, got %d", m.ctx.Counts.Attention)
+	}
+	if m.ctx.Counts.All != 2 { // urgent + visible (normal is still dismissed)
+		t.Errorf("expected 2 visible sessions, got %d", m.ctx.Counts.All)
+	}
+}

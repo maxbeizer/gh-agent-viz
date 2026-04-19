@@ -17,6 +17,7 @@ type tasksLoadedMsg struct {
 	tasks       []data.Session
 	allSessions []data.Session // unfiltered, for mission
 	counts      FilterCounts
+	tokenUsage  map[string]*data.TokenUsage
 }
 
 // Phase 1: local sessions loaded (fast, filesystem only)
@@ -84,6 +85,7 @@ type gitDiffPollTickMsg struct{}
 // fetchTasks fetches the list of sessions (both agent tasks and local sessions)
 func (m Model) fetchTasks() tea.Msg {
 	var sessions []data.Session
+	var tokenUsage map[string]*data.TokenUsage
 
 	if m.demo {
 		sessions = data.DemoSessions()
@@ -108,7 +110,7 @@ func (m Model) fetchTasks() tea.Msg {
 		sessions = visible
 
 		// Enrich sessions with token usage from CLI logs
-		tokenUsage, _ := data.FetchTokenUsage()
+		tokenUsage, _ = data.FetchTokenUsage()
 		for i := range sessions {
 			if usage, ok := tokenUsage[sessions[i].ID]; ok {
 				if sessions[i].Telemetry == nil {
@@ -157,7 +159,7 @@ func (m Model) fetchTasks() tea.Msg {
 		sessions = filtered
 	}
 
-	return tasksLoadedMsg{sessions, allSessions, counts}
+	return tasksLoadedMsg{sessions, allSessions, counts, tokenUsage}
 }
 
 // fetchLocalSessions loads local sessions quickly (filesystem only)

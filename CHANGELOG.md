@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [v0.11.0] - 2026-04-19
+
+### Added
+
+- **Event-driven attention detection** — sessions now use lock file PID validation and `events.jsonl` state machine to accurately determine `needs-input` vs `running` vs `failed` status. Replaces the heuristic-based `workspace.yaml` approach which was unreliable.
+- **Last assistant message in attention panel** — each attention item shows the actual assistant message (`💬`) so you can see what's waiting on you without clicking in.
+- **24h attention cutoff** — sessions older than 24 hours are filtered out of the attention panel to reduce noise from stale sessions.
+- **Cost estimates** — per-model token pricing (Opus/Haiku/GPT-4/default) with `💰 $X.XX` shown in the stats bar and Fleet panel.
+- **Model distribution** — shows which AI models are being used across sessions in the Activity panel.
+- **Sparkline component** — reusable `▁▂▃▄▅▆▇█` renderer with trend arrows (↑↓→) for data visualization.
+- **24h activity heatmap** — hourly session density strip using `░▒▓█` intensity blocks.
+- **7-day trend sparkline** — daily session counts with directional trend arrow.
+- **Pulse animation** — `◐◓◑◒` live indicator in the Fleet panel title.
+
+### Changed
+
+- **Attention-first layout** — mission dashboard restructured with Attention as the primary panel (60% left column). Active, Recent, Fleet, and Activity panels are compact context on the right.
+- **Collapsed failed sessions** — failed sessions in the attention panel are collapsed into a single summary line (`❌ N failed sessions`) instead of one per failure.
+- **Stats bar simplified** — removed idle/warning counts; unified to `✋ N attention`.
+- **Removed Repos panel** — repo breakdown removed from mission view to reduce clutter.
+- **Removed Idle panel** — idle sessions no longer shown in mission view.
+
+### Removed
+
+- **Kanban view** — the `K` key binding and kanban board view have been removed. The mission dashboard now covers all use cases better.
+
+### Fixed
+
+- **Flaky test** — `TestSelectedTaskReturnsCursorSession` fixed by using distinct timestamps to avoid nondeterministic sort order.
+
 ## [v0.10.2] - 2026-03-30
 
 ### Fixed

@@ -60,16 +60,17 @@ func TestMoveCursorInFocusedList(t *testing.T) {
 
 func TestSelectedTaskReturnsCursorSession(t *testing.T) {
 	model := newModel()
+	now := time.Now()
 	model.SetTasks([]data.Session{
-		{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: time.Now()},
-		{ID: "2", Status: "completed", Title: "Done 1", UpdatedAt: time.Now()},
-		{ID: "3", Status: "failed", Title: "Failed 1", UpdatedAt: time.Now()},
+		{ID: "1", Status: "running", Title: "Running 1", UpdatedAt: now.Add(-2 * time.Minute)},
+		{ID: "2", Status: "completed", Title: "Done 1", UpdatedAt: now.Add(-3 * time.Minute)},
+		{ID: "3", Status: "failed", Title: "Failed 1", UpdatedAt: now},
 	})
 
-	// First session should be selected by default (failed first due to priority)
+	// Most recent session (ID=3) should be selected by default
 	selected := model.SelectedTask()
 	if selected == nil || selected.ID != "3" {
-		t.Fatalf("expected failed task first due to priority, got %#v", selected)
+		t.Fatalf("expected most recent task (ID=3) first, got %#v", selected)
 	}
 
 	model.MoveCursor(1)

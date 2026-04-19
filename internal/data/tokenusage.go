@@ -3,6 +3,7 @@ package data
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,12 +14,71 @@ import (
 
 // TokenUsage holds aggregated token usage for a single session.
 type TokenUsage struct {
-	SessionID    string
-	Model        string
-	InputTokens  int64
-	OutputTokens int64
-	CachedTokens int64
-	Calls        int
+	SessionID     string
+	Model         string
+	InputTokens   int64
+	OutputTokens  int64
+	CachedTokens  int64
+	Calls         int
+	EstimatedCost float64
+}
+
+// modelPricing holds per-million-token input/output rates.
+type modelPricing struct {
+	inputPerMTok  float64
+	outputPerMTok float64
+}
+
+var defaultPricing = modelPricing{inputPerMTok: 3, outputPerMTok: 15}
+
+var modelPricingTable = []struct {
+	substring string
+	pricing   modelPricing
+}{
+	{"opus", modelPricing{inputPerMTok: 15, outputPerMTok: 75}},
+	{"haiku", modelPricing{inputPerMTok: 0.80, outputPerMTok: 4}},
+	{"gpt-4", modelPricing{inputPerMTok: 2.50, outputPerMTok: 10}},
+	{"gpt-5", modelPricing{inputPerMTok: 3, outputPerMTok: 15}},
+}
+
+func computeCost(model string, inputTokens, outputTokens int64) float64 {
+	p := defaultPricing
+	lower := strings.ToLower(model)
+	for _, entry := range modelPricingTable {
+		if strings.Contains(lower, entry.substring) {
+			p = entry.pricing
+			break
+		}
+	}
+	return (float64(inputTokens)/1_000_000)*p.inputPerMTok + (float64(outputTokens)/1_000_000)*p.outputPerMTok
+}
+
+// FormatCost formats a dollar amount nicely (e.g. "$0.42", "$1.23").
+func FormatCost(dollars float64) string {
+	if dollars < 0.01 {
+		return fmt.Sprintf("$%.4f", dollars)
+	}
+	return fmt.Sprintf("$%.2f", dollars)
+}
+
+// ModelDistribution returns a map of model name to session count from token usage data.
+func ModelDistribution(usage map[string]*TokenUsage) map[string]int {
+	dist := map[string]int{}
+	for _, u := range usage {
+		if u.Model != "" {
+			dist[u.Model]++
+		}
+	}
+	return dist
+}
+
+// TotalCost returns the sum of EstimatedCost across all sessions.
+func TotalCost(usage map[string]*TokenUsage) float64 {
+	var total float64
+	for _, u := range usage {
+		total += u.EstimatedCost
+	}
+	return total
 }
 
 // responseUsage mirrors the JSON usage block in log output.
@@ -217,4 +277,5 @@ func processJSONBlock(jsonStr string, sessionID string, result map[string]*Token
 		}
 		usage.Model = model
 	}
+	usage.EstimatedCost = computeCost(usage.Model, usage.InputTokens, usage.OutputTokens)
 }

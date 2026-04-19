@@ -126,10 +126,10 @@ func TestMergeSessions_AutoUndismissOnStatusChange(t *testing.T) {
 	}
 
 	sessions := []data.Session{
-		{ID: "transitioning-session", Status: "failed", UpdatedAt: time.Unix(3000, 0)},
-		{ID: "already-failed-session", Status: "failed", UpdatedAt: time.Unix(2000, 0)},
-		{ID: "normal-session", Status: "completed", UpdatedAt: time.Unix(1500, 0)},
-		{ID: "visible-session", Status: "running", UpdatedAt: time.Unix(1000, 0)},
+		{ID: "transitioning-session", Status: "failed", UpdatedAt: time.Now().Add(-1 * time.Hour)},
+		{ID: "already-failed-session", Status: "failed", UpdatedAt: time.Now().Add(-2 * time.Hour)},
+		{ID: "normal-session", Status: "completed", UpdatedAt: time.Now().Add(-3 * time.Hour)},
+		{ID: "visible-session", Status: "running", UpdatedAt: time.Now().Add(-4 * time.Hour)},
 	}
 	m.mergeSessions(sessions)
 

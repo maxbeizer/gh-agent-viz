@@ -116,12 +116,21 @@ const IdleWarningThreshold = 4 * time.Hour
 // it's considered a warning.
 const QueuedWarningThreshold = 30 * time.Minute
 
+// AttentionMaxAge is how old a session can be and still appear in the
+// attention panel. Sessions older than this are considered stale and ignored.
+const AttentionMaxAge = 24 * time.Hour
+
 // SessionAttentionLevel returns the graduated attention level for a session.
 func SessionAttentionLevel(session Session) AttentionLevel {
 	status := strings.ToLower(strings.TrimSpace(session.Status))
 
 	// Urgent: explicit failures or blocking on user input
 	if status == "needs-input" || status == "failed" {
+		// Skip stale sessions — if last activity was over AttentionMaxAge ago,
+		// you've moved on and don't need to be nagged about it.
+		if !session.UpdatedAt.IsZero() && time.Since(session.UpdatedAt) > AttentionMaxAge {
+			return AttentionNone
+		}
 		return AttentionUrgent
 	}
 

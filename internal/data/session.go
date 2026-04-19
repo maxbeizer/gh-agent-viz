@@ -49,7 +49,8 @@ type Session struct {
 	Source     SessionSource `json:"source"`
 	WorkDir    string        `json:"workDir,omitempty"` // local filesystem path (git_root or cwd)
 	Telemetry  *SessionTelemetry `json:"telemetry,omitempty"`
-	HasLog     bool              `json:"-"` // true when a viewable log exists (e.g. events.jsonl)
+	HasLog               bool              `json:"-"` // true when a viewable log exists (e.g. events.jsonl)
+	LastAssistantMessage string            `json:"-"` // last assistant message (for attention display)
 }
 
 // FromAgentTask converts an AgentTask to a Session

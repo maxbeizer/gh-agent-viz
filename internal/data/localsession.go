@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -110,7 +112,8 @@ func fetchLocalSessionsUncached() ([]Session, error) {
 		// workspace.yaml's updated_at is written once and not continuously
 		// updated, so the file mtime of events.jsonl (which is appended to
 		// during active work) is a better indicator of recent activity.
-		eventsFile := filepath.Join(sessionDir, entry.Name(), "events.jsonl")
+		entryDir := filepath.Join(sessionDir, entry.Name())
+		eventsFile := filepath.Join(entryDir, "events.jsonl")
 		if info, err := os.Stat(eventsFile); err == nil && info.Size() > 0 {
 			session.HasLog = true
 			if mtime := info.ModTime(); mtime.After(session.UpdatedAt) {
@@ -118,6 +121,15 @@ func fetchLocalSessionsUncached() ([]Session, error) {
 				// Re-derive status with the corrected activity time
 				session.Status = DeriveLocalSessionStatus(session.Status, session.UpdatedAt)
 			}
+		}
+
+		// Event-driven status detection (more accurate than workspace.yaml flags)
+		eventStatus, lastMsg := deriveStatusFromEvents(entryDir)
+		if eventStatus != "" {
+			session.Status = eventStatus
+		}
+		if lastMsg != "" {
+			session.LastAssistantMessage = lastMsg
 		}
 
 		sessions = append(sessions, session)
@@ -412,6 +424,140 @@ func truncateTitle(s string) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// stateBearingEvents are event types that indicate session state.
+// Hook events, tool completion, and other noise are ignored.
+var stateBearingEvents = map[string]bool{
+	"assistant.turn_end":   true,
+	"assistant.turn_start": true,
+	"tool.execution_start": true,
+	"user.message":         true,
+	"session.shutdown":     true,
+	"session.start":        true,
+	"abort":                true,
+	"session.error":        true,
+}
+
+// deriveStatusFromEvents determines session status by examining lock files and
+// the tail of events.jsonl. This is more accurate than workspace.yaml fields
+// which are often not updated.
+//
+// State machine:
+//   - Lock alive + last state event is assistant.turn_end → "needs-input"
+//   - Lock alive + last state event is assistant.turn_start/tool.execution_start/user.message → "running"
+//   - No live lock + last state event is abort/session.error → "failed"
+//   - No live lock + last state event is session.shutdown → "completed"
+//   - No live lock + other → "completed" (default for detached)
+//
+// Also returns the last assistant message content for display in attention panels.
+func deriveStatusFromEvents(sessionDir string) (status string, lastMsg string) {
+	// Check for live lock files: inuse.{PID}.lock
+	locks, _ := filepath.Glob(filepath.Join(sessionDir, "inuse.*.lock"))
+	hasLiveLock := false
+	for _, lock := range locks {
+		base := filepath.Base(lock)
+		parts := strings.Split(base, ".")
+		if len(parts) >= 2 {
+			pid, err := strconv.Atoi(parts[1])
+			if err == nil && isProcessAlive(pid) {
+				hasLiveLock = true
+				break
+			}
+		}
+	}
+
+	// Tail events.jsonl (last 50 lines)
+	eventsFile := filepath.Join(sessionDir, "events.jsonl")
+	lines := tailFile(eventsFile, 50)
+	if len(lines) == 0 {
+		return "", ""
+	}
+
+	// Scan backward for the last state-bearing event
+	var lastStateEvent string
+	for i := len(lines) - 1; i >= 0; i-- {
+		var event struct {
+			Type string          `json:"type"`
+			Data json.RawMessage `json:"data"`
+		}
+		if json.Unmarshal([]byte(lines[i]), &event) != nil {
+			continue
+		}
+		if stateBearingEvents[event.Type] {
+			lastStateEvent = event.Type
+			break
+		}
+	}
+
+	// Scan backward for the last assistant message
+	for i := len(lines) - 1; i >= 0; i-- {
+		var event struct {
+			Type string `json:"type"`
+			Data struct {
+				Content string `json:"content"`
+			} `json:"data"`
+		}
+		if json.Unmarshal([]byte(lines[i]), &event) != nil {
+			continue
+		}
+		if event.Type == "assistant.message" && event.Data.Content != "" {
+			lastMsg = strings.TrimSpace(event.Data.Content)
+			// Get just the last paragraph/sentence for display
+			if idx := strings.LastIndex(lastMsg, "\n\n"); idx >= 0 {
+				lastMsg = strings.TrimSpace(lastMsg[idx+2:])
+			}
+			break
+		}
+	}
+
+	// Derive status
+	switch {
+	case hasLiveLock && lastStateEvent == "assistant.turn_end":
+		status = "needs-input"
+	case hasLiveLock:
+		status = "running"
+	case lastStateEvent == "abort" || lastStateEvent == "session.error":
+		status = "failed"
+	case lastStateEvent == "session.shutdown":
+		status = "completed"
+	default:
+		// No live lock and no terminal event — defer to existing heuristics
+		status = ""
+	}
+	return status, lastMsg
+}
+
+// isProcessAlive checks if a process with the given PID is running.
+func isProcessAlive(pid int) bool {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	// On Unix, FindProcess always succeeds. Use Signal(0) to probe.
+	err = process.Signal(syscall.Signal(0))
+	return err == nil
+}
+
+// tailFile reads the last n lines of a file. Returns nil on error.
+func tailFile(path string, n int) []string {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	// Read all lines (most events.jsonl are small enough)
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	var all []string
+	for scanner.Scan() {
+		all = append(all, scanner.Text())
+	}
+	if len(all) <= n {
+		return all
+	}
+	return all[len(all)-n:]
 }
 
 // FetchLocalSessionLog reads events.jsonl for a local session and formats it

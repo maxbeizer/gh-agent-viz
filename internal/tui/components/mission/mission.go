@@ -9,6 +9,7 @@ import (
 "charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/compat"
 "github.com/maxbeizer/gh-agent-viz/internal/data"
+"github.com/maxbeizer/gh-agent-viz/internal/tui/components/sparkline"
 )
 
 // SessionCard pairs a session with its derived last-action text.
@@ -67,6 +68,7 @@ scrollOffsets [5]int  // per-panel scroll offset (first visible item index)
 panelHeights  [5]int  // per-panel visible content height from last render
 // Panel Y ranges for mouse click detection (set during render)
 panelYRanges [3][2]int // [panel][start, end] row ranges
+tokenUsage map[string]*data.TokenUsage
 statusIcon func(string) string
 animStatusIcon func(string, int) string
 animFrame  int
@@ -103,6 +105,11 @@ m.computeStats()
 m.computeRepos()
 m.computeAttention()
 m.clampCursor()
+}
+
+// SetTokenUsage stores the token usage map for cost/model display.
+func (m *Model) SetTokenUsage(usage map[string]*data.TokenUsage) {
+	m.tokenUsage = usage
 }
 
 func (m *Model) computeStats() {
@@ -180,13 +187,12 @@ var reason string
 switch {
 case status == "needs-input":
 reason = "🔴 Waiting for input"
-if s.Source == data.SourceLocalCopilot {
-if msg := data.FetchLastAssistantMessage(s.ID); msg != "" {
+if s.LastAssistantMessage != "" {
+msg := s.LastAssistantMessage
 if len(msg) > 60 {
 msg = msg[:57] + "..."
 }
 reason = "🔴 \"" + msg + "\""
-}
 }
 case status == "failed":
 reason = "🔴 Failed"
@@ -654,6 +660,10 @@ if s.Telemetry != nil { totalTokens += s.Telemetry.InputTokens }
 if totalTokens > 0 {
 summaryParts = append(summaryParts, fmt.Sprintf("🪙 %s", data.FormatTokenCount(totalTokens)))
 }
+// Pulse animation indicator
+pulseFrames := []string{"◐", "◓", "◑", "◒"}
+pulseChar := pulseFrames[m.animFrame % len(pulseFrames)]
+pulseStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("28"), Dark: lipgloss.Color("42")})
 fleetLines = append(fleetLines, strings.Join(summaryParts, "  "))
 barWidth := rightWidth - 6
 if barWidth > 50 { barWidth = 50 }
@@ -666,6 +676,51 @@ var todayParts []string
 if todayDone > 0 { todayParts = append(todayParts, fmt.Sprintf("✅ %d completed", todayDone)) }
 if todayTokens > 0 { todayParts = append(todayParts, fmt.Sprintf("🪙 %s", data.FormatTokenCount(todayTokens))) }
 fleetLines = append(fleetLines, dim.Render("today: " + strings.Join(todayParts, "  ")))
+}
+
+// Cost estimate
+totalCost := data.TotalCost(m.tokenUsage)
+if totalCost > 0 {
+fleetLines = append(fleetLines, dim.Render("est. cost: " + data.FormatCost(totalCost)))
+}
+
+// Activity panel content (split from fleet)
+var activityLines []string
+
+// 24h activity heatmap
+hourly := data.HourlyActivity(m.sessions)
+hourlyFloats := make([]float64, 24)
+for i, v := range hourly {
+hourlyFloats[i] = float64(v)
+}
+heatmapStr := sparkline.RenderHeatmap(hourlyFloats, 24)
+heatLabel := lipgloss.NewStyle().Bold(true).Foreground(compat.AdaptiveColor{Light: lipgloss.Color("172"), Dark: lipgloss.Color("214")}).Render("🔥 24h")
+activityLines = append(activityLines, heatLabel + " " + heatmapStr + dim.Render("  0h─────────12h────────23h"))
+
+// 7-day trend
+daily7 := data.DailySessionCounts(m.sessions, 7)
+daily7f := make([]float64, len(daily7))
+for i, v := range daily7 { daily7f[i] = float64(v) }
+trendStr := sparkline.Render(daily7f, 14)
+arrow := sparkline.TrendArrow(daily7f)
+trendLabel := lipgloss.NewStyle().Bold(true).Foreground(compat.AdaptiveColor{Light: lipgloss.Color("30"), Dark: lipgloss.Color("75")}).Render("📊 7d")
+activityLines = append(activityLines, trendLabel + "  " + trendStr + " " + arrow)
+
+// Model distribution
+if m.tokenUsage != nil {
+dist := data.ModelDistribution(m.tokenUsage)
+if len(dist) > 0 {
+activityLines = append(activityLines, "")
+modelLabel := lipgloss.NewStyle().Bold(true).Foreground(compat.AdaptiveColor{Light: lipgloss.Color("99"), Dark: lipgloss.Color("141")}).Render("🤖 Models")
+activityLines = append(activityLines, modelLabel)
+type mc struct { name string; count int }
+var models []mc
+for k, v := range dist { models = append(models, mc{k, v}) }
+sort.Slice(models, func(i, j int) bool { return models[i].count > models[j].count })
+for _, mdl := range models {
+activityLines = append(activityLines, dim.Render(fmt.Sprintf("  %s: %d sessions", mdl.name, mdl.count)))
+}
+}
 }
 
 // Repos
@@ -686,16 +741,17 @@ repoLines = append(repoLines, m.renderRepoRow(r, selected, rInnerW))
 // Fleet is treated as fixed-size (always shows all its lines).
 
 leftPanelCount := 3 // Active, Recent, Attention
-rightPanelCount := 2 // Fleet, Repos
+rightPanelCount := 3 // Fleet, Activity, Repos
 hasIdle := len(idleLines) > 0
-if hasIdle { rightPanelCount = 3 }
+if hasIdle { rightPanelCount = 4 }
 
 leftContentBudget := availHeight - (leftPanelCount * panelChrome)
 if leftContentBudget < leftPanelCount { leftContentBudget = leftPanelCount }
 
-// Right column: reserve fleet lines first (fixed), budget the rest.
+// Right column: reserve fleet+activity lines first (fixed), budget the rest.
 fleetFixed := len(fleetLines)
-rightContentBudget := availHeight - (rightPanelCount * panelChrome) - fleetFixed
+activityFixed := len(activityLines)
+rightContentBudget := availHeight - (rightPanelCount * panelChrome) - fleetFixed - activityFixed
 if rightContentBudget < 2 { rightContentBudget = 2 }
 
 // Allocate left column: Active (priority) → Recent → Attention
@@ -742,7 +798,9 @@ fmt.Sprintf("❸ Attention (%d)", len(m.attention)),
 strings.Join(attnLines, "\n"), leftWidth, len(attnLines),
 m.focus == PanelAttention, focusColor)
 
-fleetPanel := renderPanel("Fleet", strings.Join(fleetLines, "\n"), rightWidth, len(fleetLines))
+fleetTitle := pulseStyle.Render(pulseChar) + " Fleet"
+fleetPanel := renderPanel(fleetTitle, strings.Join(fleetLines, "\n"), rightWidth, len(fleetLines))
+activityPanel := renderPanel("📊 Activity", strings.Join(activityLines, "\n"), rightWidth, len(activityLines))
 
 repoPanel := renderPanelFocused("❹ Repos",
 strings.Join(repoLines, "\n"), rightWidth, len(repoLines),
@@ -759,7 +817,7 @@ m.focus == PanelIdle, focusColor)
 // ── ASSEMBLE COLUMNS ──
 leftCol := lipgloss.JoinVertical(lipgloss.Left, activePanel, recentPanel, attnPanel)
 
-rightPanels := []string{fleetPanel, repoPanel}
+rightPanels := []string{fleetPanel, activityPanel, repoPanel}
 if hasIdle {
 rightPanels = append(rightPanels, idlePanel)
 }
@@ -837,7 +895,11 @@ if m.stats.Active > 0 { summaryParts = append(summaryParts, fmt.Sprintf("● %d 
 if m.stats.Idle > 0 { summaryParts = append(summaryParts, fmt.Sprintf("💤 %d idle", m.stats.Idle)) }
 if m.stats.Done > 0 { summaryParts = append(summaryParts, fmt.Sprintf("✅ %d done", m.stats.Done)) }
 if m.stats.Failed > 0 { summaryParts = append(summaryParts, fmt.Sprintf("❌ %d fail", m.stats.Failed)) }
-fleetLine := "  " + strings.Join(summaryParts, "  ")
+// Pulse animation
+pulseFrames := []string{"◐", "◓", "◑", "◒"}
+pulseChar := pulseFrames[m.animFrame % len(pulseFrames)]
+pulseStyle := lipgloss.NewStyle().Foreground(compat.AdaptiveColor{Light: lipgloss.Color("28"), Dark: lipgloss.Color("42")})
+fleetLine := "  " + pulseStyle.Render(pulseChar + " LIVE") + "  " + strings.Join(summaryParts, "  ")
 
 // Chrome: fleet line + tab bar + blank line = 3 lines.
 contentHeight := availHeight - 3

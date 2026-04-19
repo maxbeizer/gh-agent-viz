@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -80,7 +79,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	// / activates search in navigable views
 	if msg.String() == "/" {
-		if m.viewMode == ViewModeList || m.viewMode == ViewModeKanban || m.viewMode == ViewModeMission || m.viewMode == ViewModeActive {
+		if m.viewMode == ViewModeList || m.viewMode == ViewModeMission || m.viewMode == ViewModeActive {
 			m.searchActive = true
 			m.searchQuery = ""
 			return m, nil
@@ -96,8 +95,6 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleLogKeys(msg)
 	case ViewModeDiff:
 		return m.handleDiffKeys(msg)
-	case ViewModeKanban:
-		return m.handleKanbanKeys(msg)
 	case ViewModeToolTimeline:
 		return m.handleToolTimelineKeys(msg)
 	case ViewModeMission:
@@ -210,11 +207,6 @@ func (m Model) handleListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.taskList.ToggleGroupExpand()
 			return m, nil
 		}
-	case "K":
-		m.viewMode = ViewModeKanban
-		m.kanban.SetSessions(m.visibleSessions())
-		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-6)
-		return m, nil
 	case "M":
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
@@ -455,66 +447,6 @@ func (m Model) handleLogKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleKanbanKeys handles keys in kanban view mode
-func (m Model) handleKanbanKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc", "K":
-		m.viewMode = ViewModeMission
-		m.mission.SetSessions(m.visibleSessions())
-		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
-	case "h", "left":
-		m.kanban.MoveColumn(-1)
-	case "l", "right":
-		m.kanban.MoveColumn(1)
-	case "tab":
-		m.kanban.MoveColumn(1)
-	case "shift+tab", "backtab":
-		m.kanban.MoveColumn(-1)
-	case "j", "down":
-		m.kanban.MoveRow(1)
-	case "k", "up":
-		m.kanban.MoveRow(-1)
-	case "enter":
-		session := m.kanban.SelectedSession()
-		if session != nil {
-			if session.Source == data.SourceLocalCopilot {
-				m.ctx.Error = nil
-				m.viewMode = ViewModeDetail
-				m.taskDetail.SetTask(session)
-				return m, nil
-			}
-			m.viewMode = ViewModeDetail
-			return m, m.fetchTaskDetail(session.ID, session.Repository)
-		}
-	case "X":
-		// Dismiss completed/failed sessions from all sessions
-		count := 0
-		if m.dismissedStore != nil {
-			m.toast.Push("🧹", "Sweeping", "clearing the decks...")
-			for _, s := range m.allSessions {
-				status := strings.ToLower(strings.TrimSpace(s.Status))
-				if status == "completed" || status == "failed" {
-					m.dismissedStore.Add(s.ID)
-					count++
-				}
-			}
-		}
-		if count > 0 {
-			m.toast.Push("✨", "Spotless", fmt.Sprintf("%d session(s) swept away", count))
-			m.kanban.SetSessions(m.visibleSessions())
-		} else {
-			m.toast.Push("🤷", "Already clean", "nothing to dismiss")
-		}
-	case "r":
-		return m, m.fetchTasks
-	case "A":
-		m.viewMode = ViewModeActive
-		m.activeView.SetSessions(m.visibleSessions())
-		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-6)
-	}
-	return m, nil
-}
-
 // handleToolTimelineKeys handles keys in tool timeline view mode
 func (m Model) handleToolTimelineKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
@@ -584,10 +516,6 @@ func (m Model) handleMissionKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.taskList.SetTasks(filtered)
 			}
 		}
-	case "K":
-		m.viewMode = ViewModeKanban
-		m.kanban.SetSessions(m.visibleSessions())
-		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-6)
 	case "A":
 		m.viewMode = ViewModeActive
 		m.activeView.SetSessions(m.visibleSessions())
@@ -648,10 +576,6 @@ func (m Model) handleActiveKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.recomputeAndDisplay(m.visibleSessions())
 	case "r":
 		return m, m.fetchTasks
-	case "K":
-		m.viewMode = ViewModeKanban
-		m.kanban.SetSessions(m.visibleSessions())
-		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-6)
 	case "M":
 		m.viewMode = ViewModeMission
 		m.mission.SetSessions(m.visibleSessions())
@@ -668,8 +592,6 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			switch m.viewMode {
 			case ViewModeList:
 				m.taskList.MoveCursor(-3)
-			case ViewModeKanban:
-				m.kanban.MoveRow(-1)
 			case ViewModeMission:
 				m.mission.MoveCursor(-1)
 			case ViewModeActive:
@@ -690,8 +612,6 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			switch m.viewMode {
 			case ViewModeList:
 				m.taskList.MoveCursor(3)
-			case ViewModeKanban:
-				m.kanban.MoveRow(1)
 			case ViewModeMission:
 				m.mission.MoveCursor(1)
 			case ViewModeActive:

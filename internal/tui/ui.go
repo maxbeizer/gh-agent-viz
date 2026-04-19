@@ -18,7 +18,6 @@ import (
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/gitactivity"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/header"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/help"
-	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/kanban"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/logview"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/mission"
 	"github.com/maxbeizer/gh-agent-viz/internal/tui/components/activeview"
@@ -37,7 +36,6 @@ const (
 	ViewModeList ViewMode = iota
 	ViewModeDetail
 	ViewModeLog
-	ViewModeKanban
 	ViewModeToolTimeline
 	ViewModeMission
 	ViewModeDiff
@@ -57,7 +55,6 @@ type Model struct {
 	taskDetail  taskdetail.Model
 	logView     logview.Model
 	diffView    diffview.Model
-	kanban         kanban.Model
 	toolTimeline   tooltimeline.Model
 	conversationView conversation.Model
 	mission        mission.Model
@@ -78,6 +75,7 @@ type Model struct {
 	prevSessions map[string]string // session ID → previous status
 	demo         bool
 	allSessions  []data.Session // accumulated across load phases
+	tokenUsageMap map[string]*data.TokenUsage // cached for cost computation
 	initialLoadDone bool       // true after all initial load phases complete
 	lastFingerprint string     // hash of session data; used to skip no-op refreshes
 	searchActive bool          // true when search input is active
@@ -143,8 +141,6 @@ func NewModel(repo string, debug bool, demo bool, snapshotPath string, version s
 	switch ctx.Config.DefaultView {
 	case "table":
 		defaultView = ViewModeList
-	case "kanban":
-		defaultView = ViewModeKanban
 	case "active":
 		defaultView = ViewModeActive
 	case "dashboard", "mission", "":
@@ -162,7 +158,6 @@ func NewModel(repo string, debug bool, demo bool, snapshotPath string, version s
 		taskDetail:     taskdetail.New(theme.Title, theme.Border, StatusIcon),
 		logView:        logview.New(theme.Title, 80, 20),
 		diffView:       diffview.New(80, 20),
-		kanban:         kanban.New(theme.Title, theme.Border, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
 		toolTimeline:   tooltimeline.New(80, 20),
 		conversationView: conversation.New(80, 20),
 		mission:        mission.New(theme.Title, theme.TableRow, theme.TableRowSelected, StatusIcon, animIconFunc),
@@ -234,7 +229,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.gitActivity.SetSize(m.ctx.Width-4, m.ctx.Height-10)
 		m.mission.SetSize(m.ctx.Width, m.ctx.Height-6)
 		m.activeView.SetSize(m.ctx.Width, m.ctx.Height-6)
-		m.kanban.SetSize(m.ctx.Width, m.ctx.Height-6)
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -278,6 +272,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tasksLoadedMsg:
 		m.ctx.Error = nil
 		m.ctx.Counts = msg.counts
+		m.tokenUsageMap = msg.tokenUsage
 		m.header.SetCounts(header.FilterCounts{
 			All:       msg.counts.All,
 			Attention: msg.counts.Attention,
@@ -289,9 +284,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.taskList.SetLoading(false)
 		m.taskList.SetTasks(msg.tasks)
 		// Always push sessions to all views so they're current when switched to.
-		m.kanban.SetSessions(msg.allSessions)
 		m.mission.SetSessions(msg.allSessions)
-		if m.viewMode != ViewModeKanban && m.viewMode != ViewModeMission {
+		m.mission.SetTokenUsage(msg.tokenUsage)
+		if m.viewMode != ViewModeMission {
 			m.taskDetail.SetAllSessions(msg.allSessions)
 		}
 
@@ -367,7 +362,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.animFrame++
 		m.taskList.SetAnimFrame(m.animFrame)
 		m.toast.Tick()
-		m.kanban.SetAnimFrame(m.animFrame)
 		m.mission.SetAnimFrame(m.animFrame)
 		m.activeView.SetAnimFrame(m.animFrame)
 		cmd := m.animationTickCmd()
@@ -494,8 +488,6 @@ func (m Model) View() tea.View {
 		} else {
 			mainView = m.logView.View()
 		}
-	case ViewModeKanban:
-		mainView = m.kanban.View()
 	case ViewModeToolTimeline:
 		mainView = m.toolTimeline.View()
 	case ViewModeMission:
@@ -607,8 +599,6 @@ func (m Model) viewModeName() string {
 		return "detail"
 	case ViewModeLog:
 		return "log"
-	case ViewModeKanban:
-		return "kanban"
 	case ViewModeToolTimeline:
 		return "timeline"
 	case ViewModeMission:

@@ -85,7 +85,6 @@ func (m *Model) updateSplitLayout() {
 		m.taskList.SetSize(m.ctx.Width, m.ctx.Height)
 		m.taskList.SetSplitMode(false)
 	}
-	m.kanban.SetSize(m.ctx.Width, m.ctx.Height-6)
 }
 
 // updateFooterHints updates footer hints based on current view mode and state
@@ -99,7 +98,6 @@ func (m *Model) updateFooterHints() {
 			m.keys.SelectTask,
 			m.keys.ToggleFilter,
 			m.keys.SearchFilter,
-			m.keys.ToggleKanban,
 			m.keys.ToggleMission,
 			m.keys.ShowHelp,
 			m.keys.ExitApp,
@@ -138,19 +136,6 @@ func (m *Model) updateFooterHints() {
 		}
 		logHints = append(logHints, m.keys.ShowHelp, m.keys.ExitApp)
 		m.footer.SetHints(logHints)
-	case ViewModeKanban:
-		m.footer.SetBadge(" 📊 Kanban ", footer.BadgeBgKanban())
-		m.footer.ClearStatus()
-		kanbanHints := []key.Binding{
-			m.keys.NavigateBack,
-			key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "column")),
-			key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "card")),
-			m.keys.SelectTask,
-			m.keys.MassDismiss,
-			m.keys.ShowHelp,
-			m.keys.ExitApp,
-		}
-		m.footer.SetHints(kanbanHints)
 	case ViewModeToolTimeline:
 		m.footer.SetBadge(" 🔧 Timeline ", footer.BadgeBgDetail())
 		m.footer.ClearStatus()
@@ -353,6 +338,7 @@ func (m *Model) mergeSessions(newSessions []data.Session) {
 
 // enrichTokenUsage applies token usage data to accumulated sessions and re-displays.
 func (m *Model) enrichTokenUsage(usage map[string]*data.TokenUsage) {
+	m.tokenUsageMap = usage
 	for i := range m.allSessions {
 		if u, ok := usage[m.allSessions[i].ID]; ok {
 			if m.allSessions[i].Telemetry == nil {
@@ -442,6 +428,7 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 		Warning:     counts.Warning,
 		Completed:   counts.Completed,
 		TotalTokens: totalTokens,
+		TotalCost:   data.TotalCost(m.tokenUsageMap),
 	})
 
 	// On first render, pick the best default tab
@@ -491,8 +478,6 @@ func (m *Model) recomputeAndDisplay(visible []data.Session) {
 	m.taskList.SetLoading(false)
 	m.taskList.SetTasks(filtered)
 	switch m.viewMode {
-	case ViewModeKanban:
-		m.kanban.SetSessions(visible)
 	case ViewModeMission:
 		m.mission.SetSessions(visible)
 	case ViewModeActive:

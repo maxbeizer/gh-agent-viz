@@ -15,7 +15,7 @@ import (
 // Message types
 type tasksLoadedMsg struct {
 	tasks       []data.Session
-	allSessions []data.Session // unfiltered, for kanban/mission
+	allSessions []data.Session // unfiltered, for mission
 	counts      FilterCounts
 }
 

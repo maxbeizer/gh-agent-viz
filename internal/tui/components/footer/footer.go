@@ -215,7 +215,6 @@ func renderPowerlineRight(segs []segment) string {
 // Badge color helpers for view modes
 func BadgeBgMission() color.Color  { return colorMauve }
 func BadgeBgActive() color.Color   { return colorGreen }
-func BadgeBgKanban() color.Color   { return colorTeal }
 func BadgeBgList() color.Color     { return colorLavender }
 func BadgeBgDetail() color.Color   { return colorSurface2 }
 func BadgeBgLog() color.Color      { return colorSurface2 }

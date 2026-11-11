@@ -1,5 +1,8 @@
 # gh-agent-viz
 
+> [!IMPORTANT]
+> It was a good run but there are better tools for this now. Archiving.
+
 An interactive terminal UI for visualizing GitHub Copilot coding agent sessions. Built as a `gh` CLI extension.
 
 ![gh-agent-viz demo](docs/demo.gif)
